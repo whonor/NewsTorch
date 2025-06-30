@@ -8,13 +8,16 @@ import json
 from Dataset_prepare.MIND_dataset_prepare import prepare_MIND_200k, prepare_MIND_large, prepare_MIND_small
 
 
-root = "/home/wanro238/Pypro/NNR-main"
+root = "/home/wanro238/Pypro/NewsRecTorch"
 
 class Config:
     def parse_argument(self):
         parser = argparse.ArgumentParser(description='Neural news recommendation')
         # General config
         parser.add_argument('--mode', type=str, default='train', choices=['train', 'dev', 'test'], help='Mode')
+        parser.add_argument('--model', type=str, default='NRMS',
+                            choices=['DAE-GRU', 'LSTUR', 'NRMS', 'NPA', 'TANR', 'FIM', 'DKN', 'NAML', 'CNE-SUE', 'CAUM',
+                                     'MINS', 'MINER', 'UNBERT', 'CenNewsRec', 'MANNeR'], help='News Recommendation Model')
         parser.add_argument('--news_encoder', type=str, default='MHSA', choices=['CNE', 'CNN', 'MHSA', 'KCNN', 'HDC', 'NAML', 'PNE', 'DAE', 'Inception', 'NAML_Title', 'NAML_Content', 'CNE_Title', 'CNE_Content', 'CNE_wo_CS', 'CNE_wo_CA'], help='News encoder')
         parser.add_argument('--user_encoder', type=str, default='MHSA', choices=['SUE', 'LSTUR', 'MHSA', 'ATT', 'CATT', 'FIM', 'PUE', 'GRU', 'OMAP', 'SUE_wo_GCN', 'SUE_wo_HCA'], help='User encoder')
         parser.add_argument('--dev_model_path', type=str, default='', help='Dev model path')

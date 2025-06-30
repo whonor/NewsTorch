@@ -10,81 +10,46 @@ import variantEncoders
 class Model(nn.Module):
     def __init__(self, config: Config):
         super(Model, self).__init__()
-        # For main experiments of news encoding
-        if config.news_encoder == 'CNE':
-            self.news_encoder = newsEncoders.CNE(config)
-        elif config.news_encoder == 'CNN':
-            self.news_encoder = newsEncoders.CNN(config)
-        elif config.news_encoder == 'MHSA':
-            self.news_encoder = newsEncoders.MHSA(config)
-        elif config.news_encoder == 'KCNN':
-            self.news_encoder = newsEncoders.KCNN(config)
-        elif config.news_encoder == 'HDC':
-            self.news_encoder = newsEncoders.HDC(config)
-        elif config.news_encoder == 'NAML':
-            self.news_encoder = newsEncoders.NAML(config)
-        elif config.news_encoder == 'PNE':
-            self.news_encoder = newsEncoders.PNE(config)
-        elif config.news_encoder == 'DAE':
+        if config.model == 'DAE-GRU':
             self.news_encoder = newsEncoders.DAE(config)
-        elif config.news_encoder == 'Inception':
-            self.news_encoder = newsEncoders.Inception(config)
-        # For ablations of news encoding
-        elif config.news_encoder == 'NAML_Title':
-            self.news_encoder = variantEncoders.NAML_Title(config)
-        elif config.news_encoder == 'NAML_Content':
-            self.news_encoder = variantEncoders.NAML_Content(config)
-        elif config.news_encoder == 'CNE_Title':
-            self.news_encoder = variantEncoders.CNE_Title(config)
-        elif config.news_encoder == 'CNE_Content':
-            self.news_encoder = variantEncoders.CNE_Content(config)
-        elif config.news_encoder == 'CNE_wo_CS':
-            self.news_encoder = variantEncoders.CNE_wo_CS(config)
-        elif config.news_encoder == 'CNE_wo_CA':
-            self.news_encoder = variantEncoders.CNE_wo_CA(config)
-        else:
-            raise Exception(config.news_encoder + 'is not implemented')
-
-        # For main experiments of user encoding
-        if config.user_encoder == 'SUE':
-            self.user_encoder = userEncoders.SUE(self.news_encoder, config)
-        elif config.user_encoder == 'LSTUR':
-            self.user_encoder = userEncoders.LSTUR(self.news_encoder, config)
-        elif config.user_encoder == 'MHSA':
-            self.user_encoder = userEncoders.MHSA(self.news_encoder, config)
-        elif config.user_encoder == 'ATT':
-            self.user_encoder = userEncoders.ATT(self.news_encoder, config)
-        elif config.user_encoder == 'CATT':
-            self.user_encoder = userEncoders.CATT(self.news_encoder, config)
-        elif config.user_encoder == 'FIM':
-            self.user_encoder = userEncoders.FIM(self.news_encoder, config)
-        elif config.user_encoder == 'PUE':
-            self.user_encoder = userEncoders.PUE(self.news_encoder, config)
-        elif config.user_encoder == 'GRU':
             self.user_encoder = userEncoders.GRU(self.news_encoder, config)
-        elif config.user_encoder == 'OMAP':
-            self.user_encoder = userEncoders.OMAP(self.news_encoder, config)
-        # For ablations of user encoding
-        elif config.user_encoder == 'SUE_wo_GCN':
-            self.user_encoder = variantEncoders.SUE_wo_GCN(self.news_encoder, config)
-        elif config.user_encoder == 'SUE_wo_HCA':
-            self.user_encoder = variantEncoders.SUE_wo_HCA(self.news_encoder, config)
+        elif config.model == 'LSTUR':
+            self.news_encoder = newsEncoders.CNN(config)
+            self.user_encoder = userEncoders.LSTUR(self.news_encoder, config)
+        elif config.model == 'NRMS':
+            self.news_encoder = newsEncoders.MHSA(config)
+            self.user_encoder = userEncoders.MHSA(self.news_encoder, config)
+        elif config.model == 'NAML':
+            self.news_encoder = newsEncoders.NAML(config)
+            self.user_encoder = userEncoders.ATT(self.news_encoder, config)
+        elif config.model == 'DKN':
+            self.news_encoder = newsEncoders.KCNN(config)
+            self.user_encoder = userEncoders.CATT(self.news_encoder, config)
+        elif config.model == 'FIM':
+            self.news_encoder = newsEncoders.HDC(config)
+            self.user_encoder = userEncoders.FIM(self.news_encoder, config)
+        elif config.model == 'CNE-SUE':
+            self.news_encoder = newsEncoders.CNE(config)
+            self.user_encoder = userEncoders.SUE(self.news_encoder, config)
+        elif config.model == 'NPA':
+            self.news_encoder = newsEncoders.PNE(self.news_encoder, config)
+            self.user_encoder = userEncoders.PUE(self.news_encoder, config)
         else:
-            raise Exception(config.user_encoder + 'is not implemented')
+            raise Exception(config.model + 'is not implemented')
 
-        self.model_name = config.news_encoder + '-' + config.user_encoder
+        self.model_name = config.model
         self.news_embedding_dim = self.news_encoder.news_embedding_dim
         self.dropout = nn.Dropout(p=config.dropout_rate)
-        if config.user_encoder == 'LSTUR':
+        if config.model == 'LSTUR':
             self.user_embedding = nn.Embedding(num_embeddings=config.user_num, embedding_dim=self.news_embedding_dim)
             self.use_user_embedding = True
-        elif config.news_encoder == 'PNE' or config.user_encoder == 'PUE':
+        elif config.model == 'NPA':
             self.user_embedding = nn.Embedding(num_embeddings=config.user_num, embedding_dim=config.user_embedding_dim)
             self.use_user_embedding = True
         else:
             self.use_user_embedding = False
-        if config.news_encoder == 'HDC' or config.user_encoder == 'FIM':
-            assert config.news_encoder == 'HDC' and config.user_encoder == 'FIM', 'HDC and FIM must be paired and can not be used alone'
+
+        if config.model == 'FIM':
             assert config.click_predictor == 'FIM', 'For the model FIM, the click predictor must be specially set as \'FIM\''
         self.click_predictor = config.click_predictor
         if self.click_predictor == 'mlp':
