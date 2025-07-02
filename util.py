@@ -65,7 +65,7 @@ def compute_scores(config: Config, model: nn.Module, mind_corpus: MIND_Corpus, b
                                                           user_history_category_indices, \
                                                           news_category, news_subCategory, news_title_text,
                                                           news_title_mask, news_title_entity, news_content_text,
-                                                          news_content_mask, news_content_entity).squeeze(dim=1)  # [batch_size]
+                                                          news_content_mask, news_content_entity) # [batch_size]
 
             index += batch_size
     scores = scores.tolist()

@@ -36,7 +36,7 @@ class Config:
         # Training config
         parser.add_argument('--negative_sample_num', type=int, default=4, help='Negative sample number of each positive sample')
         parser.add_argument('--max_history_num', type=int, default=50, help='Maximum number of history news for each user')
-        parser.add_argument('--epoch', type=int, default=20, help='Training epoch')
+        parser.add_argument('--epoch', type=int, default=2, help='Training epoch')
         parser.add_argument('--batch_size', type=int, default=64, help='Batch size')
         parser.add_argument('--lr', type=float, default=1e-4, help='Learning rate')
         parser.add_argument('--weight_decay', type=float, default=0, help='Optimizer weight decay')
@@ -155,7 +155,7 @@ class Config:
             exec('prepare_MIND_%s()' % self.dataset)
             print("Please prepare the dataset first!!!")
 
-        model_name = self.news_encoder + '-' + self.user_encoder
+        model_name = self.model
         mkdirs = lambda x: os.makedirs(x) if not os.path.exists(x) else None
         self.config_dir = 'logs/configs/' + self.dataset + '/' + model_name
         self.model_dir = 'logs/models/' + self.dataset + '/' + model_name

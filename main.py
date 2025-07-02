@@ -5,7 +5,13 @@ from config import Config
 import torch
 from MIND_corpus import MIND_Corpus
 from model import Model
-from modules.TANR import TANR
+from models.DKN import DKN
+from models.FIM import FIM
+from models.LSTUR import LSTUR
+from models.NAML import NAML
+from models.NPA import NPA
+from models.NRMS import NRMS
+from models.TANR import TANR
 from trainer import Trainer, distributed_train
 from util import compute_scores, get_run_index
 import torch.multiprocessing as mp
@@ -15,6 +21,18 @@ from datetime import datetime
 def train(config: Config, mind_corpus: MIND_Corpus):
     if config.model == 'TANR':
         model = TANR(config)
+    elif config.model == 'NAML':
+        model = NAML(config)
+    elif config.model == 'DKN':
+        model = DKN(config)
+    elif config.model == 'NRMS':
+        model = NRMS(config)
+    elif config.model == 'LSTUR':
+        model = LSTUR(config)
+    elif config.model == 'NPA':
+        model = NPA(config)
+    elif config.model == 'FIM':
+        model = FIM(config)
     else:
         model = Model(config)
     model.initialize()

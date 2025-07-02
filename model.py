@@ -2,9 +2,8 @@ from config import Config
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import newsEncoders
-import userEncoders
-import variantEncoders
+from models.modules import userEncoders, newsEncoders
+from models.modules.click_predictor import DotProduct
 
 
 class Model(nn.Module):
@@ -13,27 +12,27 @@ class Model(nn.Module):
         if config.model == 'DAE-GRU':
             self.news_encoder = newsEncoders.DAE(config)
             self.user_encoder = userEncoders.GRU(self.news_encoder, config)
-        elif config.model == 'LSTUR':
-            self.news_encoder = newsEncoders.CNN(config)
-            self.user_encoder = userEncoders.LSTUR(self.news_encoder, config)
-        elif config.model == 'NRMS':
-            self.news_encoder = newsEncoders.MHSA(config)
-            self.user_encoder = userEncoders.MHSA(self.news_encoder, config)
-        elif config.model == 'NAML':
-            self.news_encoder = newsEncoders.NAML(config)
-            self.user_encoder = userEncoders.ATT(self.news_encoder, config)
-        elif config.model == 'DKN':
-            self.news_encoder = newsEncoders.KCNN(config)
-            self.user_encoder = userEncoders.CATT(self.news_encoder, config)
-        elif config.model == 'FIM':
-            self.news_encoder = newsEncoders.HDC(config)
-            self.user_encoder = userEncoders.FIM(self.news_encoder, config)
+        # elif config.model == 'LSTUR':
+        #     self.news_encoder = newsEncoders.CNN(config)
+        #     self.user_encoder = userEncoders.LSTUR(self.news_encoder, config)
+        # elif config.model == 'NRMS':
+        #     self.news_encoder = newsEncoders.MHSA(config)
+        #     self.user_encoder = userEncoders.MHSA(self.news_encoder, config)
+        # elif config.model == 'NAML':
+        #     self.news_encoder = newsEncoders.NAML(config)
+        #     self.user_encoder = userEncoders.ATT(self.news_encoder, config)
+        # elif config.model == 'DKN':
+        #     self.news_encoder = newsEncoders.KCNN(config)
+        #     self.user_encoder = userEncoders.CATT(self.news_encoder, config)
+        # elif config.model == 'FIM':
+        #     self.news_encoder = newsEncoders.HDC(config)
+        #     self.user_encoder = userEncoders.FIM(self.news_encoder, config)
         elif config.model == 'CNE-SUE':
             self.news_encoder = newsEncoders.CNE(config)
             self.user_encoder = userEncoders.SUE(self.news_encoder, config)
-        elif config.model == 'NPA':
-            self.news_encoder = newsEncoders.PNE(self.news_encoder, config)
-            self.user_encoder = userEncoders.PUE(self.news_encoder, config)
+        # elif config.model == 'NPA':
+        #     self.news_encoder = newsEncoders.PNE(self.news_encoder, config)
+        #     self.user_encoder = userEncoders.PUE(self.news_encoder, config)
         else:
             raise Exception(config.model + 'is not implemented')
 
@@ -89,6 +88,7 @@ class Model(nn.Module):
         user_representation = self.user_encoder(user_title_text, user_title_mask, user_title_entity, user_content_text, user_content_mask, user_content_entity, user_category, user_subCategory, \
                                                 user_history_mask, user_history_graph, user_history_category_mask, user_history_category_indices, user_embedding, news_representation)                           # [batch_size, 1 + negative_sample_num, news_embedding_dim]
         if self.click_predictor == 'dot_product':
+            logits = DotProduct(user_representation, news_representation.permute(0, 2, 1))
             logits = (user_representation * news_representation).sum(dim=2) # wrong dot-product!!!!
         elif self.click_predictor == 'mlp':
             context = self.dropout(F.relu(self.mlp(torch.cat([user_representation, news_representation], dim=2)), inplace=True))

@@ -7,8 +7,8 @@ from torch.nn.utils.rnn import pack_padded_sequence
 from torch.nn.utils.rnn import pad_packed_sequence
 from layers import Conv1D, Attention, ScaledDotProduct_CandidateAttention, GCN
 from torch_scatter import scatter_sum, scatter_softmax # need to be installed by following `https://pytorch-scatter.readthedocs.io/en/latest`
-from newsEncoders import NewsEncoder
-from userEncoders import UserEncoder
+from models.modules.newsEncoders import NewsEncoder
+from models.modules.userEncoders import UserEncoder
 
 
 class CNE_Title(NewsEncoder):
