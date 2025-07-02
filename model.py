@@ -89,7 +89,7 @@ class Model(nn.Module):
         user_representation = self.user_encoder(user_title_text, user_title_mask, user_title_entity, user_content_text, user_content_mask, user_content_entity, user_category, user_subCategory, \
                                                 user_history_mask, user_history_graph, user_history_category_mask, user_history_category_indices, user_embedding, news_representation)                           # [batch_size, 1 + negative_sample_num, news_embedding_dim]
         if self.click_predictor == 'dot_product':
-            logits = (user_representation * news_representation).sum(dim=2) # dot-product
+            logits = (user_representation * news_representation).sum(dim=2) # wrong dot-product!!!!
         elif self.click_predictor == 'mlp':
             context = self.dropout(F.relu(self.mlp(torch.cat([user_representation, news_representation], dim=2)), inplace=True))
             logits = self.out(context).squeeze(dim=2)

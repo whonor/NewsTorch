@@ -4,10 +4,12 @@ import torch.nn as nn
 from MIND_corpus import MIND_Corpus
 from MIND_dataset import MIND_DevTest_Dataset
 from torch.utils.data import DataLoader
+
+from config import Config
 from evaluate import scoring
 
 
-def compute_scores(model: nn.Module, mind_corpus: MIND_Corpus, batch_size: int, mode: str, result_file: str, dataset: str):
+def compute_scores(config: Config, model: nn.Module, mind_corpus: MIND_Corpus, batch_size: int, mode: str, result_file: str, dataset: str):
     assert mode in ['dev', 'test'], 'mode must be chosen from \'dev\' or \'test\''
     dataloader = DataLoader(MIND_DevTest_Dataset(mind_corpus, mode), batch_size=batch_size, shuffle=False, num_workers=batch_size // 16, pin_memory=True)
     indices = (mind_corpus.dev_indices if mode == 'dev' else mind_corpus.test_indices)
@@ -46,8 +48,25 @@ def compute_scores(model: nn.Module, mind_corpus: MIND_Corpus, batch_size: int, 
             news_title_mask = news_title_mask.unsqueeze(dim=1)
             news_content_text = news_content_text.unsqueeze(dim=1)
             news_content_mask = news_content_mask.unsqueeze(dim=1)
-            scores[index: index+batch_size] = model(user_ID, user_category, user_subCategory, user_title_text, user_title_mask, user_title_entity, user_content_text, user_content_mask, user_content_entity, user_history_mask, user_history_graph, user_history_category_mask, user_history_category_indices, \
-                                                    news_category, news_subCategory, news_title_text, news_title_mask, news_title_entity, news_content_text, news_content_mask, news_content_entity).squeeze(dim=1) # [batch_size]
+            if config.model == "TANR":
+                scores[index: index + batch_size], _ = model(user_ID, user_category, user_subCategory, user_title_text,
+                                                          user_title_mask, user_title_entity, user_content_text,
+                                                          user_content_mask, user_content_entity, user_history_mask,
+                                                          user_history_graph, user_history_category_mask,
+                                                          user_history_category_indices, \
+                                                          news_category, news_subCategory, news_title_text,
+                                                          news_title_mask, news_title_entity, news_content_text,
+                                                          news_content_mask, news_content_entity)  # [batch_size]
+            else:
+                scores[index: index + batch_size] = model(user_ID, user_category, user_subCategory, user_title_text,
+                                                          user_title_mask, user_title_entity, user_content_text,
+                                                          user_content_mask, user_content_entity, user_history_mask,
+                                                          user_history_graph, user_history_category_mask,
+                                                          user_history_category_indices, \
+                                                          news_category, news_subCategory, news_title_text,
+                                                          news_title_mask, news_title_entity, news_content_text,
+                                                          news_content_mask, news_content_entity).squeeze(dim=1)  # [batch_size]
+
             index += batch_size
     scores = scores.tolist()
     sub_scores = [[] for _ in range(indices[-1] + 1)]

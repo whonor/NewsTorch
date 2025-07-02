@@ -373,3 +373,23 @@ class OMAP(UserEncoder):
             Omega = torch.norm(torch.mm(self.W.transpose(1, 0), self.W) * (self.J_k - self.I_k), p='fro')
             self.auxiliary_loss = self.HiFi_Ark_regularizer_coefficient * Omega
         return user_representation
+
+
+class TANR(UserEncoder):
+    def __init__(self, news_encoder: NewsEncoder, config: Config):
+        super(TANR, self).__init__(news_encoder, config)
+        self.attention = Attention(self.news_embedding_dim, config.attention_dim)
+        self.config = config
+
+    def initialize(self):
+        self.attention.initialize()
+
+    def forward(self, user_title_text, user_title_mask, user_title_entity, user_content_text, user_content_mask, user_content_entity, user_category, user_subCategory, \
+                user_history_mask, user_history_graph, user_history_category_mask, user_history_category_indices, user_embedding, candidate_news_representation):
+
+        history_embedding = self.news_encoder(user_title_text, user_title_mask, user_title_entity, \
+                                              user_content_text, user_content_mask, user_content_entity, \
+                                              user_category, user_subCategory, user_embedding)
+        user_representation = self.attention(history_embedding)
+        # [batch, news_embedding_dim]
+        return user_representation

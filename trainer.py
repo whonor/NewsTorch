@@ -2,6 +2,9 @@ import os
 import signal
 import shutil
 import json
+
+from torch.nn.modules.loss import CrossEntropyLoss
+
 from config import Config
 from MIND_corpus import MIND_Corpus
 from MIND_dataset import MIND_Train_Dataset
@@ -14,16 +17,20 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
+import torch.nn.functional as F
 
 
 class Trainer:
     def __init__(self, model: nn.Module, config: Config, mind_corpus: MIND_Corpus, run_index: int):
+        self.config = config
         self.model = model
         self.epoch = config.epoch
         self.batch_size = config.batch_size
         self.max_history_num = config.max_history_num
         self.negative_sample_num = config.negative_sample_num
         self.loss = self.negative_log_softmax if config.click_predictor in ['dot_product', 'mlp', 'FIM'] else self.negative_log_sigmoid
+        # initialize topic prediction loss
+
         self.optimizer = optim.Adam(filter(lambda p: p.requires_grad, self.model.parameters()), lr=config.lr, weight_decay=config.weight_decay)
         self._dataset = config.dataset
         self.mind_corpus = mind_corpus
@@ -60,6 +67,7 @@ class Trainer:
         self.gradient_clip_norm = config.gradient_clip_norm
         self.model.cuda()
         print('Running : ' + self.model.model_name + '\t#' + str(self.run_index))
+
 
     def negative_log_softmax(self, logits):
         loss = (-torch.log_softmax(logits, dim=1).select(dim=1, index=0)).mean()
@@ -102,10 +110,27 @@ class Trainer:
                 news_content_mask = news_content_mask.cuda(non_blocking=True)                                                                                                   # [batch_size, 1 + negative_sample_num, max_content_length]
                 news_content_entity = news_content_entity.cuda(non_blocking=True)                                                                                               # [batch_size, 1 + negative_sample_num, max_content_length]
 
-                logits = model(user_ID, user_category, user_subCategory, user_title_text, user_title_mask, user_title_entity, user_content_text, user_content_mask, user_content_entity, user_history_mask, user_history_graph, user_history_category_mask, user_history_category_indices, \
-                               news_category, news_subCategory, news_title_text, news_title_mask, news_title_entity, news_content_text, news_content_mask, news_content_entity) # [batch_size, 1 + negative_sample_num]
+                if self.config.model == "TANR":
+                    logits, topic_pred_loss = model(user_ID, user_category, user_subCategory, user_title_text, user_title_mask,
+                                   user_title_entity, user_content_text, user_content_mask, user_content_entity,
+                                   user_history_mask, user_history_graph, user_history_category_mask,
+                                   user_history_category_indices, \
+                                   news_category, news_subCategory, news_title_text, news_title_mask, news_title_entity,
+                                   news_content_text, news_content_mask,
+                                   news_content_entity)  # [batch_size, 1 + negative_sample_num]
+                    # topic classification loss
+                    loss = self.loss(logits) + self.config.topic_pred_loss_coef * topic_pred_loss
+                else:
+                    logits = model(user_ID, user_category, user_subCategory, user_title_text, user_title_mask,
+                                   user_title_entity, user_content_text, user_content_mask, user_content_entity,
+                                   user_history_mask, user_history_graph, user_history_category_mask,
+                                   user_history_category_indices, \
+                                   news_category, news_subCategory, news_title_text, news_title_mask, news_title_entity,
+                                   news_content_text, news_content_mask,
+                                   news_content_entity)  # [batch_size, 1 + negative_sample_num]
+                    loss = self.loss(logits)
 
-                loss = self.loss(logits)
+
                 if model.news_encoder.auxiliary_loss is not None:
                     news_auxiliary_loss = model.news_encoder.auxiliary_loss.mean()
                     loss += news_auxiliary_loss
@@ -122,7 +147,7 @@ class Trainer:
             print('loss =', epoch_loss / len(self.train_dataset))
 
             # validation
-            auc, mrr, ndcg5, ndcg10 = compute_scores(model, self.mind_corpus, self.batch_size * 3 // 2, 'dev', self.dev_res_dir + '/' + model.model_name + '-' + str(e) + '.txt', self._dataset)
+            auc, mrr, ndcg5, ndcg10 = compute_scores(self.config , model, self.mind_corpus, self.batch_size * 3 // 2, 'dev', self.dev_res_dir + '/' + model.model_name + '-' + str(e) + '.txt', self._dataset)
             self.auc_results.append(auc)
             self.mrr_results.append(mrr)
             self.ndcg5_results.append(ndcg5)
@@ -280,10 +305,24 @@ def distributed_train(rank, model: nn.Module, config: Config, mind_corpus: MIND_
             news_title_entity = news_title_entity.cuda(non_blocking=True)                                                                                                   # [batch_size, 1 + negative_sample_num, max_title_length]
             news_content_text = news_content_text.cuda(non_blocking=True)                                                                                                   # [batch_size, 1 + negative_sample_num, max_content_length]
             news_content_mask = news_content_mask.cuda(non_blocking=True)                                                                                                   # [batch_size, 1 + negative_sample_num, max_content_length]
-            news_content_entity = news_content_entity.cuda(non_blocking=True)                                                                                               # [batch_size, 1 + negative_sample_num, max_content_length]
+            news_content_entity = news_content_entity.cuda(non_blocking=True)
 
-            logits = model(user_ID, user_category, user_subCategory, user_title_text, user_title_mask, user_title_entity, user_content_text, user_content_mask, user_content_entity, user_history_mask, user_history_graph, user_history_category_mask, user_history_category_indices, \
-                           news_category, news_subCategory, news_title_text, news_title_mask, news_title_entity, news_content_text, news_content_mask, news_content_entity) # [batch_size, 1 + negative_sample_num]
+            if config.model == "TANR":
+                logits, topic_loss = model(user_ID, user_category, user_subCategory, user_title_text, user_title_mask,
+                               user_title_entity, user_content_text, user_content_mask, user_content_entity,
+                               user_history_mask, user_history_graph, user_history_category_mask,
+                               user_history_category_indices, \
+                               news_category, news_subCategory, news_title_text, news_title_mask, news_title_entity,
+                               news_content_text, news_content_mask,
+                               news_content_entity)  # [batch_size, 1 + negative_sample_num]
+            else:
+                logits = model(user_ID, user_category, user_subCategory, user_title_text, user_title_mask,
+                               user_title_entity, user_content_text, user_content_mask, user_content_entity,
+                               user_history_mask, user_history_graph, user_history_category_mask,
+                               user_history_category_indices, \
+                               news_category, news_subCategory, news_title_text, news_title_mask, news_title_entity,
+                               news_content_text, news_content_mask,
+                               news_content_entity)  # [batch_size, 1 + negative_sample_num]
 
             loss = loss_(logits)
             if model.module.news_encoder.auxiliary_loss is not None:
@@ -303,7 +342,7 @@ def distributed_train(rank, model: nn.Module, config: Config, mind_corpus: MIND_
 
         # dev
         if rank == 0:
-            auc, mrr, ndcg5, ndcg10 = compute_scores(model.module, mind_corpus, batch_size * 3 // 2, 'dev', dev_res_dir + '/' + model_name + '-' + str(e) + '.txt', config.dataset)
+            auc, mrr, ndcg5, ndcg10 = compute_scores(config, model.module, mind_corpus, batch_size * 3 // 2, 'dev', dev_res_dir + '/' + model_name + '-' + str(e) + '.txt', config.dataset)
             auc_results.append(auc)
             mrr_results.append(mrr)
             ndcg5_results.append(ndcg5)

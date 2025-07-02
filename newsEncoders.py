@@ -431,3 +431,30 @@ class Inception(NewsEncoder):
         subnetwork3 = title_embedding + content_embedding + category_embedding + subCategory_embedding                                             # [batch_size, news_num, embedding_dim]
         news_representation = self.linear_transform(torch.cat([subnetwork1, subnetwork2, subnetwork3], dim=2))                                     # [batch_size, news_num, embedding_dim]
         return news_representation
+
+
+class TANR(NewsEncoder):
+    def __init__(self, config: Config):
+        super(TANR, self).__init__(config)
+        self.max_sentence_length = config.max_title_length
+        self.cnn_kernel_num = config.cnn_kernel_num
+        self.conv = Conv1D(config.cnn_method, config.word_embedding_dim, config.cnn_kernel_num, config.cnn_window_size)
+        self.attention = Attention(config.cnn_kernel_num, config.attention_dim)
+        self.news_embedding_dim = config.cnn_kernel_num
+
+    def initialize(self):
+        super().initialize()
+        self.attention.initialize()
+
+    def forward(self, title_text, title_mask, title_entity, content_text, content_mask, content_entity, category, subCategory, user_embedding):
+        batch_size = title_text.size(0)
+        news_num = title_text.size(1)
+        batch_news_num = batch_size * news_num
+        mask = title_mask.view([batch_news_num, self.max_sentence_length])                                                          # [batch_size * news_num, max_sentence_length]
+        # 1. word embedding
+        w = self.dropout(self.word_embedding(title_text)).view([batch_news_num, self.max_sentence_length, self.word_embedding_dim]) # [batch_size * news_num, max_sentence_length, word_embedding_dim]
+        # 2. CNN encoding
+        c = self.dropout_(self.conv(w.permute(0, 2, 1)).permute(0, 2, 1))                                                           # [batch_size * news_num, max_sentence_length, cnn_kernel_num]
+        # 3. attention layer
+        news_representation = self.attention(c, mask=mask).view([batch_size, news_num, self.cnn_kernel_num])                        # [batch_size, news_num, cnn_kernel_num]                                      # [batch_size, news_num, news_embedding_dim]
+        return news_representation

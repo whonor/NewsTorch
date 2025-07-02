@@ -15,7 +15,7 @@ class Config:
         parser = argparse.ArgumentParser(description='Neural news recommendation')
         # General config
         parser.add_argument('--mode', type=str, default='train', choices=['train', 'dev', 'test'], help='Mode')
-        parser.add_argument('--model', type=str, default='NRMS',
+        parser.add_argument('--model', type=str, default='TANR',
                             choices=['DAE-GRU', 'LSTUR', 'NRMS', 'NPA', 'TANR', 'FIM', 'DKN', 'NAML', 'CNE-SUE', 'CAUM',
                                      'MINS', 'MINER', 'UNBERT', 'CenNewsRec', 'MANNeR'], help='News Recommendation Model')
         parser.add_argument('--news_encoder', type=str, default='MHSA', choices=['CNE', 'CNN', 'MHSA', 'KCNN', 'HDC', 'NAML', 'PNE', 'DAE', 'Inception', 'NAML_Title', 'NAML_Content', 'CNE_Title', 'CNE_Content', 'CNE_wo_CS', 'CNE_wo_CA'], help='News encoder')
@@ -80,6 +80,15 @@ class Config:
         parser.add_argument('--OMAP_head_num', type=int, default=3, help='Head num of OMAP for Hi-Fi Ark')
         parser.add_argument('--HiFi_Ark_regularizer_coefficient', type=float, default=0.1, help='Coefficient of regularization loss for Hi-Fi Ark')
         parser.add_argument('--click_predictor', type=str, default='dot_product', choices=['dot_product', 'mlp', 'sigmoid', 'FIM'], help='Click predictor')
+        # TANR model
+        parser.add_argument('--num_categ_classes', type=int, default=18,
+                            help='The number of topics the topic predictor')
+        parser.add_argument('--topic_pred_loss_coef', type=int, default=0.2,
+                            help='loss_coef for the topic predictor')
+        #
+
+
+
 
         self.attribute_dict = dict(vars(parser.parse_args()))
         for attribute in self.attribute_dict:
