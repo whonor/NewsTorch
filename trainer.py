@@ -66,7 +66,7 @@ class Trainer:
         self.epoch_not_increase = 0
         self.gradient_clip_norm = config.gradient_clip_norm
         self.model.cuda()
-        print('Running : ' + self.model.model_name + '\t#' + str(self.run_index))
+        print('Running : ' + self.config.model + '\t#' + str(self.run_index))
 
 
     def negative_log_softmax(self, logits):
@@ -147,7 +147,7 @@ class Trainer:
             print('loss =', epoch_loss / len(self.train_dataset))
 
             # validation
-            auc, mrr, ndcg5, ndcg10 = compute_scores(self.config , model, self.mind_corpus, self.batch_size * 3 // 2, 'dev', self.dev_res_dir + '/' + model.model_name + '-' + str(e) + '.txt', self._dataset)
+            auc, mrr, ndcg5, ndcg10 = compute_scores(self.config , model, self.mind_corpus, self.batch_size * 3 // 2, 'dev', self.dev_res_dir + '/' + self.config.model + '-' + str(e) + '.txt', self._dataset)
             self.auc_results.append(auc)
             self.mrr_results.append(mrr)
             self.ndcg5_results.append(ndcg5)
@@ -205,16 +205,16 @@ class Trainer:
             print('Best ' + self.dev_criterion + ' : ' + str(getattr(self, 'best_dev_' + self.dev_criterion)))
             torch.cuda.empty_cache()
             if self.epoch_not_increase == 0:
-                torch.save({model.model_name: model.state_dict()}, self.model_dir + '/' + model.model_name + '-' + str(self.best_dev_epoch))
+                torch.save({self.config.model: model.state_dict()}, self.model_dir + '/' + self.config.model + '-' + str(self.best_dev_epoch))
             if self.epoch_not_increase == self.early_stopping_epoch:
                 break
 
-        with open('%s/%s-%s-dev_log.txt' % (self.dev_res_dir, model.model_name, self._dataset), 'w', encoding='utf-8') as f:
+        with open('%s/%s-%s-dev_log.txt' % (self.dev_res_dir, self.config.model, self._dataset), 'w', encoding='utf-8') as f:
             f.write('Epoch\tAUC\tMRR\tnDCG@5\tnDCG@10\n')
             for i in range(len(self.auc_results)):
                 f.write('%d\t%.4f\t%.4f\t%.4f\t%.4f\n' % (i + 1, self.auc_results[i], self.mrr_results[i], self.ndcg5_results[i], self.ndcg10_results[i]))
-        shutil.copy(self.model_dir + '/' + model.model_name + '-' + str(self.best_dev_epoch), self.best_model_dir + '/' + model.model_name)
-        print('Training : ' + model.model_name + ' #' + str(self.run_index) + ' completed\nDev criterions:')
+        shutil.copy(self.model_dir + '/' + self.config.model + '-' + str(self.best_dev_epoch), self.best_model_dir + '/' + self.config.model)
+        print('Training : ' + self.config.model + ' #' + str(self.run_index) + ' completed\nDev criterions:')
         print('AUC : %.4f' % self.auc_results[self.best_dev_epoch - 1])
         print('MRR : %.4f' % self.mrr_results[self.best_dev_epoch - 1])
         print('nDCG@5 : %.4f' % self.ndcg5_results[self.best_dev_epoch - 1])
@@ -233,7 +233,7 @@ def negative_log_sigmoid(logits):
 
 def distributed_train(rank, model: nn.Module, config: Config, mind_corpus: MIND_Corpus, run_index: int):
     world_size = config.world_size
-    model_name = model.model_name
+    model_name = config.model
     dist.init_process_group(backend='nccl', init_method='env://', world_size=world_size, rank=rank)
     config.device_id = rank
     config.set_cuda()

@@ -364,6 +364,7 @@ class MIND_Corpus:
                         non_click_impressions.append(self.news_ID_dict[impression[:-2]])
                 if len(history) != 0:
                     history = list(map(lambda x: self.news_ID_dict[x], history.strip().split(' ')))
+                    clicked_news_length = len(history)
                     padding_num = max(0, self.max_history_num - len(history))
                     user_history = history[-self.max_history_num:] + [0] * padding_num
                     user_history_mask = np.zeros([self.max_history_num], dtype=bool)

@@ -4,10 +4,11 @@ import shutil
 from config import Config
 import torch
 from MIND_corpus import MIND_Corpus
-from model import Model
+from models.CNE_SUE import Model
 from models.DKN import DKN
 from models.FIM import FIM
 from models.LSTUR import LSTUR
+from models.MINS import MINS
 from models.NAML import NAML
 from models.NPA import NPA
 from models.NRMS import NRMS
@@ -33,6 +34,8 @@ def train(config: Config, mind_corpus: MIND_Corpus):
         model = NPA(config)
     elif config.model == 'FIM':
         model = FIM(config)
+    elif config.model == 'MINS':
+        model = MINS(config)
     else:
         model = Model(config)
     model.initialize()
@@ -60,6 +63,20 @@ def train(config: Config, mind_corpus: MIND_Corpus):
 def dev(config: Config, mind_corpus: MIND_Corpus):
     if config.model == 'TANR':
         model = TANR(config)
+    elif config.model == 'NAML':
+        model = NAML(config)
+    elif config.model == 'DKN':
+        model = DKN(config)
+    elif config.model == 'NRMS':
+        model = NRMS(config)
+    elif config.model == 'LSTUR':
+        model = LSTUR(config)
+    elif config.model == 'NPA':
+        model = NPA(config)
+    elif config.model == 'FIM':
+        model = FIM(config)
+    elif config.model == 'MINS':
+        model = MINS(config)
     else:
         model = Model(config)
     assert os.path.exists(config.dev_model_path), 'Dev model does not exist : ' + config.dev_model_path
@@ -79,6 +96,20 @@ def dev(config: Config, mind_corpus: MIND_Corpus):
 def test(config: Config, mind_corpus: MIND_Corpus):
     if config.model == 'TANR':
         model = TANR(config)
+    elif config.model == 'NAML':
+        model = NAML(config)
+    elif config.model == 'DKN':
+        model = DKN(config)
+    elif config.model == 'NRMS':
+        model = NRMS(config)
+    elif config.model == 'LSTUR':
+        model = LSTUR(config)
+    elif config.model == 'NPA':
+        model = NPA(config)
+    elif config.model == 'FIM':
+        model = FIM(config)
+    elif config.model == 'MINS':
+        model = MINS(config)
     else:
         model = Model(config)
     assert os.path.exists(config.test_model_path), 'Test model does not exist : ' + config.test_model_path
@@ -100,7 +131,7 @@ def test(config: Config, mind_corpus: MIND_Corpus):
                 f.write('#' + str(config.seed + 1) + '\t' + str(auc) + '\t' + str(mrr) + '\t' + str(ndcg5) + '\t' + str(ndcg10) + '\n')
     else:
         if config.mode == 'train':
-            shutil.copy(test_res_dir + '/' + model.model_name + '.txt', 'logs/prediction/large/%s/#%d/prediction.txt' % (model.model_name, config.run_index))
+            shutil.copy(test_res_dir + '/' + config.model + '.txt', 'logs/prediction/large/%s/#%d/prediction.txt' % (model.model_name, config.run_index))
             os.chdir('logs/prediction/large/%s/#%d' % (model.model_name, config.run_index))
             os.system('zip prediction.zip prediction.txt')
             os.chdir('../../../..')

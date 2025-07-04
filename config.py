@@ -16,7 +16,7 @@ class Config:
         # General config
         parser.add_argument('--mode', type=str, default='train', choices=['train', 'dev', 'test'], help='Mode')
         parser.add_argument('--model', type=str, default='TANR',
-                            choices=['DAE-GRU', 'LSTUR', 'NRMS', 'NPA', 'TANR', 'FIM', 'DKN', 'NAML', 'CNE-SUE', 'CAUM',
+                            choices=['LSTUR', 'NRMS', 'NPA', 'TANR', 'FIM', 'DKN', 'NAML', 'CNE-SUE', 'CAUM',
                                      'MINS', 'MINER', 'UNBERT', 'CenNewsRec', 'MANNeR'], help='News Recommendation Model')
         parser.add_argument('--news_encoder', type=str, default='MHSA', choices=['CNE', 'CNN', 'MHSA', 'KCNN', 'HDC', 'NAML', 'PNE', 'DAE', 'Inception', 'NAML_Title', 'NAML_Content', 'CNE_Title', 'CNE_Content', 'CNE_wo_CS', 'CNE_wo_CA'], help='News encoder')
         parser.add_argument('--user_encoder', type=str, default='MHSA', choices=['SUE', 'LSTUR', 'MHSA', 'ATT', 'CATT', 'FIM', 'PUE', 'GRU', 'OMAP', 'SUE_wo_GCN', 'SUE_wo_HCA'], help='User encoder')
@@ -37,7 +37,7 @@ class Config:
         parser.add_argument('--negative_sample_num', type=int, default=4, help='Negative sample number of each positive sample')
         parser.add_argument('--max_history_num', type=int, default=50, help='Maximum number of history news for each user')
         parser.add_argument('--epoch', type=int, default=2, help='Training epoch')
-        parser.add_argument('--batch_size', type=int, default=64, help='Batch size')
+        parser.add_argument('--batch_size', type=int, default=32, help='Batch size')
         parser.add_argument('--lr', type=float, default=1e-4, help='Learning rate')
         parser.add_argument('--weight_decay', type=float, default=0, help='Optimizer weight decay')
         parser.add_argument('--gradient_clip_norm', type=float, default=4, help='Gradient clip norm (non-positive value for no clipping)')
@@ -83,10 +83,19 @@ class Config:
         # TANR model
         parser.add_argument('--num_categ_classes', type=int, default=18,
                             help='The number of topics the topic predictor')
-        parser.add_argument('--topic_pred_loss_coef', type=int, default=0.2,
-                            help='loss_coef for the topic predictor')
-        #
-
+        parser.add_argument('--topic_pred_loss_coef', type=float, default=0.2,
+                            help='Loss_coef for the topic predictor')
+        # MINS model
+        parser.add_argument('--num_attention_heads', type=int, default=15,
+                            help='The number of multi-head attention heads')
+        parser.add_argument('--num_gru_layers', type=int, default=15,
+                            help='The number of gru units')
+        parser.add_argument('--query_vector_dim', type=int, default=200,
+                            help='Query vector dim')
+        parser.add_argument('--num_filters', type=int, default=300,
+                            help='GRU dim')
+        parser.add_argument('--layers', type=int, default=15,
+                            help='The number of GRU')
 
 
 
@@ -141,8 +150,8 @@ class Config:
         torch.cuda.manual_seed(self.seed)
         random.seed(self.seed)
         np.random.seed(self.seed)
-        torch.backends.cudnn.benchmark = False
-        torch.backends.cudnn.deterministic = True # For reproducibility (https://pytorch.org/docs/stable/notes/randomness.html)
+        torch.backends.cudnn.benchmark = True # For faster training
+        torch.backends.cudnn.deterministic = False # For reproducibility (https://pytorch.org/docs/stable/notes/randomness.html)
 
 
     def preliminary_setup(self):
