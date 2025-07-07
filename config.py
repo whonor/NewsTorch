@@ -36,7 +36,7 @@ class Config:
         # Training config
         parser.add_argument('--negative_sample_num', type=int, default=4, help='Negative sample number of each positive sample')
         parser.add_argument('--max_history_num', type=int, default=50, help='Maximum number of history news for each user')
-        parser.add_argument('--epoch', type=int, default=2, help='Training epoch')
+        parser.add_argument('--epoch', type=int, default=1, help='Training epoch')
         parser.add_argument('--batch_size', type=int, default=32, help='Batch size')
         parser.add_argument('--lr', type=float, default=1e-4, help='Learning rate')
         parser.add_argument('--weight_decay', type=float, default=0, help='Optimizer weight decay')
@@ -186,7 +186,8 @@ class Config:
             with open(os.path.join(self.dev_root, 'behaviors.tsv'), 'r', encoding='utf-8') as dev_f:
                 with open('logs/dev/ref/truth-%s.txt' % self.dataset, 'w', encoding='utf-8') as truth_f:
                     for dev_ID, line in enumerate(dev_f):
-                        impression_ID, user_ID, time, history, impressions, is_fake = line.split('\t')
+                        # impression_ID, user_ID, time, history, impressions, is_fake = line.split('\t')
+                        impression_ID, user_ID, time, history, impressions = line.split('\t')
                         labels = [int(impression[-1]) for impression in impressions.strip().split(' ')]
                         truth_f.write(('' if dev_ID == 0 else '\n') + str(dev_ID + 1) + ' ' + str(labels).replace(' ', ''))
         if self.dataset != 'large':
@@ -194,7 +195,8 @@ class Config:
                 with open(os.path.join(self.test_root, 'behaviors.tsv'), 'r', encoding='utf-8') as test_f:
                     with open('logs/test/ref/truth-%s.txt' % self.dataset, 'w', encoding='utf-8') as truth_f:
                         for test_ID, line in enumerate(test_f):
-                            impression_ID, user_ID, time, history, impressions, is_fake = line.split('\t')
+                            # impression_ID, user_ID, time, history, impressions, is_fake = line.split('\t')
+                            impression_ID, user_ID, time, history, impressions = line.split('\t')
                             labels = [int(impression[-1]) for impression in impressions.strip().split(' ')]
                             truth_f.write(('' if test_ID == 0 else '\n') + str(test_ID + 1) + ' ' + str(labels).replace(' ', ''))
         else:

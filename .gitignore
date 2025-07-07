@@ -47,3 +47,13 @@ MIND-small/train/behaviors.tsv
 MIND-small/train/context_embedding.vec
 MIND-small/train/entity_embedding.vec
 MIND-small/train/news.tsv
+data/category-small.json
+data/context_embedding-small.pkl
+data/entity_embedding-small.pkl
+data/entity-small.json
+data/news_ID-small.json
+data/subCategory-small.json
+data/user_history_graph-50-self-normalize-symmetric-small.pkl
+data/user_ID-small.json
+data/vocabulary-3-MIND-32-128-small.json
+data/word_embedding-3-300-MIND-32-128-small.pkl

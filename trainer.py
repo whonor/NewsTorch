@@ -146,7 +146,7 @@ class Trainer:
             print('Epoch %d : train done' % e)
             print('loss =', epoch_loss / len(self.train_dataset))
 
-            # validation
+            # validation 
             auc, mrr, ndcg5, ndcg10 = compute_scores(self.config , model, self.mind_corpus, self.batch_size * 3 // 2, 'dev', self.dev_res_dir + '/' + self.config.model + '-' + str(e) + '.txt', self._dataset)
             self.auc_results.append(auc)
             self.mrr_results.append(mrr)
