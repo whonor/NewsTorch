@@ -10,7 +10,7 @@ import collections
 random.seed(0)
 np.random.seed(0)
 
-root = "/home/wanro238/Pypro/NNR-main"
+root = "/home/wanro238/Pypro/NewsRecTorch"
 # 数据集根路径
 MIND_small_dataset_root = root + '/MIND-small'
 MIND_large_dataset_root = root + '/MIND-large'
@@ -229,6 +229,7 @@ def main():
     # prepare_MIND_200k()
     # print("准备 MIND-large...")
     # prepare_MIND_large()
+    print("所有数据集准备完成。")
 
 
 if __name__ == '__main__':

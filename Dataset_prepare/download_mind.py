@@ -52,14 +52,14 @@ def process_dataset(base_dir: Path, splits: dict, include_wikidata: bool = False
 
 def main():
     datasets = {
-        'MIND-200k': {
-            'train': 'https://recodatasets.z20.web.core.windows.net/newsrec/MINDlarge_train.zip',
-            'dev':   'https://recodatasets.z20.web.core.windows.net/newsrec/MINDlarge_dev.zip',
-        },
-        # 'MIND-small': {
-        #     'train': 'https://recodatasets.z20.web.core.windows.net/newsrec/MINDsmall_train.zip',
-        #     'dev':   'https://recodatasets.z20.web.core.windows.net/newsrec/MINDsmall_dev.zip',
+        # 'MIND-200k': {
+        #     'train': 'https://recodatasets.z20.web.core.windows.net/newsrec/MINDlarge_train.zip',
+        #     'dev':   'https://recodatasets.z20.web.core.windows.net/newsrec/MINDlarge_dev.zip',
         # },
+        'MIND-small': {
+            'train': 'https://recodatasets.z20.web.core.windows.net/newsrec/MINDsmall_train.zip',
+            'dev':   'https://recodatasets.z20.web.core.windows.net/newsrec/MINDsmall_dev.zip',
+        },
         # 'MIND-large': {
         #     'train': 'https://recodatasets.z20.web.core.windows.net/newsrec/MINDlarge_train.zip',
         #     'dev':   'https://recodatasets.z20.web.core.windows.net/newsrec/MINDlarge_dev.zip',
