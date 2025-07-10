@@ -1,0 +1,7 @@
+
+{
+    "num_attention_heads": 15,
+    "query_vector_dim": 200,
+    "num_filters": 300,
+    "layers": 6
+}

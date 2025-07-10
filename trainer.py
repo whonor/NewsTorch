@@ -3,8 +3,6 @@ import signal
 import shutil
 import json
 
-from torch.nn.modules.loss import CrossEntropyLoss
-
 from config import Config
 from MIND_corpus import MIND_Corpus
 from MIND_dataset import MIND_Train_Dataset
@@ -17,7 +15,6 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
-import torch.nn.functional as F
 
 
 class Trainer:
@@ -29,8 +26,6 @@ class Trainer:
         self.max_history_num = config.max_history_num
         self.negative_sample_num = config.negative_sample_num
         self.loss = self.negative_log_softmax if config.click_predictor in ['dot_product', 'mlp', 'FIM'] else self.negative_log_sigmoid
-        # initialize topic prediction loss
-
         self.optimizer = optim.Adam(filter(lambda p: p.requires_grad, self.model.parameters()), lr=config.lr, weight_decay=config.weight_decay)
         self._dataset = config.dataset
         self.mind_corpus = mind_corpus
@@ -145,6 +140,7 @@ class Trainer:
                 self.optimizer.step()
             print('Epoch %d : train done' % e)
             print('loss =', epoch_loss / len(self.train_dataset))
+            print('Epoch loss =', epoch_loss)
 
             # validation 
             auc, mrr, ndcg5, ndcg10 = compute_scores(self.config , model, self.mind_corpus, self.batch_size * 3 // 2, 'dev', self.dev_res_dir + '/' + self.config.model + '-' + str(e) + '.txt', self._dataset)

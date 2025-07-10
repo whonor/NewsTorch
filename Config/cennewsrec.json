@@ -1,0 +1,12 @@
+
+{
+    "cnn_num_filters": 400,
+    "window_size": 3,
+    "num_filters": 400,
+    "num_heads": 20,
+    "query_dim": 200,
+    "gru_hidden_dim": 400,
+    "num_recent_news": 20,
+    "dropout_probability": 0.2
+
+}

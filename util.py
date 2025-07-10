@@ -67,14 +67,15 @@ def compute_scores(config: Config, model: nn.Module, mind_corpus: MIND_Corpus, b
                                                           news_title_mask, news_title_entity, news_content_text,
                                                           news_content_mask, news_content_entity).squeeze(1)  # [batch_size]
             else:
-                scores[index: index + batch_size] = model(user_ID, user_category, user_subCategory, user_title_text,
+                logits = model(user_ID, user_category, user_subCategory, user_title_text,
                                                           user_title_mask, user_title_entity, user_content_text,
                                                           user_content_mask, user_content_entity, user_history_mask,
                                                           user_history_graph, user_history_category_mask,
                                                           user_history_category_indices, \
                                                           news_category, news_subCategory, news_title_text,
                                                           news_title_mask, news_title_entity, news_content_text,
-                                                          news_content_mask, news_content_entity) # [batch_size]
+                                                          news_content_mask, news_content_entity) # [batch_size, 5]
+                scores[index: index + batch_size] = logits[:, 0]
 
             index += batch_size
     scores = scores.tolist()

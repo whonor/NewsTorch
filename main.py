@@ -13,6 +13,7 @@ from models.NAML import NAML
 from models.NPA import NPA
 from models.NRMS import NRMS
 from models.TANR import TANR
+from models.CenNewsRec import CenNewsRec
 from trainer import Trainer, distributed_train
 from util import compute_scores, get_run_index
 import torch.multiprocessing as mp
@@ -36,6 +37,8 @@ def train(config: Config, mind_corpus: MIND_Corpus):
         model = FIM(config)
     elif config.model == 'MINS':
         model = MINS(config)
+    elif config.model == 'CENNEWSREC':
+        model = CenNewsRec(config)
     else:
         model = Model(config)
     model.initialize()
@@ -113,14 +116,14 @@ def test(config: Config, mind_corpus: MIND_Corpus):
     else:
         model = Model(config)
     assert os.path.exists(config.test_model_path), 'Test model does not exist : ' + config.test_model_path
-    model.load_state_dict(torch.load(config.test_model_path, map_location=torch.device('cpu'))[model.model_name])
+    model.load_state_dict(torch.load(config.test_model_path, map_location=torch.device('cpu'))[config.model])
     model.cuda()
     test_res_dir = os.path.join(config.test_res_dir, config.test_model_path.replace('\\', '_').replace('/', '_'))
     if not os.path.exists(test_res_dir):
         os.mkdir(test_res_dir)
     print('test model path  : ' + config.test_model_path)
-    print('test output file : ' + test_res_dir + '/' + model.model_name + '.txt')
-    auc, mrr, ndcg5, ndcg10 = compute_scores(config, model, mind_corpus, config.batch_size * 2 // config.world_size, 'test', test_res_dir + '/' + model.model_name + '.txt', config.dataset)
+    print('test output file : ' + test_res_dir + '/' + config.model + '.txt')
+    auc, mrr, ndcg5, ndcg10 = compute_scores(config, model, mind_corpus, config.batch_size * 2 // config.world_size, 'test', test_res_dir + '/' + config.model + '.txt', config.dataset)
     if config.dataset != 'large':
         print('AUC : %.4f\nMRR : %.4f\nnDCG@5 : %.4f\nnDCG@10 : %.4f' % (auc, mrr, ndcg5, ndcg10))
         if config.mode == 'train':
@@ -131,8 +134,8 @@ def test(config: Config, mind_corpus: MIND_Corpus):
                 f.write('#' + str(config.seed + 1) + '\t' + str(auc) + '\t' + str(mrr) + '\t' + str(ndcg5) + '\t' + str(ndcg10) + '\n')
     else:
         if config.mode == 'train':
-            shutil.copy(test_res_dir + '/' + config.model + '.txt', 'logs/prediction/large/%s/#%d/prediction.txt' % (model.model_name, config.run_index))
-            os.chdir('logs/prediction/large/%s/#%d' % (model.model_name, config.run_index))
+            shutil.copy(test_res_dir + '/' + config.model + '.txt', 'logs/prediction/large/%s/#%d/prediction.txt' % (config.model, config.run_index))
+            os.chdir('logs/prediction/large/%s/#%d' % (config.model, config.run_index))
             os.system('zip prediction.zip prediction.txt')
             os.chdir('../../../..')
 

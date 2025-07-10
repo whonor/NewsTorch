@@ -1,0 +1,5 @@
+
+{
+    "num_categ_classes": 18,
+    "topic_pred_loss_coef": 0.2
+}
