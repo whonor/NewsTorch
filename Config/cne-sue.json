@@ -1,0 +1,13 @@
+
+{
+    "word_embedding_dim": 300,
+    "category_embedding_dim": 50,
+    "subCategory_embedding_dim": 50,
+    "hidden_dim": 200,
+    "attention_dim": 200,
+    "gcn_layer_num": 4,
+    "dropout_rate": 0.2,
+    "no_gcn_residual": false,
+    "gcn_layer_norm": false,
+    "gcn_use_bias": true
+}

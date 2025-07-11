@@ -80,6 +80,8 @@ def dev(config: Config, mind_corpus: MIND_Corpus):
         model = FIM(config)
     elif config.model == 'MINS':
         model = MINS(config)
+    elif config.model == 'CENNEWSREC':
+        model = CenNewsRec(config)
     else:
         model = Model(config)
     assert os.path.exists(config.dev_model_path), 'Dev model does not exist : ' + config.dev_model_path
@@ -113,6 +115,8 @@ def test(config: Config, mind_corpus: MIND_Corpus):
         model = FIM(config)
     elif config.model == 'MINS':
         model = MINS(config)
+    elif config.model == 'CENNEWSREC':
+        model = CenNewsRec(config)
     else:
         model = Model(config)
     assert os.path.exists(config.test_model_path), 'Test model does not exist : ' + config.test_model_path

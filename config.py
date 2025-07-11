@@ -87,9 +87,9 @@ class Config:
     Usage:
         config = Config(model='TANR')
     '''
-    def __init__(self, model='CenNewsRec'):
+    def __init__(self, model='MINS'):
         self.model = model.upper()
-        self.mode = 'train' # 'train', 'dev', or 'test'
+        self.mode = 'train'
         self.dev_model_path = ''
         self.test_model_path = ''
         self.test_output_file = ''
@@ -105,46 +105,43 @@ class Config:
         self.max_abstract_length = 128
         self.negative_sample_num = 4
         self.max_history_num = 50
-        self.epoch = 10
+        self.epoch = 2
 
-        self.batch_size = 64
+        self.batch_size = 32
         self.lr = 1e-4
         self.weight_decay = 0
         self.gradient_clip_norm = 4
         self.world_size = 1
         self.dev_criterion = 'avg'
         self.early_stopping_epoch = 5
-        self.word_embedding_dim = 300
-        self.entity_embedding_dim = 100
-        self.context_embedding_dim = 100
-        self.cnn_method = 'naive'
-        self.cnn_kernel_num = 400
-        self.cnn_window_size = 3
-        self.attention_dim = 200
-        self.head_num = 20
-        self.head_dim = 20
-        self.user_embedding_dim = 50
         self.category_embedding_dim = 50
         self.subCategory_embedding_dim = 50
         self.dropout_rate = 0.2
         self.no_self_connection = False
         self.no_adjacent_normalization = False
-        self.gcn_normalization_type = 'symmetric'
-        self.gcn_layer_num = 4
-        self.no_gcn_residual = False
-        self.gcn_layer_norm = False
-        self.hidden_dim = 200
         self.Alpha = 0.1
-        self.long_term_masking_probability = 0.1
-        self.personalized_embedding_dim = 200
-        self.HDC_window_size = 3
-        self.HDC_filter_num = 150
-        self.conv3D_filter_num_first = 32
-        self.conv3D_kernel_size_first = 3
-        self.conv3D_filter_num_second = 16
-        self.conv3D_kernel_size_second = 3
-        self.maxpooling3D_size = 3
-        self.maxpooling3D_stride = 3
+        self.gcn_normalization_type = 'symmetric'
+
+        # self.word_embedding_dim = 300
+        # self.entity_embedding_dim = 100
+        # self.context_embedding_dim = 100
+        # self.cnn_method = 'naive'
+        # self.cnn_kernel_num = 400
+        # self.cnn_window_size = 3
+        # self.attention_dim = 200
+        # self.head_num = 20
+        # self.head_dim = 20
+        # self.user_embedding_dim = 50
+        # self.long_term_masking_probability = 0.1
+        # self.personalized_embedding_dim = 200
+        # self.HDC_window_size = 3
+        # self.HDC_filter_num = 150
+        # self.conv3D_filter_num_first = 32
+        # self.conv3D_kernel_size_first = 3
+        # self.conv3D_filter_num_second = 16
+        # self.conv3D_kernel_size_second = 3
+        # self.maxpooling3D_size = 3
+        # self.maxpooling3D_stride = 3
         self.click_predictor = 'dot_product'
 
         self.train_root = self.root + '/MIND-%s/train' % self.dataset
@@ -162,10 +159,14 @@ class Config:
         #     self.gcn_layer_num = 4
         #     self.epoch = 6
         self.seed = self.seed if self.seed >= 0 else (int)(time.time())
-        with open(f'Config/{model.lower()}.json', 'r') as f:
-            model_params = json.load(f)
-        for k, v in model_params.items():
-            setattr(self, k, v)
+        json_path = f'Config/{model.lower()}.json'
+        if os.path.exists(json_path):
+            with open(json_path, 'r') as f:
+                model_params = json.load(f)
+            for k, v in model_params.items():
+                setattr(self, k, v)
+        else:
+            print(f"Warning: Model config file {json_path} not found, using default parameters")
 
         self.attribute_dict = self.__dict__.copy()
         if self.config_file != '':

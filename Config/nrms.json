@@ -3,9 +3,7 @@
     "word_embedding_dim": 300,
     "category_embedding_dim": 50,
     "subCategory_embedding_dim": 50,
-    "num_attention_heads": 15,
-    "query_vector_dim": 200,
-    "num_filters": 300,
-    "layers": 6,
+    "head_num": 20,
+    "head_dim": 20,
     "attention_dim": 200
 }

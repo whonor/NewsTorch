@@ -3,9 +3,8 @@
     "word_embedding_dim": 300,
     "category_embedding_dim": 50,
     "subCategory_embedding_dim": 50,
-    "num_attention_heads": 15,
-    "query_vector_dim": 200,
-    "num_filters": 300,
-    "layers": 6,
+    "cnn_method": "naive",
+    "cnn_kernel_num": 400,
+    "cnn_window_size": 3,
     "attention_dim": 200
 }
