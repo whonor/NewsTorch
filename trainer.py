@@ -4,7 +4,7 @@ import shutil
 import json
 
 from config import Config
-from MIND_corpus import MIND_Corpus
+from dataset_corpus_preprocessing.MIND_corpus import MIND_Corpus
 from MIND_dataset import MIND_Train_Dataset
 from util import AvgMetric
 from util import compute_scores

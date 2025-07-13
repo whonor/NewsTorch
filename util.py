@@ -1,7 +1,7 @@
 import os
 import torch
 import torch.nn as nn
-from MIND_corpus import MIND_Corpus
+from dataset_corpus_preprocessing.MIND_corpus import MIND_Corpus
 from MIND_dataset import MIND_DevTest_Dataset
 from torch.utils.data import DataLoader
 

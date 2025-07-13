@@ -159,7 +159,7 @@ class MIND_Corpus:
             with open(context_embedding_file, 'wb') as context_embedding_f:
                 pickle.dump(context_embedding_vectors, context_embedding_f)
 
-            # 6. user history graph
+            # 6. user history graph for CNE-SUE
             category_num = len(category_dict)
             graph_size = config.max_history_num + category_num # graph size of |V_{n}|+|V_{p}|
             prefix_mode = ['train', 'dev', 'test']

@@ -16,7 +16,7 @@ Our experiments require python>=3.7, torch==1.12.1, and torch_scatter==2.0.9. Th
 
 - ML-based models: LibFM, DSSM, Wide&Deep
 
-- DL-based models: DAE-GRU, NPA, DKN, LSTUR, NAML, NRMS, FIM, 
+- DL-based models: NPA, DKN, LSTUR, NAML, NRMS, FIM, 
 
 - Graph-based models: CNE-SUE, DIAT, IPNR
 

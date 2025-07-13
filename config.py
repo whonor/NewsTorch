@@ -105,7 +105,7 @@ class Config:
         self.max_abstract_length = 128
         self.negative_sample_num = 4
         self.max_history_num = 50
-        self.epoch = 2
+        self.epoch = 20
 
         self.batch_size = 32
         self.lr = 1e-4
@@ -116,6 +116,8 @@ class Config:
         self.early_stopping_epoch = 5
         self.category_embedding_dim = 50
         self.subCategory_embedding_dim = 50
+        self.entity_embedding_dim = 100
+        self.context_embedding_dim = 100
         self.dropout_rate = 0.2
         self.no_self_connection = False
         self.no_adjacent_normalization = False
