@@ -87,7 +87,7 @@ class Config:
     Usage:
         config = Config(model='TANR')
     '''
-    def __init__(self, model='MINS'):
+    def __init__(self, model='CENNEWSREC'):
         self.model = model.upper()
         self.mode = 'train'
         self.dev_model_path = ''
