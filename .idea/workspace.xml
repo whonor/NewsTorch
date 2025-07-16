@@ -4,7 +4,23 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d7693a56-5c44-498b-ba31-629b35906ee1" name="Changes" comment="Reconstruct the data preprocessing" />
+    <list default="true" id="d7693a56-5c44-498b-ba31-629b35906ee1" name="Changes" comment="Reconstruct the data preprocessing">
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Config/cennewsrec.json" beforeDir="false" afterPath="$PROJECT_DIR$/config/cennewsrec.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Config/cne-sue.json" beforeDir="false" afterPath="$PROJECT_DIR$/config/cne-sue.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Config/dkn.json" beforeDir="false" afterPath="$PROJECT_DIR$/config/dkn.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Config/fim.json" beforeDir="false" afterPath="$PROJECT_DIR$/config/fim.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Config/lstur.json" beforeDir="false" afterPath="$PROJECT_DIR$/config/lstur.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Config/mins.json" beforeDir="false" afterPath="$PROJECT_DIR$/config/mins.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Config/naml.json" beforeDir="false" afterPath="$PROJECT_DIR$/config/naml.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Config/npa.json" beforeDir="false" afterPath="$PROJECT_DIR$/config/npa.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Config/nrms.json" beforeDir="false" afterPath="$PROJECT_DIR$/config/nrms.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Config/tanr.json" beforeDir="false" afterPath="$PROJECT_DIR$/config/tanr.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Dataset_prepare/MIND_dataset_prepare.py" beforeDir="false" afterPath="$PROJECT_DIR$/dataset_download_prepare/MIND_dataset_prepare.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Dataset_prepare/download_mind.py" beforeDir="false" afterPath="$PROJECT_DIR$/dataset_download_prepare/download_mind.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/config.py" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -49,8 +65,14 @@
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.git.unshallow": "true",
     "git-widget-placeholder": "master",
-    "last_opened_file_path": "/home/wanro238/Pypro/NewsRecTorch",
-    "settings.editor.selected.configurable": "preferences.pluginManager"
+    "last_opened_file_path": "E:/Pyprojects/NewsRecTorch",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "settings.editor.selected.configurable": "preferences.pluginManager",
+    "vue.rearranger.settings.migration": "true"
   }
 }]]></component>
   <component name="RecentsManager">
@@ -81,6 +103,7 @@
       <option name="IS_MODULE_SDK" value="true" />
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
       <option name="SCRIPT_NAME" value="$PROJECT_DIR$/main.py" />
       <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="false" />
@@ -99,10 +122,12 @@
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
-        <option value="bundled-python-sdk-53e2683a6804-9cdd278e9d02-com.jetbrains.pycharm.community.sharedIndexes.bundled-PC-251.26094.141" />
+        <option value="bundled-js-predefined-d6986cc7102b-5c90d61e3bab-JavaScript-PY-242.24807.21" />
+        <option value="bundled-python-sdk-00717045f1d3-399fe30bd8c1-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-242.24807.21" />
       </set>
     </attachedChunks>
   </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
   <component name="TaskManager">
     <task active="true" id="Default" summary="Default task">
       <changelist id="d7693a56-5c44-498b-ba31-629b35906ee1" name="Changes" comment="" />
@@ -110,6 +135,7 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1751959270281</updated>
+      <workItem from="1752641108191" duration="1373000" />
     </task>
     <task id="LOCAL-00001" summary="rebuild config code and add new models CenNewsRec">
       <option name="closed" value="true" />
@@ -145,6 +171,9 @@
     </task>
     <option name="localTasksCounter" value="5" />
     <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="rebuild config code and add new models CenNewsRec" />

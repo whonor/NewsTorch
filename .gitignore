@@ -19,7 +19,7 @@
 /prediction
 /__pycache__
 /.vscode
-Dataset_prepare/__pycache__/MIND_dataset_prepare.cpython-38.pyc
+dataset_download_prepare/__pycache__/MIND_dataset_prepare.cpython-38.pyc
 MIND-small/dev/behaviors.tsv
 MIND-small/dev/context_embedding.vec
 MIND-small/dev/entity_embedding.vec

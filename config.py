@@ -5,7 +5,7 @@ import torch
 import random
 import numpy as np
 import json
-from Dataset_prepare.MIND_dataset_prepare import prepare_MIND_200k, prepare_MIND_large, prepare_MIND_small
+from dataset_download_prepare.MIND_dataset_prepare import prepare_MIND_200k, prepare_MIND_large, prepare_MIND_small
 
 class Config:
     '''
@@ -85,7 +85,7 @@ class Config:
         set_cuda(): Sets up the CUDA environment for GPU training.
         preliminary_setup(): Prepares the dataset and checks for necessary files.
     Usage:
-        config = Config(model='TANR')
+        config = config(model='TANR')
     '''
     def __init__(self, model='CENNEWSREC'):
         self.model = model.upper()
@@ -161,7 +161,7 @@ class Config:
         #     self.gcn_layer_num = 4
         #     self.epoch = 6
         self.seed = self.seed if self.seed >= 0 else (int)(time.time())
-        json_path = f'Config/{model.lower()}.json'
+        json_path = f'config/{model.lower()}.json'
         if os.path.exists(json_path):
             with open(json_path, 'r') as f:
                 model_params = json.load(f)
@@ -181,7 +181,7 @@ class Config:
                             setattr(self, attribute, configs[attribute])
                             self.attribute_dict[attribute] = configs[attribute]
             else:
-                raise Exception('Config file does not exist : ' + self.config_file)
+                raise Exception('config file does not exist : ' + self.config_file)
         assert not (
                     self.no_self_connection and not self.no_adjacent_normalization), 'Adjacent normalization of graph only can be set in case of self-connection'
         print('*' * 32 + ' Experiment setting ' + '*' * 32)
