@@ -3,7 +3,7 @@ import gc
 import shutil
 from config import Config
 import torch
-from dataset_corpus_preprocessing.MIND_corpus import MIND_Corpus
+from dataset_corpus_preprocessing.MIND_corpus_main import MIND_Corpus
 from models.CNE_SUE import Model
 from models.DKN import DKN
 from models.FIM import FIM

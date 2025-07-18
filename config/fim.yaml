@@ -1,0 +1,13 @@
+
+
+"word_embedding_dim": 300
+"category_embedding_dim": 50
+"subCategory_embedding_dim": 50
+"HDC_window_size": 3
+"HDC_filter_num": 150
+"conv3D_filter_num_first ": 32
+"conv3D_kernel_size_first": 3
+"conv3D_filter_num_second": 16
+"conv3D_kernel_size_second": 3
+"maxpooling3D_size": 3
+"maxpooling3D_stride": 3

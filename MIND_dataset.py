@@ -1,4 +1,4 @@
-from dataset_corpus_preprocessing.MIND_corpus import MIND_Corpus
+from dataset_corpus_preprocessing.MIND_corpus_main import MIND_Corpus
 import time
 from config import Config
 import torch.utils.data as data

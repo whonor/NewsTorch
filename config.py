@@ -87,7 +87,7 @@ class Config:
     Usage:
         config = config(model='TANR')
     '''
-    def __init__(self, model='CENNEWSREC'):
+    def __init__(self, model='UNBERT'):
         self.model = model.upper()
         self.mode = 'train'
         self.dev_model_path = ''
@@ -105,7 +105,7 @@ class Config:
         self.max_abstract_length = 128
         self.negative_sample_num = 4
         self.max_history_num = 50
-        self.epoch = 20
+        self.epoch = 1
 
         self.batch_size = 32
         self.lr = 1e-4
@@ -124,26 +124,6 @@ class Config:
         self.Alpha = 0.1
         self.gcn_normalization_type = 'symmetric'
 
-        # self.word_embedding_dim = 300
-        # self.entity_embedding_dim = 100
-        # self.context_embedding_dim = 100
-        # self.cnn_method = 'naive'
-        # self.cnn_kernel_num = 400
-        # self.cnn_window_size = 3
-        # self.attention_dim = 200
-        # self.head_num = 20
-        # self.head_dim = 20
-        # self.user_embedding_dim = 50
-        # self.long_term_masking_probability = 0.1
-        # self.personalized_embedding_dim = 200
-        # self.HDC_window_size = 3
-        # self.HDC_filter_num = 150
-        # self.conv3D_filter_num_first = 32
-        # self.conv3D_kernel_size_first = 3
-        # self.conv3D_filter_num_second = 16
-        # self.conv3D_kernel_size_second = 3
-        # self.maxpooling3D_size = 3
-        # self.maxpooling3D_stride = 3
         self.click_predictor = 'dot_product'
 
         self.train_root = self.root + '/MIND-%s/train' % self.dataset
@@ -161,21 +141,24 @@ class Config:
         #     self.gcn_layer_num = 4
         #     self.epoch = 6
         self.seed = self.seed if self.seed >= 0 else (int)(time.time())
-        json_path = f'config/{model.lower()}.json'
-        if os.path.exists(json_path):
-            with open(json_path, 'r') as f:
-                model_params = json.load(f)
+
+        import yaml
+
+        yaml_path = f'config/{model.lower()}.yaml'
+        if os.path.exists(yaml_path):
+            with open(yaml_path, 'r') as f:
+                model_params = yaml.safe_load(f)
             for k, v in model_params.items():
                 setattr(self, k, v)
         else:
-            print(f"Warning: Model config file {json_path} not found, using default parameters")
+            print(f"Warning: Model config file {yaml_path} not found, using default parameters")
 
         self.attribute_dict = self.__dict__.copy()
         if self.config_file != '':
             if os.path.exists(self.config_file):
                 print('Get experiment settings from the config file : ' + self.config_file)
                 with open(self.config_file, 'r', encoding='utf-8') as f:
-                    configs = json.load(f)
+                    configs = yaml.safe_load(f)
                     for attribute in self.attribute_dict:
                         if attribute in configs:
                             setattr(self, attribute, configs[attribute])
@@ -184,6 +167,7 @@ class Config:
                 raise Exception('config file does not exist : ' + self.config_file)
         assert not (
                     self.no_self_connection and not self.no_adjacent_normalization), 'Adjacent normalization of graph only can be set in case of self-connection'
+
         print('*' * 32 + ' Experiment setting ' + '*' * 32)
         for attribute, value in self.__dict__.items():
             print(f"{attribute} : {value}")

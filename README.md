@@ -16,7 +16,7 @@ Our experiments require python>=3.7, torch==1.12.1, and torch_scatter==2.0.9. Th
 
 - ML-based models: LibFM, DSSM, Wide&Deep
 
-- DL-based models: NPA, DKN, LSTUR, NAML, NRMS, FIM, 
+- DL-based models: NPA, DKN, LSTUR, NAML, NRMS, FIM, TANR, CenNewsRec, MINS
 
 - Graph-based models: CNE-SUE, DIAT, IPNR
 
@@ -47,6 +47,6 @@ For coding simplicity, we do not implement news representation caching in the in
 
 ## To Do
 1. Add more datasets: Adressa, EB-NeRD
-2. Add more models: CAUM, MINER, MINS, TANR, MANNeR, CenNewsRec, UNBERT
+2. Add more models: MANNeR, UNBERT, LKPNR, ONCE, Prompt4NR
 3. Add more evaluation metrics using TorchMetrics.
 
