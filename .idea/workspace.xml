@@ -4,7 +4,15 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d7693a56-5c44-498b-ba31-629b35906ee1" name="Changes" comment="Reconstruct the data preprocessing" />
+    <list default="true" id="d7693a56-5c44-498b-ba31-629b35906ee1" name="Changes" comment="Add UNBERT model and change config files">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/evaluate.py" beforeDir="false" afterPath="$PROJECT_DIR$/evaluate.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/models/modules/unbert/eval.py" beforeDir="false" afterPath="$PROJECT_DIR$/models/modules/unbert/eval.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/trainer.py" beforeDir="false" afterPath="$PROJECT_DIR$/trainer.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/unbert_runner.py" beforeDir="false" afterPath="$PROJECT_DIR$/unbert_runner.py" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -227,7 +235,15 @@
       <option name="project" value="LOCAL" />
       <updated>1752817790225</updated>
     </task>
-    <option name="localTasksCounter" value="10" />
+    <task id="LOCAL-00010" summary="Add UNBERT model and change config files">
+      <option name="closed" value="true" />
+      <created>1752818403443</created>
+      <option name="number" value="00010" />
+      <option name="presentableId" value="LOCAL-00010" />
+      <option name="project" value="LOCAL" />
+      <updated>1752818403443</updated>
+    </task>
+    <option name="localTasksCounter" value="11" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -261,10 +277,11 @@
     <MESSAGE value="rebuild config code and the model CenNewsRec pass test" />
     <MESSAGE value="MINS model pass test" />
     <MESSAGE value="Reconstruct the data preprocessing" />
-    <option name="LAST_COMMIT_MESSAGE" value="Reconstruct the data preprocessing" />
+    <MESSAGE value="Add UNBERT model and change config files" />
+    <option name="LAST_COMMIT_MESSAGE" value="Add UNBERT model and change config files" />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
-    <SUITE FILE_PATH="coverage/NewsRecTorch$run.coverage" NAME="unbert_runner Coverage Results" MODIFIED="1752815860345" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/NewsRecTorch$run.coverage" NAME="unbert_runner Coverage Results" MODIFIED="1752818973541" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/NewsRecTorch$main.coverage" NAME="main Coverage Results" MODIFIED="1752726430980" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
   </component>
 </project>

@@ -22,6 +22,8 @@ from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 import multiprocessing
 from sklearn.metrics import roc_auc_score, log_loss, accuracy_score
+from torchmetrics import AUROC
+from torchmetrics.retrieval import RetrievalMRR, RetrievalNormalizedDCG
 from transformers import AutoTokenizer, get_linear_schedule_with_warmup
 from tqdm import tqdm
 from time import gmtime, strftime
@@ -31,16 +33,35 @@ import numpy as np
 import os
 
 from config import Config
-from evaluate import scoring, mrr_score, ndcg_score
+from evaluate import scoring
 
-def func(grouped_df):
+def func_auc(grouped_df):
     if sum(grouped_df["label"]) == 0 or sum(grouped_df["label"]) == len(grouped_df["label"]):
         return 1.0
-    auc = roc_auc_score(grouped_df["label"], grouped_df["score"])
-    mrr = mrr_score(grouped_df["label"], grouped_df["score"])
-    ndcg5 = ndcg_score(grouped_df["label"], grouped_df["score"], 5)
-    ndcg10 = ndcg_score(grouped_df["label"], grouped_df["score"], 10)
-    return [auc, mrr, ndcg5, ndcg10]
+    auc_metric = AUROC(task='binary', num_classes=2)
+    auc = auc_metric(grouped_df["label"], grouped_df["score"])
+    return auc
+
+def func_mrr(grouped_df):
+    if sum(grouped_df["label"]) == 0 or sum(grouped_df["label"]) == len(grouped_df["label"]):
+        return 1.0
+    mrr_metric = RetrievalMRR()
+    mrr = mrr_metric(grouped_df["label"], grouped_df["score"])
+    return mrr
+
+def func_ndcg5(grouped_df):
+    if sum(grouped_df["label"]) == 0 or sum(grouped_df["label"]) == len(grouped_df["label"]):
+        return 1.0
+    ndcg5_metric = RetrievalNormalizedDCG(top_k=5)
+    ndcg5 = ndcg5_metric(grouped_df["label"], grouped_df["score"], 5)
+    return ndcg5
+
+def func_ndcg10(grouped_df):
+    if sum(grouped_df["label"]) == 0 or sum(grouped_df["label"]) == len(grouped_df["label"]):
+        return 1.0
+    ndcg10_metric = RetrievalNormalizedDCG(top_k=10)
+    ndcg10 = ndcg10_metric(grouped_df["label"], grouped_df["score"], 10)
+    return ndcg10
 
 def dev(model, dev_loader, device, out_path, is_epoch=False):
     impression_ids = []
@@ -76,13 +97,16 @@ def dev(model, dev_loader, device, out_path, is_epoch=False):
     groups_iter = EVAL_DF.groupby("impression_id")
     imp, df_groups = zip(*groups_iter)
     pool = multiprocessing.Pool()
-    result = pool.map(func, df_groups)
+    result_auc = pool.map(func_auc, df_groups)
+    result_mrr = pool.map(func_mrr, df_groups)
+    result_ndcg5 = pool.map(func_ndcg5, df_groups)
+    result_ndcg10 = pool.map(func_ndcg10, df_groups)
     pool.close()
     pool.join()
-    auc = np.mean(result[0])
-    mrr = np.mean(result[1])
-    ndcg5 = np.mean(result[2])
-    ndcg10 = np.mean(result[3])
+    auc = np.mean(result_auc)
+    mrr = np.mean(result_mrr)
+    ndcg5 = np.mean(result_ndcg5)
+    ndcg10 = np.mean(result_ndcg10)
 
     return auc, mrr, ndcg5, ndcg10
 

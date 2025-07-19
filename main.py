@@ -14,13 +14,14 @@ from models.NPA import NPA
 from models.NRMS import NRMS
 from models.TANR import TANR
 from models.CenNewsRec import CenNewsRec
-from trainer import Trainer, distributed_train
+from trainer import Trainer
 from util import compute_scores, get_run_index
 import torch.multiprocessing as mp
 from datetime import datetime
+import wandb
 
 
-def train(config: Config, mind_corpus: MIND_Corpus):
+def train(config: Config, mind_corpus: MIND_Corpus, wandb):
     if config.model == 'TANR':
         model = TANR(config)
     elif config.model == 'NAML':
@@ -43,19 +44,10 @@ def train(config: Config, mind_corpus: MIND_Corpus):
         model = Model(config)
     model.initialize()
     run_index = get_run_index(config.result_dir)
-    if config.world_size == 1:
-        trainer = Trainer(model, config, mind_corpus, run_index)
-        trainer.train()
-        trainer = None
-        del trainer
-    else:
-        try:
-            mp.spawn(distributed_train, args=(model, config, mind_corpus, run_index), nprocs=config.world_size, join=True)
-        except Exception as e:
-            print(e)
-            e = str(e).lower()
-            if 'cuda' in e or 'pytorch' in e:
-                exit()
+    trainer = Trainer(model, config, mind_corpus, wandb, run_index)
+    trainer.train()
+    trainer = None
+    del trainer
     config.run_index = run_index
     model = None
     del model
@@ -145,11 +137,17 @@ def test(config: Config, mind_corpus: MIND_Corpus):
 
 
 if __name__ == '__main__':
+    wandb.login()
     config = Config()
+    run = wandb.init(
+        project="NewsRecTorch-project",  # Specify your project
+        config=config.attribute_dict,
+    )
+
     mind_corpus = MIND_Corpus(config)
     if config.mode == 'train':
         print("Start training at: ", datetime.now())
-        train(config, mind_corpus)
+        train(config, mind_corpus, wandb)
         print("Finish training at: ", datetime.now())
         config.test_model_path = config.best_model_dir + '/#' + str(config.run_index) + '/' + config.model
         print("Start testing at: ", datetime.now())

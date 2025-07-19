@@ -20,7 +20,7 @@ from dataset_corpus_preprocessing.data_loader_unbert import MindDataset
 from models.UNBERT import UNBERT
 from config import Config
 from models.modules.unbert.eval import dev, test
-
+import wandb
 
 class DataLoader(DataLoader):
     def __init__(
@@ -38,20 +38,11 @@ class DataLoader(DataLoader):
             collate_fn = dataset.collate
         )
 
-def run(config: Config):
+def main(config: Config):
     dataset_path = config.dataset_path
-
-    # log_file = os.path.join(config.ouput+"/{}-{}-{}.log".format(
-    #                 config.mode, config.split, strftime('%Y%m%d%H%M%S', gmtime())))
-    # os.makedirs(config.output, exist_ok=True)
-    # def printzzz(log):
-    #     with open(log_file, "a") as fout:
-    #         fout.write(log + "\n")
-    #     print(log)
-
     model = UNBERT(config)
     if config.restore is not None and os.path.isfile(config.restore):
-        # printzzz("restore model from {}".format(config.restore))
+        print("restore model from {}".format(config.restore))
         state_dict = torch.load(config.restore, map_location=torch.device('cpu'))
         st = {}
         for k in state_dict:
@@ -112,6 +103,8 @@ def run(config: Config):
         print("start training...")
 
         best_auc = 0.0
+        best_dev_epoch = 0
+        epoch_not_increase = 0
         for epoch in range(config.epoch):
             avg_loss = 0.0
             batch_iterator = tqdm(train_loader, disable=False)
@@ -134,13 +127,25 @@ def run(config: Config):
                 m_optim.zero_grad()
 
             auc, mrr, ndcg5, ndcg10 = dev(model, dev_loader, device, config.output, is_epoch=True)
+            wandb.log({"epoch": epoch + 1, "loss": avg_loss / len(train_loader)})
+            wandb.log({"epoch": epoch + 1, "AUC": auc, "MRR": mrr, "nDCG@5": ndcg5, "nDCG@10": ndcg10})
+            if auc > best_auc:
+                best_auc = auc
+                best_dev_epoch = epoch
+                epoch_not_increase = 0
+
+            else:
+                epoch_not_increase += 1
+
             print("Epoch {}: \n".format(epoch+1))
             print('AUC : %.4f\nMRR : %.4f\nnDCG@5 : %.4f\nnDCG@10 : %.4f' % (auc, mrr, ndcg5, ndcg10))
-            final_path = os.path.join(config.output, "epoch_{}.bin".format(epoch+1))
-            if torch.cuda.device_count() > 1:
-                torch.save(model.module.state_dict(), final_path)
-            else:
-                torch.save(model.state_dict(), final_path)
+            print('Best epoch :', best_dev_epoch)
+            print('Best ' + config.dev_criterion + ' : ' + str('best_dev_' + config.dev_criterion))
+            if epoch_not_increase == 0:
+                torch.save({config.model: model.state_dict()}, config.model_dir + '/' + config.model + '-' + str(best_dev_epoch))
+            if epoch_not_increase == config.early_stopping_epoch:
+                break
+
         print("train success!")
         print('reading test data...')
         test_set = MindDataset(
@@ -158,8 +163,8 @@ def run(config: Config):
             num_workers=8
         )
 
-        if torch.cuda.device_count() > 1:
-            model = nn.DataParallel(model)
+        # if torch.cuda.device_count() > 1:
+        #     model = nn.DataParallel(model)
         auc, mrr, ndcg5, ndcg10 = dev(model, test_loader, device, config.output, is_epoch=True)
         print('AUC : %.4f\nMRR : %.4f\nnDCG@5 : %.4f\nnDCG@10 : %.4f' % (auc, mrr, ndcg5, ndcg10))
         print("test success!")
@@ -210,6 +215,12 @@ def run(config: Config):
         print("test success!")
 
 if __name__ == "__main__":
+    wandb.login()
     config = Config()
-    run(config)
+    run = wandb.init(
+        project="NewsRecTorch-UNBERT",  # Specify your project
+        config=config.attribute_dict,
+        mode='offline'
+    )
+    main(config)
 

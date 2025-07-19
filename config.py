@@ -203,22 +203,14 @@ class Config:
 
         model_name = self.model
         mkdirs = lambda x: os.makedirs(x) if not os.path.exists(x) else None
-        self.config_dir = 'logs/configs/' + self.dataset + '/' + model_name
         self.model_dir = 'logs/models/' + self.dataset + '/' + model_name
-        self.best_model_dir = 'logs/best_model/' + self.dataset + '/' + model_name
         self.dev_res_dir = 'logs/dev/res/' + self.dataset + '/' + model_name
-        self.test_res_dir = 'logs/test/res/' + self.dataset + '/' + model_name
         self.result_dir = 'logs/results/' + self.dataset + '/' + model_name
-        self.running_files_dir = 'data'
-        mkdirs(self.config_dir)
         mkdirs(self.model_dir)
-        mkdirs(self.best_model_dir)
         mkdirs('logs/dev/ref')
         mkdirs(self.dev_res_dir)
         mkdirs('logs/test/ref')
-        mkdirs(self.test_res_dir)
         mkdirs(self.result_dir)
-        mkdirs(self.running_files_dir)
         if not os.path.exists('logs/dev/ref/truth-%s.txt' % self.dataset):
             with open(os.path.join(self.dev_root, 'behaviors.tsv'), 'r', encoding='utf-8') as dev_f:
                 with open('logs/dev/ref/truth-%s.txt' % self.dataset, 'w', encoding='utf-8') as truth_f:
