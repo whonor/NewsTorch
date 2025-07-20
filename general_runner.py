@@ -1,11 +1,26 @@
 import os
-import signal
+import gc
 import shutil
-import json
 
+from dataset_corpus_preprocessing.MIND_corpus_IPNR import MIND_Corpus_IPNR
+from models.CNE_SUE import Model
+from models.DKN import DKN
+from models.FIM import FIM
+from models.IPNR import IPNR
+from models.LSTUR import LSTUR
+from models.MINS import MINS
+from models.NAML import NAML
+from models.NPA import NPA
+from models.NRMS import NRMS
+from models.TANR import TANR
+from models.CenNewsRec import CenNewsRec
+from models.modules.ipnr.trainer import TrainerIPNR
+from util import get_run_index
+from datetime import datetime
+import wandb
 from config import Config
 from dataset_corpus_preprocessing.MIND_corpus_main import MIND_Corpus
-from MIND_dataset import MIND_Train_Dataset
+from dataset_corpus_preprocessing.MIND_dataset import MIND_Train_Dataset
 from util import AvgMetric
 from util import compute_scores
 from tqdm import tqdm
@@ -13,8 +28,6 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
-import torch.distributed as dist
-from torch.nn.parallel import DistributedDataParallel as DDP
 
 
 class Trainer:
@@ -33,17 +46,9 @@ class Trainer:
         self.train_dataset = MIND_Train_Dataset(mind_corpus)
         self.run_index = run_index
         self.model_dir = config.model_dir + '/#' + str(self.run_index)
-        # self.best_model_dir = config.best_model_dir + '/#' + str(self.run_index)
         self.dev_res_dir = config.dev_res_dir + '/#' + str(self.run_index)
-        # self.result_dir = config.result_dir
-        # if not os.path.exists(self.model_dir):
-        #     os.mkdir(self.model_dir)
-        # if not os.path.exists(self.best_model_dir):
-        #     os.mkdir(self.best_model_dir)
         if not os.path.exists(self.dev_res_dir):
             os.mkdir(self.dev_res_dir)
-        # with open(config.config_dir + '/#' + str(self.run_index) + '.json', 'w', encoding='utf-8') as f:
-        #     json.dump(config.attribute_dict, f)
         if self._dataset == 'large':
             self.prediction_dir = config.prediction_dir + '/#' + str(self.run_index)
             os.mkdir(self.prediction_dir)
@@ -147,7 +152,7 @@ class Trainer:
             print('Epoch loss =', epoch_loss)
             self.wandb.log({'train epoch': e, 'loss': epoch_loss / len(self.train_dataset)})
 
-            # validation 
+            # validation
             auc, mrr, ndcg5, ndcg10 = compute_scores(self.config , model, self.mind_corpus, self.batch_size * 3 // 2, 'dev', self.dev_res_dir + '/' + self.config.model + '-' + str(e) + '.txt', self._dataset)
             self.auc_results.append(auc)
             self.mrr_results.append(mrr)
@@ -156,8 +161,9 @@ class Trainer:
             print('Epoch %d : dev done\nDev criterions' % e)
             print('AUC = {:.4f}\nMRR = {:.4f}\nnDCG@5 = {:.4f}\nnDCG@10 = {:.4f}'.format(auc, mrr, ndcg5, ndcg10))
             self.wandb.log({'validation epoch': e, 'AUC': auc, 'MRR': mrr, 'nDCG@5': ndcg5, 'nDCG@10': ndcg10})
-            if auc >= self.best_dev_auc:
-                self.best_dev_auc = auc
+            avg = AvgMetric(auc, mrr, ndcg5, ndcg10)
+            if avg >= self.best_dev_avg:
+                self.best_dev_avg = avg
                 self.best_dev_epoch = e
                 self.epoch_not_increase = 0
             else:
@@ -171,13 +177,7 @@ class Trainer:
             if self.epoch_not_increase == self.early_stopping_epoch:
                 break
 
-        # with open('%s/%s-%s-dev_log.txt' % (self.dev_res_dir, self.config.model, self._dataset), 'w', encoding='utf-8') as f:
-        #     f.write('Epoch\tAUC\tMRR\tnDCG@5\tnDCG@10\n')
-        #     for i in range(len(self.auc_results)):
-        #         f.write('%d\t%.4f\t%.4f\t%.4f\t%.4f\n' % (i + 1, self.auc_results[i], self.mrr_results[i], self.ndcg5_results[i], self.ndcg10_results[i]))
-        # shutil.copy(self.model_dir + '/' + self.config.model + '-' + str(self.best_dev_epoch), self.best_model_dir + '/' + self.config.model)
         print('Training : ' + self.config.model + ' #' + str(self.run_index) + ' completed\nDev criterions:')
-
         print('AUC : %.4f' % self.auc_results[self.best_dev_epoch - 1])
         print('MRR : %.4f' % self.mrr_results[self.best_dev_epoch - 1])
         print('nDCG@5 : %.4f' % self.ndcg5_results[self.best_dev_epoch - 1])
@@ -193,3 +193,159 @@ def negative_log_sigmoid(logits):
     negative_sigmoid = torch.clamp(torch.sigmoid(-logits[:, 1:]), min=1e-15, max=1)
     loss = -(torch.log(positive_sigmoid).sum() + torch.log(negative_sigmoid).sum()) / logits.numel()
     return loss
+
+
+def train(config: Config, mind_corpus: MIND_Corpus, wandb):
+    if config.model == 'TANR':
+        model = TANR(config)
+    elif config.model == 'NAML':
+        model = NAML(config)
+    elif config.model == 'DKN':
+        model = DKN(config)
+    elif config.model == 'NRMS':
+        model = NRMS(config)
+    elif config.model == 'LSTUR':
+        model = LSTUR(config)
+    elif config.model == 'NPA':
+        model = NPA(config)
+    elif config.model == 'FIM':
+        model = FIM(config)
+    elif config.model == 'MINS':
+        model = MINS(config)
+    elif config.model == 'CENNEWSREC':
+        model = CenNewsRec(config)
+    elif config.model == 'IPNR':
+        model = IPNR(config)
+    else:
+        model = Model(config)
+    model.initialize()
+    run_index = get_run_index(config.result_dir)
+    if config.model == 'IPNR':
+        trainer = TrainerIPNR(model, config, mind_corpus, wandb, run_index)
+    else:
+        trainer = Trainer(model, config, mind_corpus, wandb, run_index)
+
+    trainer.train()
+    trainer = None
+    del trainer
+    config.run_index = run_index
+    model = None
+    del model
+    gc.collect()
+    torch.cuda.empty_cache()
+
+
+def dev(config: Config, mind_corpus: MIND_Corpus):
+    if config.model == 'TANR':
+        model = TANR(config)
+    elif config.model == 'NAML':
+        model = NAML(config)
+    elif config.model == 'DKN':
+        model = DKN(config)
+    elif config.model == 'NRMS':
+        model = NRMS(config)
+    elif config.model == 'LSTUR':
+        model = LSTUR(config)
+    elif config.model == 'NPA':
+        model = NPA(config)
+    elif config.model == 'FIM':
+        model = FIM(config)
+    elif config.model == 'MINS':
+        model = MINS(config)
+    elif config.model == 'CENNEWSREC':
+        model = CenNewsRec(config)
+    elif config.model == 'IPNR':
+        model = IPNR(config)
+    else:
+        model = Model(config)
+    assert os.path.exists(config.dev_model_path), 'Dev model does not exist : ' + config.dev_model_path
+    model.load_state_dict(torch.load(config.dev_model_path, map_location=torch.device('cpu'))[model.model_name])
+    model.cuda()
+    dev_res_dir = os.path.join(config.dev_res_dir, config.dev_model_path.replace('\\', '_').replace('/', '_'))
+    if not os.path.exists(dev_res_dir):
+        os.mkdir(dev_res_dir)
+    auc, mrr, ndcg5, ndcg10 = compute_scores(config, model, mind_corpus, config.batch_size * 2 // config.world_size, 'dev',
+                                             dev_res_dir + '/' + config.model + '.txt', config.dataset)
+    print('Dev : ' + config.dev_model_path)
+    print('AUC : %.4f\nMRR : %.4f\nnDCG@5 : %.4f\nnDCG@10 : %.4f' % (auc, mrr, ndcg5, ndcg10))
+    return auc, mrr, ndcg5, ndcg10
+
+
+
+def test(config: Config, mind_corpus: MIND_Corpus):
+    if config.model == 'TANR':
+        model = TANR(config)
+    elif config.model == 'NAML':
+        model = NAML(config)
+    elif config.model == 'DKN':
+        model = DKN(config)
+    elif config.model == 'NRMS':
+        model = NRMS(config)
+    elif config.model == 'LSTUR':
+        model = LSTUR(config)
+    elif config.model == 'NPA':
+        model = NPA(config)
+    elif config.model == 'FIM':
+        model = FIM(config)
+    elif config.model == 'MINS':
+        model = MINS(config)
+    elif config.model == 'CENNEWSREC':
+        model = CenNewsRec(config)
+    elif config.model == 'IPNR':
+        model = IPNR(config)
+    else:
+        model = Model(config)
+    assert os.path.exists(config.test_model_path), 'Test model does not exist : ' + config.test_model_path
+    model.load_state_dict(torch.load(config.test_model_path, map_location=torch.device('cpu'))[config.model])
+    model.cuda()
+    test_res_dir = os.path.join(config.test_res_dir, config.test_model_path.replace('\\', '_').replace('/', '_'))
+    if not os.path.exists(test_res_dir):
+        os.mkdir(test_res_dir)
+    print('test model path  : ' + config.test_model_path)
+    print('test output file : ' + test_res_dir + '/' + config.model + '.txt')
+    auc, mrr, ndcg5, ndcg10 = compute_scores(config, model, mind_corpus, config.batch_size * 2 // config.world_size, 'test', test_res_dir + '/' + config.model + '.txt', config.dataset)
+    if config.dataset != 'large':
+        print('AUC : %.4f\nMRR : %.4f\nnDCG@5 : %.4f\nnDCG@10 : %.4f' % (auc, mrr, ndcg5, ndcg10))
+        if config.mode == 'train':
+            with open(config.result_dir + '/#' + str(config.run_index) + '-test', 'w') as result_f:
+                result_f.write('#' + str(config.run_index) + '\t' + str(auc) + '\t' + str(mrr) + '\t' + str(ndcg5) + '\t' + str(ndcg10) + '\n')
+        elif config.mode == 'test' and config.test_output_file != '':
+            with open(config.test_output_file, 'w', encoding='utf-8') as f:
+                f.write('#' + str(config.seed + 1) + '\t' + str(auc) + '\t' + str(mrr) + '\t' + str(ndcg5) + '\t' + str(ndcg10) + '\n')
+    else:
+        if config.mode == 'train':
+            shutil.copy(test_res_dir + '/' + config.model + '.txt', 'cache/prediction/large/%s/#%d/prediction.txt' % (config.model, config.run_index))
+            os.chdir('cache/prediction/large/%s/#%d' % (config.model, config.run_index))
+            os.system('zip prediction.zip prediction.txt')
+            os.chdir('../../../..')
+
+
+if __name__ == '__main__':
+    wandb.login()
+    config = Config()
+    run = wandb.init(
+        project="NewsRecTorch-project",  # Specify your project
+        config=config.attribute_dict,
+        mode=config.wandb  # Set mode based on config
+    )
+    if config.model == 'IPNR':
+        mind_corpus = MIND_Corpus_IPNR(config)
+    else:
+        mind_corpus = MIND_Corpus(config)
+
+    if config.mode == 'train':
+        print("Start training at: ", datetime.now())
+        train(config, mind_corpus, wandb)
+        print("Finish training at: ", datetime.now())
+        config.test_model_path = config.best_model_dir + '/#' + str(config.run_index) + '/' + config.model
+        print("Start testing at: ", datetime.now())
+        test(config, mind_corpus)
+        print("Finish testing at: ", datetime.now())
+    elif config.mode == 'dev':
+        print("Start dev at: ", datetime.now())
+        dev(config, mind_corpus)
+        print("Finish dev at: ", datetime.now())
+    elif config.mode == 'test':
+        print("Start testing at: ", datetime.now())
+        test(config, mind_corpus)
+        print("Finish testing at: ", datetime.now())

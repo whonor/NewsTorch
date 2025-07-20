@@ -58,7 +58,7 @@ def main(config: Config):
 
     tokenizer = AutoTokenizer.from_pretrained(config.pretrain)
     if config.mode == "train":
-        print('reading training data...')
+        print('reading training cache...')
         train_set = MindDataset(
             dataset_path,
             tokenizer=tokenizer,
@@ -74,7 +74,7 @@ def main(config: Config):
             shuffle=True,
             num_workers=8
         )
-        print('reading dev data...')
+        print('reading dev cache...')
         dev_set = MindDataset(
             dataset_path,
             tokenizer=tokenizer,
@@ -147,7 +147,7 @@ def main(config: Config):
                 break
 
         print("train success!")
-        print('reading test data...')
+        print('reading test cache...')
         test_set = MindDataset(
             dataset_path,
             tokenizer=tokenizer,
@@ -169,7 +169,7 @@ def main(config: Config):
         print('AUC : %.4f\nMRR : %.4f\nnDCG@5 : %.4f\nnDCG@10 : %.4f' % (auc, mrr, ndcg5, ndcg10))
         print("test success!")
     elif config.mode == "dev":
-        print('reading dev data...')
+        print('reading dev cache...')
         dev_set = MindDataset(
             dataset_path,
             tokenizer=tokenizer,
@@ -192,7 +192,7 @@ def main(config: Config):
         print('AUC : %.4f\nMRR : %.4f\nnDCG@5 : %.4f\nnDCG@10 : %.4f' % (auc, mrr, ndcg5, ndcg10))
         print("dev success!")
     else:
-        print('reading test data...')
+        print('reading test cache...')
         test_set = MindDataset(
             dataset_path,
             tokenizer=tokenizer,

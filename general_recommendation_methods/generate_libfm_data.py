@@ -2,7 +2,7 @@ import os
 import pickle
 import argparse
 import random
-parser = argparse.ArgumentParser(description='Generate libfm data')
+parser = argparse.ArgumentParser(description='Generate libfm cache')
 parser.add_argument('--dataset', type=str, default='200k', choices=['200k', 'small', 'large'], help='Dataset type')
 parser.add_argument('--negative_sample_num', type=int, default=4, help='Negative sample number of each positive sample')
 args = parser.parse_args()

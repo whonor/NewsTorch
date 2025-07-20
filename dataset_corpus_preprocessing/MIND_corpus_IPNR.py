@@ -8,6 +8,35 @@ from torchtext.vocab import GloVe
 from config import Config
 import torch
 import numpy as np
+import networkx as nx
+from config import Config
+
+
+def build_subgraph(graph: nx.Graph, vocab: list):
+    all_ents = set([])
+    all_ents = all_ents.union(vocab)
+
+    all_ents = list(all_ents)
+    sub_graph = graph.subgraph(all_ents)
+
+    remove = [node for node, degree in dict(sub_graph.degree()).items() if degree < 1]
+    # print("Remove_nodes: ")
+    # print(remove)
+    g = sub_graph.copy()
+    g.remove_nodes_from(remove)
+    print(g)
+    # adj是图G的邻接矩阵的稀疏表示，左边节点对代表一条边，右边是边的值，adj是对称矩阵。
+    adj = nx.to_scipy_sparse_array(g).tocoo()
+
+    # row是adj中非零元素所在的行索引
+    row = torch.from_numpy(adj.row.astype(np.int64)).to(torch.long)
+    # col是adj中非零元素所在的列索引。
+    col = torch.from_numpy(adj.col.astype(np.int64)).to(torch.long)
+
+    # 将行和列进行拼接，shape变为[2, num_edges], 包含两个列表，第一个是row, 第二个是col
+    edge_index = torch.stack([row, col], dim=0)
+
+    return edge_index, adj
 
 
 def is_number(s):
@@ -19,8 +48,7 @@ def is_number(s):
 
 pat = re.compile(r"[\w]+|[.,!?;|]")
 
-
-class MIND_Corpus:
+class MIND_Corpus_IPNR:
     @staticmethod
     def preprocess(config: Config):
         user_ID_file = 'cache/user_ID-%s.json' % config.dataset
@@ -34,6 +62,7 @@ class MIND_Corpus:
         context_embedding_file = 'cache/context_embedding-%s.pkl' % config.dataset
         user_history_graph_file = 'cache/user_history_graph-' + str(config.max_history_num) + ('' if config.no_self_connection else '-self') + ('' if config.no_adjacent_normalization else '-normalize-' + config.gcn_normalization_type) + '-' + config.dataset + '.pkl'
         preprocessed_data_files = [user_ID_file, news_ID_file, category_file, subCategory_file, vocabulary_file, word_embedding_file, entity_file, entity_embedding_file, context_embedding_file, user_history_graph_file]
+        content_file = 'cache/content-%s.json' % config.dataset
 
         if not all(list(map(os.path.exists, preprocessed_data_files))):
             user_ID_dict = {'<UNK>': 0}
@@ -44,6 +73,9 @@ class MIND_Corpus:
             word_counter = collections.Counter()
             entity_dict = {'<PAD>': 0, '<UNK>': 1}
             news_category_dict = {}
+
+            content_dict = {}
+            news_content_dict = {}
 
             # 1. user ID dictionay
             with open(os.path.join(config.train_root, 'behaviors.tsv'), 'r', encoding='utf-8') as train_behaviors_f:
@@ -58,13 +90,17 @@ class MIND_Corpus:
             for i, prefix in enumerate([config.train_root, config.dev_root, config.test_root]):
                 with open(os.path.join(prefix, 'news.tsv'), 'r', encoding='utf-8') as news_f:
                     for line in news_f:
-                        news_ID, category, subCategory, title, abstract, _, title_entities, abstract_entities = line.split('\t')
+                        news_ID, category, subCategory, title, abstract, title_entities, abstract_entities, content = line.split('\t')
                         if news_ID not in news_ID_dict:
                             news_ID_dict[news_ID] = len(news_ID_dict)
                             if category not in category_dict:
                                 category_dict[category] = len(category_dict)
                             if subCategory not in subCategory_dict:
                                 subCategory_dict[subCategory] = len(subCategory_dict)
+
+                            if content not in content_dict:
+                                content_dict[news_ID] = len(content_dict)
+
                             words = pat.findall(title.lower()) if config.tokenizer == 'MIND' else word_tokenize(title.lower())
                             for word in words:
                                 if is_number(word):
@@ -85,6 +121,7 @@ class MIND_Corpus:
                                     else:
                                         if word in word_counter: # already appeared in training set
                                             word_counter[word] += 1
+
                             for entity in json.loads(title_entities):
                                 WikidataId = entity['WikidataId']
                                 if WikidataId not in entity_dict:
@@ -93,13 +130,31 @@ class MIND_Corpus:
                                 WikidataId = entity['WikidataId']
                                 if WikidataId not in entity_dict:
                                     entity_dict[WikidataId] = len(entity_dict)
+
+                            words = pat.findall(content.lower()) if config.tokenizer == 'MIND' else word_tokenize(
+                                content.lower())
+                            for word in words:
+                                if is_number(word):
+                                    word_counter['<NUM>'] += 1
+                                else:
+                                    if i == 0:  # training set
+                                        word_counter[word] += 1
+                                    else:
+                                        if word in word_counter:  # already appeared in training set
+                                            word_counter[word] += 1
+
                         news_category_dict[news_ID] = category_dict[category]
+                        news_content_dict[news_ID] = content.strip().split(' ')
+
             with open(news_ID_file, 'w', encoding='utf-8') as news_ID_f:
                 json.dump(news_ID_dict, news_ID_f)
             with open(category_file, 'w', encoding='utf-8') as category_f:
                 json.dump(category_dict, category_f)
             with open(subCategory_file, 'w', encoding='utf-8') as subCategory_f:
                 json.dump(subCategory_dict, subCategory_f)
+
+            with open(content_file, 'w', encoding='utf-8') as content_f:
+                json.dump(content_dict, content_f)
 
             # 3. word dictionay
             word_counter_list = [[word, word_counter[word]] for word in word_counter]
@@ -159,9 +214,10 @@ class MIND_Corpus:
             with open(context_embedding_file, 'wb') as context_embedding_f:
                 pickle.dump(context_embedding_vectors, context_embedding_f)
 
-            # 6. user history graph for CNE-SUE
-            category_num = len(category_dict)
-            graph_size = config.max_history_num + category_num # graph size of |V_{n}|+|V_{p}|
+            content_vocab_num = config.num_concepts * config.max_history_num
+            # 6. user history graph
+
+            graph_size = content_vocab_num  # graph size of |V_{n}|+|V_{p}|
             prefix_mode = ['train', 'dev', 'test']
             user_history_graph_data = {}
             for prefix_index, prefix in enumerate([config.train_root, config.dev_root, config.test_root]):
@@ -170,36 +226,45 @@ class MIND_Corpus:
                 with open(os.path.join(prefix, 'behaviors.tsv'), 'r', encoding='utf-8') as behaviors_f:
                     for line in behaviors_f:
                         user_history_num += 1
+
                 user_history_graph = np.zeros([user_history_num, graph_size, graph_size], dtype=np.float32)
-                user_history_category_mask = np.zeros([user_history_num, category_num + 1], dtype=np.float32)
-                user_history_category_indices = np.zeros([user_history_num, config.max_history_num], dtype=np.int64)
+
+                graph = pickle.load(open("MIND-small/"+mode+"/concepts_subgraph.pkl", 'rb'))   # build by 02_build_edge_index.py
+
                 with open(os.path.join(prefix, 'behaviors.tsv'), 'r', encoding='utf-8') as behaviors_f:
                     for line_index, line in enumerate(behaviors_f):
                         impression_ID, user_ID, time, history, impressions = line.split('\t')
                         if config.no_self_connection:
                             history_graph = np.zeros([graph_size, graph_size], dtype=np.float32)
                         else:
-                            history_graph = np.identity(graph_size, dtype=np.float32)
-                        history_category_mask = np.zeros(category_num + 1, dtype=np.float32) # extra one category index for padding news
-                        history_category_indices = np.full([config.max_history_num], category_num, dtype=np.int64)
+                            history_graph = np.identity(graph_size, dtype=np.float16)
+
                         if len(history.strip()) > 0:
                             history_news_ID = history.split(' ')
                             offset = max(0, len(history_news_ID) - config.max_history_num)
                             history_news_num = min(len(history_news_ID), config.max_history_num)
+                            history_news_contents = []
+                            history_news_content_vocabs = []
                             for i in range(history_news_num):
-                                category_index = news_category_dict[history_news_ID[i + offset]]
-                                history_category_mask[category_index] = 1.0
-                                history_category_indices[i] = category_index
-                                history_graph[i, config.max_history_num + category_index] = 1 # edge of E_{p}^{1} in inter-cluster graph G2
-                                history_graph[config.max_history_num + category_index, i] = 1 # edge of E_{p}^{1} in inter-cluster graph G2
-                                for j in range(i + 1, history_news_num):
-                                    _category_index = news_category_dict[history_news_ID[j + offset]]
-                                    if category_index == _category_index:
-                                        history_graph[i, j] = 1 # edge of E_{n} in intra-cluster graph G1
-                                        history_graph[j, i] = 1 # edge of E_{n} in intra-cluster graph G1
-                                    else:
-                                        history_graph[config.max_history_num + category_index, config.max_history_num + _category_index] = 1 # edge of E_{p}^{2} in inter-cluster graph G2
-                                        history_graph[config.max_history_num + _category_index, config.max_history_num + category_index] = 1 # edge of E_{p}^{2} in inter-cluster graph G2
+                                content_ith_news = news_content_dict[history_news_ID[i + offset]]
+                                history_news_contents.append(content_ith_news)
+                            for m in history_news_contents:
+                                for n in m:
+                                    history_news_content_vocabs.append(n)
+                            print(len(history_news_content_vocabs))
+                            repeated_times = content_vocab_num - len(history_news_content_vocabs)
+                            if repeated_times >= 0:
+                                history_news_content_vocabs = history_news_content_vocabs + ['0']*repeated_times
+                            else:
+                                history_news_content_vocabs = history_news_content_vocabs[:content_vocab_num]
+
+                            for v in range(len(history_news_content_vocabs)):
+                                for w in range(len(history_news_content_vocabs[v+1:])):
+                                    c1 = history_news_content_vocabs[v]
+                                    c2 = history_news_content_vocabs[w]
+                                    if graph.get_edge_data(c1, c2) is not None:
+                                        history_graph[v, w] = 1
+
                             if not config.no_adjacent_normalization:
                                 if config.gcn_normalization_type == 'asymmetric':
                                     # Asymmetric adjacent matrix normalization: D^{-\frac{1}{2}}A
@@ -209,20 +274,19 @@ class MIND_Corpus:
                                 else:
                                     # Symmetric adjacent matrix normalization: D^{-\frac{1}{2}}AD^{-\frac{1}{2}}
                                     D_inv_sqrt = np.zeros([graph_size, graph_size], dtype=np.float32)
-                                    np.fill_diagonal(D_inv_sqrt, np.sqrt(1 / history_graph.sum(axis=1, keepdims=False)))
+                                    np.fill_diagonal(D_inv_sqrt,
+                                                     np.sqrt(1 / history_graph.sum(axis=1, keepdims=False)))
                                     history_graph = np.matmul(np.matmul(D_inv_sqrt, history_graph), D_inv_sqrt)
                         user_history_graph[line_index] = history_graph
-                        user_history_category_mask[line_index] = history_category_mask
-                        user_history_category_indices[line_index] = history_category_indices
                     user_history_graph_data[mode + '_user_history_graph'] = user_history_graph
-                    user_history_graph_data[mode + '_user_history_category_mask'] = user_history_category_mask
-                    user_history_graph_data[mode + '_user_history_category_indices'] = user_history_category_indices
+
             with open(user_history_graph_file, 'wb') as user_history_graph_f:
                 pickle.dump(user_history_graph_data, user_history_graph_f)
 
+
     def __init__(self, config: Config):
-        # preprocess cache
-        MIND_Corpus.preprocess(config)
+        # preprocess data
+        MIND_Corpus_IPNR.preprocess(config)
         with open('cache/user_ID-%s.json' % config.dataset, 'r', encoding='utf-8') as user_ID_f:
             self.user_ID_dict = json.load(user_ID_f)
             config.user_num = len(self.user_ID_dict)
@@ -244,16 +308,16 @@ class MIND_Corpus:
         with open('cache/user_history_graph-' + str(config.max_history_num) + ('' if config.no_self_connection else '-self') + ('' if config.no_adjacent_normalization else '-normalize-' + config.gcn_normalization_type) + '-' + config.dataset + '.pkl', 'rb') as user_history_graph_f:
             user_history_data = pickle.load(user_history_graph_f)
             self.train_user_history_graph = user_history_data['train_user_history_graph']
-            self.train_user_history_category_mask = user_history_data['train_user_history_category_mask']
-            self.train_user_history_category_indices = user_history_data['train_user_history_category_indices']
+            # self.train_user_history_category_mask = user_history_data['train_user_history_category_mask']
+            # self.train_user_history_category_indices = user_history_data['train_user_history_category_indices']
             self.dev_user_history_graph = user_history_data['dev_user_history_graph']
-            self.dev_user_history_category_mask = user_history_data['dev_user_history_category_mask']
-            self.dev_user_history_category_indices = user_history_data['dev_user_history_category_indices']
+            # self.dev_user_history_category_mask = user_history_data['dev_user_history_category_mask']
+            # self.dev_user_history_category_indices = user_history_data['dev_user_history_category_indices']
             self.test_user_history_graph = user_history_data['test_user_history_graph']
-            self.test_user_history_category_mask = user_history_data['test_user_history_category_mask']
-            self.test_user_history_category_indices = user_history_data['test_user_history_category_indices']
+            # self.test_user_history_category_mask = user_history_data['test_user_history_category_mask']
+            # self.test_user_history_category_indices = user_history_data['test_user_history_category_indices']
 
-        # meta cache
+        # meta data
         self.negative_sample_num = config.negative_sample_num                                           # negative sample number for training
         self.max_history_num = config.max_history_num                                                   # max history number for each training user
         self.max_title_length = config.max_title_length                                                 # max title length for each news text
@@ -261,10 +325,10 @@ class MIND_Corpus:
         self.news_category = np.zeros([self.news_num], dtype=np.int32)                                  # [news_num]
         self.news_subCategory = np.zeros([self.news_num], dtype=np.int32)                               # [news_num]
         self.news_title_text = np.zeros([self.news_num, self.max_title_length], dtype=np.int32)         # [news_num, max_title_length]
-        self.news_title_mask = np.zeros([self.news_num, self.max_title_length], dtype=np.float32)       # [news_num, max_title_length]
+        self.news_title_mask = np.zeros([self.news_num, self.max_title_length], dtype=bool)             # [news_num, max_title_length]
         self.news_title_entity = np.zeros([self.news_num, self.max_title_length], dtype=np.int32)       # [news_num, max_title_length]
         self.news_abstract_text = np.zeros([self.news_num, self.max_abstract_length], dtype=np.int32)   # [news_num, max_abstract_length]
-        self.news_abstract_mask = np.zeros([self.news_num, self.max_abstract_length], dtype=np.float32) # [news_num, max_abstract_length]
+        self.news_abstract_mask = np.zeros([self.news_num, self.max_abstract_length], dtype=bool)       # [news_num, max_abstract_length]
         self.news_abstract_entity = np.zeros([self.news_num, self.max_abstract_length], dtype=np.int32) # [news_num, max_abstract_length]
         self.train_behaviors = []                                                                       # [user_ID, [history], [history_mask], click impression, [non-click impressions], behavior_index]
         self.dev_behaviors = []                                                                         # [user_ID, [history], [history_mask], candidate_news_ID, behavior_index]
@@ -274,30 +338,35 @@ class MIND_Corpus:
         self.title_word_num = 0
         self.abstract_word_num = 0
 
-        # generate news meta cache
+        self.max_concept_num = config.concept_num_per_news
+        self.news_concept_text = np.zeros([self.news_num, self.max_concept_num], dtype=np.int32)
+        self.news_concept_mask = np.zeros([self.news_num, self.max_concept_num], dtype=bool)
+        self.concept_word_num = 0
+
+        # generate news meta data
         news_ID_set = set(['<PAD>'])
         news_lines = []
         with open(os.path.join(config.train_root, 'news.tsv'), 'r', encoding='utf-8') as train_news_f:
             for line in train_news_f:
-                news_ID, category, subCategory, title, abstract, _, title_entities, abstract_entities = line.split('\t')
+                news_ID, category, subCategory, title, abstract, title_entities, abstract_entities, content = line.split('\t')
                 if news_ID not in news_ID_set:
                     news_lines.append(line)
                     news_ID_set.add(news_ID)
         with open(os.path.join(config.dev_root, 'news.tsv'), 'r', encoding='utf-8') as dev_news_f:
             for line in dev_news_f:
-                news_ID, category, subCategory, title, abstract, _, title_entities, abstract_entities = line.split('\t')
+                news_ID, category, subCategory, title, abstract, title_entities, abstract_entities, content = line.split('\t')
                 if news_ID not in news_ID_set:
                     news_lines.append(line)
                     news_ID_set.add(news_ID)
         with open(os.path.join(config.test_root, 'news.tsv'), 'r', encoding='utf-8') as test_news_f:
             for line in test_news_f:
-                news_ID, category, subCategory, title, abstract, _, title_entities, abstract_entities = line.split('\t')
+                news_ID, category, subCategory, title, abstract, title_entities, abstract_entities, content = line.split('\t')
                 if news_ID not in news_ID_set:
                     news_lines.append(line)
                     news_ID_set.add(news_ID)
         assert self.news_num == len(news_ID_set), 'news num mismatch %d v.s. %d' % (self.news_num, len(news_ID_set))
         for line in news_lines:
-            news_ID, category, subCategory, title, abstract, _, title_entities, abstract_entities = line.split('\t')
+            news_ID, category, subCategory, title, abstract, title_entities, abstract_entities, content = line.split('\t')
             index = self.news_ID_dict[news_ID]
             self.news_category[index] = self.category_dict[category] if category in self.category_dict else 0
             self.news_subCategory[index] = self.subCategory_dict[subCategory] if subCategory in self.subCategory_dict else 0
@@ -349,10 +418,32 @@ class MIND_Corpus:
                     if offsets[offset] != -1 and WikidataId in self.entity_dict:
                         self.news_abstract_entity[index][offsets[offset]] = self.entity_dict[WikidataId]
             self.abstract_word_num += len(words)
-        self.news_title_mask[0][0] = 1    # for <PAD> news
-        self.news_abstract_mask[0][0] = 1 # for <PAD> news
 
-        # generate behavior meta cache
+            # content
+            words = pat.findall(content.lower()) if config.tokenizer == 'MIND' else word_tokenize(content.lower())
+            offsets = [-1 for _ in range(len(content))]
+            offset_index = 0
+            for i, word in enumerate(words):
+                if i == self.max_concept_num:
+                    break
+                if is_number(word):
+                    self.news_concept_text[index][i] = self.word_dict['<NUM>']
+                elif word in self.word_dict:
+                    self.news_concept_text[index][i] = self.word_dict[word]
+                else:
+                    self.news_concept_text[index][i] = 1
+                self.news_concept_mask[index][i] = 1
+                while content[offset_index] in [' ', '\t']:
+                    offset_index += 1
+                for j in range(len(word)):
+                    offsets[offset_index] = i
+                    offset_index += 1
+            self.concept_word_num += len(words)
+        self.news_concept_mask[0][0] = 1    # for <PAD> news
+        self.news_title_mask[0][0] = 1  # for <PAD> news
+        self.news_abstract_mask[0][0] = 1  # for <PAD> news
+
+        # generate behavior meta data
         with open(os.path.join(config.train_root, 'behaviors.tsv'), 'r', encoding='utf-8') as train_behaviors_f:
             for behavior_index, line in enumerate(train_behaviors_f):
                 impression_ID, user_ID, time, history, impressions = line.split('\t')
@@ -367,13 +458,13 @@ class MIND_Corpus:
                     history = list(map(lambda x: self.news_ID_dict[x], history.strip().split(' ')))
                     padding_num = max(0, self.max_history_num - len(history))
                     user_history = history[-self.max_history_num:] + [0] * padding_num
-                    user_history_mask = np.zeros([self.max_history_num], dtype=np.float32)
-                    user_history_mask[:min(len(history), self.max_history_num)] = 1.0
+                    user_history_mask = np.zeros([self.max_history_num], dtype=bool)
+                    user_history_mask[:min(len(history), self.max_history_num)] = 1
                     for click_impression in click_impressions:
                         self.train_behaviors.append([self.user_ID_dict[user_ID], user_history, user_history_mask, click_impression, non_click_impressions, behavior_index])
                 else:
                     for click_impression in click_impressions:
-                        self.train_behaviors.append([self.user_ID_dict[user_ID], [0 for _ in range(self.max_history_num)], np.zeros([self.max_history_num], dtype=np.float32), click_impression, non_click_impressions, behavior_index])
+                        self.train_behaviors.append([self.user_ID_dict[user_ID], [0 for _ in range(self.max_history_num)], np.zeros([self.max_history_num], dtype=bool), click_impression, non_click_impressions, behavior_index])
         with open(os.path.join(config.dev_root, 'behaviors.tsv'), 'r', encoding='utf-8') as dev_behaviors_f:
             for dev_ID, line in enumerate(dev_behaviors_f):
                 impression_ID, user_ID, time, history, impressions = line.split('\t')
@@ -381,15 +472,15 @@ class MIND_Corpus:
                     history = list(map(lambda x: self.news_ID_dict[x], history.strip().split(' ')))
                     padding_num = max(0, self.max_history_num - len(history))
                     user_history = history[-self.max_history_num:] + [0] * padding_num
-                    user_history_mask = np.zeros([self.max_history_num], dtype=np.float32)
-                    user_history_mask[:min(len(history), self.max_history_num)] = 1.0
+                    user_history_mask = np.zeros([self.max_history_num], dtype=bool)
+                    user_history_mask[:min(len(history), self.max_history_num)] = 1
                     for impression in impressions.strip().split(' '):
                         self.dev_indices.append(dev_ID)
                         self.dev_behaviors.append([self.user_ID_dict[user_ID] if user_ID in self.user_ID_dict else 0, user_history, user_history_mask, self.news_ID_dict[impression[:-2]], dev_ID])
                 else:
                     for impression in impressions.strip().split(' '):
                         self.dev_indices.append(dev_ID)
-                        self.dev_behaviors.append([self.user_ID_dict[user_ID] if user_ID in self.user_ID_dict else 0, [0 for _ in range(self.max_history_num)], np.zeros([self.max_history_num], dtype=np.float32), self.news_ID_dict[impression[:-2]], dev_ID])
+                        self.dev_behaviors.append([self.user_ID_dict[user_ID] if user_ID in self.user_ID_dict else 0, [0 for _ in range(self.max_history_num)], np.zeros([self.max_history_num], dtype=bool), self.news_ID_dict[impression[:-2]], dev_ID])
         with open(os.path.join(config.test_root, 'behaviors.tsv'), 'r', encoding='utf-8') as test_behaviors_f:
             for test_ID, line in enumerate(test_behaviors_f):
                 impression_ID, user_ID, time, history, impressions = line.split('\t')
@@ -397,8 +488,8 @@ class MIND_Corpus:
                     history = list(map(lambda x: self.news_ID_dict[x], history.strip().split(' ')))
                     padding_num = max(0, self.max_history_num - len(history))
                     user_history = history[-self.max_history_num:] + [0] * padding_num
-                    user_history_mask = np.zeros([self.max_history_num], dtype=np.float32)
-                    user_history_mask[:min(len(history), self.max_history_num)] = 1.0
+                    user_history_mask = np.zeros([self.max_history_num], dtype=bool)
+                    user_history_mask[:min(len(history), self.max_history_num)] = 1
                     for impression in impressions.strip().split(' '):
                         self.test_indices.append(test_ID)
                         if config.dataset != 'large':
@@ -409,6 +500,6 @@ class MIND_Corpus:
                     for impression in impressions.strip().split(' '):
                         self.test_indices.append(test_ID)
                         if config.dataset != 'large':
-                            self.test_behaviors.append([self.user_ID_dict[user_ID] if user_ID in self.user_ID_dict else 0, [0 for _ in range(self.max_history_num)], np.zeros([self.max_history_num], dtype=np.float32), self.news_ID_dict[impression[:-2]], test_ID])
+                            self.test_behaviors.append([self.user_ID_dict[user_ID] if user_ID in self.user_ID_dict else 0, [0 for _ in range(self.max_history_num)], np.zeros([self.max_history_num], dtype=bool), self.news_ID_dict[impression[:-2]], test_ID])
                         else:
-                            self.test_behaviors.append([self.user_ID_dict[user_ID] if user_ID in self.user_ID_dict else 0, [0 for _ in range(self.max_history_num)], np.zeros([self.max_history_num], dtype=np.float32), self.news_ID_dict[impression], test_ID])
+                            self.test_behaviors.append([self.user_ID_dict[user_ID] if user_ID in self.user_ID_dict else 0, [0 for _ in range(self.max_history_num)], np.zeros([self.max_history_num], dtype=bool), self.news_ID_dict[impression], test_ID])

@@ -39,28 +39,36 @@ def func_auc(grouped_df):
     if sum(grouped_df["label"]) == 0 or sum(grouped_df["label"]) == len(grouped_df["label"]):
         return 1.0
     auc_metric = AUROC(task='binary', num_classes=2)
-    auc = auc_metric(grouped_df["label"], grouped_df["score"])
+    labels = torch.tensor(grouped_df["label"].values, dtype=torch.float32)
+    scores = torch.tensor(grouped_df["score"].values, dtype=torch.float32)
+    auc = auc_metric(labels, scores)
     return auc
 
 def func_mrr(grouped_df):
     if sum(grouped_df["label"]) == 0 or sum(grouped_df["label"]) == len(grouped_df["label"]):
         return 1.0
     mrr_metric = RetrievalMRR()
-    mrr = mrr_metric(grouped_df["label"], grouped_df["score"])
+    labels = torch.tensor(grouped_df["label"].values, dtype=torch.float32)
+    scores = torch.tensor(grouped_df["score"].values, dtype=torch.float32)
+    mrr = mrr_metric(labels, scores)
     return mrr
 
 def func_ndcg5(grouped_df):
     if sum(grouped_df["label"]) == 0 or sum(grouped_df["label"]) == len(grouped_df["label"]):
         return 1.0
     ndcg5_metric = RetrievalNormalizedDCG(top_k=5)
-    ndcg5 = ndcg5_metric(grouped_df["label"], grouped_df["score"], 5)
+    labels = torch.tensor(grouped_df["label"].values, dtype=torch.float32)
+    scores = torch.tensor(grouped_df["score"].values, dtype=torch.float32)
+    ndcg5 = ndcg5_metric(labels, scores, 5)
     return ndcg5
 
 def func_ndcg10(grouped_df):
     if sum(grouped_df["label"]) == 0 or sum(grouped_df["label"]) == len(grouped_df["label"]):
         return 1.0
     ndcg10_metric = RetrievalNormalizedDCG(top_k=10)
-    ndcg10 = ndcg10_metric(grouped_df["label"], grouped_df["score"], 10)
+    labels = torch.tensor(grouped_df["label"].values, dtype=torch.float32)
+    scores = torch.tensor(grouped_df["score"].values, dtype=torch.float32)
+    ndcg10 = ndcg10_metric(labels, scores, 10)
     return ndcg10
 
 def dev(model, dev_loader, device, out_path, is_epoch=False):

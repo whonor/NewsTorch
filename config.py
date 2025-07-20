@@ -71,9 +71,9 @@ class Config:
         maxpooling3D_size (int): Size of 3D max pooling for FIM.
         maxpooling3D_stride (int): Stride of 3D max pooling for FIM.
         click_predictor (str): Type of click predictor, can be 'dot_product', 'mlp', 'sigmoid', or 'FIM'.
-        train_root (str): Root directory for training data.
-        dev_root (str): Root directory for development data.
-        test_root (str): Root directory for test data.
+        train_root (str): Root directory for training cache.
+        dev_root (str): Root directory for development cache.
+        test_root (str): Root directory for test cache.
         config_dir (str): Directory for saving configuration files.
         model_dir (str): Directory for saving model checkpoints.
         best_model_dir (str): Directory for saving the best model.
@@ -87,8 +87,9 @@ class Config:
     Usage:
         config = config(model='TANR')
     '''
-    def __init__(self, model='UNBERT'):
+    def __init__(self, model='IPNR'):
         self.model = model.upper()
+        self.wandb = 'offline'  # Whether to use Weights & Biases for experiment tracking
         self.mode = 'train'
         self.dev_model_path = ''
         self.test_model_path = ''
@@ -107,7 +108,7 @@ class Config:
         self.max_history_num = 50
         self.epoch = 1
 
-        self.batch_size = 32
+        self.batch_size = 64
         self.lr = 1e-4
         self.weight_decay = 0
         self.gradient_clip_norm = 4
@@ -202,34 +203,35 @@ class Config:
             print("Please prepare the dataset first!!!")
 
         model_name = self.model
+        data_path = "cache/"
         mkdirs = lambda x: os.makedirs(x) if not os.path.exists(x) else None
-        self.model_dir = 'logs/models/' + self.dataset + '/' + model_name
-        self.dev_res_dir = 'logs/dev/res/' + self.dataset + '/' + model_name
-        self.result_dir = 'logs/results/' + self.dataset + '/' + model_name
+        self.model_dir = data_path + 'models/' + self.dataset + '/' + model_name
+        self.dev_res_dir = data_path + 'dev/res/' + self.dataset + '/' + model_name
+        self.result_dir = data_path + 'results/' + self.dataset + '/' + model_name
         mkdirs(self.model_dir)
-        mkdirs('logs/dev/ref')
+        mkdirs(data_path + 'dev/ref')
         mkdirs(self.dev_res_dir)
-        mkdirs('logs/test/ref')
+        mkdirs(data_path + 'test/ref')
         mkdirs(self.result_dir)
-        if not os.path.exists('logs/dev/ref/truth-%s.txt' % self.dataset):
+        if not os.path.exists(data_path + 'dev/ref/truth-%s.txt' % self.dataset):
             with open(os.path.join(self.dev_root, 'behaviors.tsv'), 'r', encoding='utf-8') as dev_f:
-                with open('logs/dev/ref/truth-%s.txt' % self.dataset, 'w', encoding='utf-8') as truth_f:
+                with open(data_path + 'dev/ref/truth-%s.txt' % self.dataset, 'w', encoding='utf-8') as truth_f:
                     for dev_ID, line in enumerate(dev_f):
                         # impression_ID, user_ID, time, history, impressions, is_fake = line.split('\t')
                         impression_ID, user_ID, time, history, impressions = line.split('\t')
                         labels = [int(impression[-1]) for impression in impressions.strip().split(' ')]
                         truth_f.write(('' if dev_ID == 0 else '\n') + str(dev_ID + 1) + ' ' + str(labels).replace(' ', ''))
         if self.dataset != 'large':
-            if not os.path.exists('logs/test/ref/truth-%s.txt' % self.dataset):
+            if not os.path.exists(data_path + 'test/ref/truth-%s.txt' % self.dataset):
                 with open(os.path.join(self.test_root, 'behaviors.tsv'), 'r', encoding='utf-8') as test_f:
-                    with open('logs/test/ref/truth-%s.txt' % self.dataset, 'w', encoding='utf-8') as truth_f:
+                    with open(data_path + 'test/ref/truth-%s.txt' % self.dataset, 'w', encoding='utf-8') as truth_f:
                         for test_ID, line in enumerate(test_f):
                             # impression_ID, user_ID, time, history, impressions, is_fake = line.split('\t')
                             impression_ID, user_ID, time, history, impressions = line.split('\t')
                             labels = [int(impression[-1]) for impression in impressions.strip().split(' ')]
                             truth_f.write(('' if test_ID == 0 else '\n') + str(test_ID + 1) + ' ' + str(labels).replace(' ', ''))
         else:
-            self.prediction_dir = 'logs/prediction/large/' + model_name
+            self.prediction_dir = data_path + 'prediction/large/' + model_name
             mkdirs(self.prediction_dir)
 
 

@@ -1,0 +1,35 @@
+
+word_embedding_dim: 300
+category_embedding_dim: 50
+subCategory_embedding_dim: 50
+hidden_dim: 200
+attention_dim: 200
+gcn_layer_num: 4
+dropout_rate: 0.2
+no_gcn_residual: false
+gcn_layer_norm: false
+gcn_use_bias: true
+num_concepts: 1
+concept_num_per_news: 20
+head_num: 20
+head_dim: 20
+cnn_method: "naive"
+cnn_kernel_num: 400
+cnn_window_size: 5
+# Fastformer
+hidden_size: 400
+hidden_dropout_prob: 0.2
+num_hidden_layers: 2
+hidden_act: "gelu"
+num_attention_heads: 20
+intermediate_size: 256
+max_position_embeddings: 512256
+type_vocab_size: 2
+vocab_size: 100000
+layer_norm_eps: 0.000000000001
+initializer_range: 0.02
+pooler_type: "weightpooler"
+enable_fp16: "False"
+
+
+

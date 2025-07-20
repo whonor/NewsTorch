@@ -1,4 +1,8 @@
 import math
+import pickle
+
+import numpy as np
+
 from config import Config
 import torch
 import torch.nn as nn
@@ -433,8 +437,8 @@ class IPNR(UserEncoder):
         self.attention = Attention(self.news_embedding_dim, config.attention_dim)
         self.attention_decoder = Attention(config.word_embedding_dim, config.attention_dim)
         self.attention_dim = max(config.attention_dim, self.news_embedding_dim // 4)
-        self.gcn = GCN(in_dim=self.word_embedding_dim, out_dim=self.word_embedding_dim,
-                       hidden_dim=self.word_embedding_dim, num_layers=config.gcn_layer_num,
+        self.gcn = GCN(in_dim=config.word_embedding_dim, out_dim=config.word_embedding_dim,
+                       hidden_dim=config.word_embedding_dim, num_layers=config.gcn_layer_num,
                        dropout=config.dropout_rate / 2, residual=not config.no_gcn_residual,
                        layer_norm=config.gcn_layer_norm)
         self.dropout = nn.Dropout(p=config.dropout_rate, inplace=True)
@@ -444,14 +448,15 @@ class IPNR(UserEncoder):
         self.num_concepts = config.num_concepts
         self.title_length = config.max_title_length
         self.content_length = config.max_abstract_length
+        self.word_embedding_dim = config.word_embedding_dim
 
         # gate net
         self.gate_layer = nn.Sequential(
-            nn.Linear(self.news_embedding_dim + self.word_embedding_dim, self.news_embedding_dim, bias=False),
+            nn.Linear(self.news_embedding_dim + config.word_embedding_dim, self.news_embedding_dim, bias=False),
             nn.Sigmoid()
         )
         self.fuse_layer1 = nn.Sequential(
-            nn.Linear(self.word_embedding_dim, self.news_embedding_dim, bias=False),
+            nn.Linear(config.word_embedding_dim, self.news_embedding_dim, bias=False),
             nn.Tanh()
         )
         # intention parameter
@@ -466,6 +471,15 @@ class IPNR(UserEncoder):
         #
         self.FusionAttention = ScaledDotProduct_CandidateAttention(self.news_embedding_dim, self.news_embedding_dim, self.attention_dim)
         self.fastformer = FastformerEncoder(config)
+
+        self.pretrained_concept_embedding = torch.from_numpy(
+            np.load(
+                'MIND-small/all_concept_word_embedding.npy')).float().to(
+            device=self.device)  # build by 03_generate_concept_embedding.py
+        with open('cache/word_embedding-' + str(config.word_threshold) + '-' + str(
+                config.word_embedding_dim) + '-' + config.tokenizer + '-' + str(config.max_title_length) + '-' + str(
+            config.max_abstract_length) + '-' + config.dataset + '.pkl', 'rb') as word_embedding_f:
+            self.word_embedding = nn.Embedding.from_pretrained(pickle.load(word_embedding_f))
 
     def initialize(self):
         self.multiheadAttention.initialize()
