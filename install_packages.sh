@@ -1,19 +1,6 @@
 #!/bin/bash
-
-# 检查 requirements.txt 是否存在
-if [ ! -f "requirements.txt" ]; then
-  echo "Error: requirements.txt not found in the current directory."
-  exit 1
-fi
-
-# 使用 pip 安装 requirements.txt 中的所有包
-echo "Installing packages from requirements.txt..."
-pip install --no-cache-dir -r requirements.txt
-
-# 检查安装是否成功
-if [ $? -eq 0 ]; then
-  echo "All packages installed successfully."
-else
-  echo "Error occurred during package installation."
-  exit 1
-fi
+# This script install s the required packages for the project. python=3.8
+pip install torch==2.1.0 torchvision==0.16.0 torchaudio==2.1.0 --index-url https://download.pytorch.org/whl/cu121
+pip install torchtext==0.16.0 torchmetrics==1.5.2 transformers==4.46.3 wandb==0.21.0 scikit-learn==1.0.2 pandas==2.0.3 scipy==1.10.1 openai==1.88.0 nltk==3.7 networkx==3.1 matplotlib
+pip install --no-index torch-scatter -f https://pytorch-geometric.com/whl/torch-2.1.0+cu121.html
+pip install --no-index torch-sparse -f https://pytorch-geometric.com/whl/torch-2.1.0+cu121.html

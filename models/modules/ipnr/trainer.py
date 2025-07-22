@@ -7,9 +7,9 @@ import wandb
 
 from config import Config
 from dataset_corpus_preprocessing.MIND_corpus_IPNR import MIND_Corpus_IPNR
-from dataset_corpus_preprocessing.MIND_dataset_IPNR import MIND_Train_Dataset
+from dataset_corpus_preprocessing.MIND_dataset_IPNR import MIND_Train_Dataset_IPNR
 
-from util import AvgMetric
+from util import AvgMetric, compute_scores_IPNR
 from util import compute_scores
 from tqdm import tqdm
 import torch
@@ -31,16 +31,16 @@ class TrainerIPNR:
         self.optimizer = optim.Adam(filter(lambda p: p.requires_grad, self.model.parameters()), lr=config.lr, weight_decay=config.weight_decay)
         self._dataset = config.dataset
         self.mind_corpus = mind_corpus
-        self.train_dataset = MIND_Train_Dataset(mind_corpus)
+        self.train_dataset = MIND_Train_Dataset_IPNR(mind_corpus)
         self.run_index = run_index
         self.model_dir = config.model_dir + '/#' + str(self.run_index)
-        # self.best_model_dir = config.best_model_dir + '/#' + str(self.run_index)
+        self.best_model_dir = config.best_model_dir + '/#' + str(self.run_index)
         self.dev_res_dir = config.dev_res_dir + '/#' + str(self.run_index)
         self.result_dir = config.result_dir
         if not os.path.exists(self.model_dir):
             os.mkdir(self.model_dir)
-        # if not os.path.exists(self.best_model_dir):
-        #     os.mkdir(self.best_model_dir)
+        if not os.path.exists(self.best_model_dir):
+            os.mkdir(self.best_model_dir)
         if not os.path.exists(self.dev_res_dir):
             os.mkdir(self.dev_res_dir)
         # with open(config.config_dir + '/#' + str(self.run_index) + '.json', 'w', encoding='utf-8') as f:
@@ -133,7 +133,7 @@ class TrainerIPNR:
             wandb.log({'epoch': e, 'train_loss': epoch_loss / len(self.train_dataset)}, step=e)
 
             # validation
-            auc, mrr, ndcg5, ndcg10 = compute_scores(Config, model, self.mind_corpus, self.batch_size * 3 // 2, 'dev', self.dev_res_dir + '/' + model.model_name + '-' + str(e) + '.txt', self._dataset)
+            auc, mrr, ndcg5, ndcg10 = compute_scores_IPNR(Config, model, self.mind_corpus, self.batch_size * 3 // 2, 'dev', self.dev_res_dir + '/' + model.model_name + '-' + str(e) + '.txt', self._dataset)
             self.auc_results.append(auc)
             self.mrr_results.append(mrr)
             self.ndcg5_results.append(ndcg5)
@@ -200,7 +200,7 @@ class TrainerIPNR:
         #     f.write('Epoch\tAUC\tMRR\tnDCG@5\tnDCG@10\n')
         #     for i in range(len(self.auc_results)):
         #         f.write('%d\t%.4f\t%.4f\t%.4f\t%.4f\n' % (i + 1, self.auc_results[i], self.mrr_results[i], self.ndcg5_results[i], self.ndcg10_results[i]))
-        # shutil.copy(self.model_dir + '/' + model.model_name + '-' + str(self.best_dev_epoch), self.best_model_dir + '/' + model.model_name)
+        shutil.copy(self.model_dir + '/' + model.model_name + '-' + str(self.best_dev_epoch), self.best_model_dir + '/' + model.model_name)
         print('Training : ' + model.model_name + ' #' + str(self.run_index) + ' completed\nDev criterions:')
         print('AUC : %.4f' % self.auc_results[self.best_dev_epoch - 1])
         print('MRR : %.4f' % self.mrr_results[self.best_dev_epoch - 1])
@@ -231,7 +231,7 @@ def distributed_train(rank, model: nn.Module, config: Config, mind_corpus: MIND_
     model = DDP(model, device_ids=[rank])
     optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.module.parameters()), lr=config.lr, weight_decay=config.weight_decay)
     gradient_clip_norm = config.gradient_clip_norm
-    train_dataset = MIND_Train_Dataset(mind_corpus)
+    train_dataset = MIND_Train_Dataset_IPNR(mind_corpus)
     if rank == 0:
         model_dir = config.model_dir + '/#' + str(run_index)
         best_model_dir = config.best_model_dir + '/#' + str(run_index)

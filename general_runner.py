@@ -15,7 +15,7 @@ from models.NRMS import NRMS
 from models.TANR import TANR
 from models.CenNewsRec import CenNewsRec
 from models.modules.ipnr.trainer import TrainerIPNR
-from util import get_run_index
+from util import get_run_index, compute_scores_IPNR
 from datetime import datetime
 import wandb
 from config import Config
@@ -47,11 +47,16 @@ class Trainer:
         self.run_index = run_index
         self.model_dir = config.model_dir + '/#' + str(self.run_index)
         self.dev_res_dir = config.dev_res_dir + '/#' + str(self.run_index)
+        self.best_model_dir = config.best_model_dir + '/#' + str(self.run_index)
         if not os.path.exists(self.dev_res_dir):
             os.mkdir(self.dev_res_dir)
         if self._dataset == 'large':
             self.prediction_dir = config.prediction_dir + '/#' + str(self.run_index)
             os.mkdir(self.prediction_dir)
+        if not os.path.exists(self.best_model_dir):
+            os.mkdir(self.best_model_dir)
+        if not os.path.exists(self.model_dir):
+            os.mkdir(self.model_dir)
         self.dev_criterion = config.dev_criterion
         self.early_stopping_epoch = config.early_stopping_epoch
         self.auc_results = []
@@ -153,7 +158,15 @@ class Trainer:
             self.wandb.log({'train epoch': e, 'loss': epoch_loss / len(self.train_dataset)})
 
             # validation
-            auc, mrr, ndcg5, ndcg10 = compute_scores(self.config , model, self.mind_corpus, self.batch_size * 3 // 2, 'dev', self.dev_res_dir + '/' + self.config.model + '-' + str(e) + '.txt', self._dataset)
+            if config.model == "IPNR":
+                auc, mrr, ndcg5, ndcg10 = compute_scores_IPNR(self.config, model, self.mind_corpus, self.batch_size * 3 // 2,
+                                                         'dev', self.dev_res_dir + '/' + self.config.model + '-' + str(
+                        e) + '.txt', self._dataset)
+            else:
+                auc, mrr, ndcg5, ndcg10 = compute_scores(self.config, model, self.mind_corpus, self.batch_size * 3 // 2,
+                                                         'dev', self.dev_res_dir + '/' + self.config.model + '-' + str(
+                        e) + '.txt', self._dataset)
+
             self.auc_results.append(auc)
             self.mrr_results.append(mrr)
             self.ndcg5_results.append(ndcg5)
@@ -176,7 +189,8 @@ class Trainer:
                 torch.save({self.config.model: model.state_dict()}, self.model_dir + '/' + self.config.model + '-' + str(self.best_dev_epoch))
             if self.epoch_not_increase == self.early_stopping_epoch:
                 break
-
+        shutil.copy(self.model_dir + '/' + model.model_name + '-' + str(self.best_dev_epoch),
+                    self.best_model_dir + '/' + model.model_name)
         print('Training : ' + self.config.model + ' #' + str(self.run_index) + ' completed\nDev criterions:')
         print('AUC : %.4f' % self.auc_results[self.best_dev_epoch - 1])
         print('MRR : %.4f' % self.mrr_results[self.best_dev_epoch - 1])
@@ -264,8 +278,15 @@ def dev(config: Config, mind_corpus: MIND_Corpus):
     dev_res_dir = os.path.join(config.dev_res_dir, config.dev_model_path.replace('\\', '_').replace('/', '_'))
     if not os.path.exists(dev_res_dir):
         os.mkdir(dev_res_dir)
-    auc, mrr, ndcg5, ndcg10 = compute_scores(config, model, mind_corpus, config.batch_size * 2 // config.world_size, 'dev',
+    if config.model == 'IPNR':
+        auc, mrr, ndcg5, ndcg10 = compute_scores_IPNR(config, model, mind_corpus, config.batch_size * 2 // config.world_size, 'dev',
                                              dev_res_dir + '/' + config.model + '.txt', config.dataset)
+    else:
+        auc, mrr, ndcg5, ndcg10 = compute_scores(config, model, mind_corpus, config.batch_size * 2 // config.world_size,
+                                                 'dev',
+                                                 dev_res_dir + '/' + config.model + '.txt', config.dataset)
+
+
     print('Dev : ' + config.dev_model_path)
     print('AUC : %.4f\nMRR : %.4f\nnDCG@5 : %.4f\nnDCG@10 : %.4f' % (auc, mrr, ndcg5, ndcg10))
     return auc, mrr, ndcg5, ndcg10
@@ -303,7 +324,13 @@ def test(config: Config, mind_corpus: MIND_Corpus):
         os.mkdir(test_res_dir)
     print('test model path  : ' + config.test_model_path)
     print('test output file : ' + test_res_dir + '/' + config.model + '.txt')
-    auc, mrr, ndcg5, ndcg10 = compute_scores(config, model, mind_corpus, config.batch_size * 2 // config.world_size, 'test', test_res_dir + '/' + config.model + '.txt', config.dataset)
+    if config.model == 'IPNR':
+        auc, mrr, ndcg5, ndcg10 = compute_scores_IPNR(config, model, mind_corpus, config.batch_size * 2 // config.world_size, 'test',
+                                             test_res_dir + '/' + config.model + '.txt', config.dataset)
+    else:
+        auc, mrr, ndcg5, ndcg10 = compute_scores(config, model, mind_corpus, config.batch_size * 2 // config.world_size,
+                                                 'test',
+                                                 test_res_dir + '/' + config.model + '.txt', config.dataset)
     if config.dataset != 'large':
         print('AUC : %.4f\nMRR : %.4f\nnDCG@5 : %.4f\nnDCG@10 : %.4f' % (auc, mrr, ndcg5, ndcg10))
         if config.mode == 'train':

@@ -208,11 +208,15 @@ class Config:
         self.model_dir = data_path + 'models/' + self.dataset + '/' + model_name
         self.dev_res_dir = data_path + 'dev/res/' + self.dataset + '/' + model_name
         self.result_dir = data_path + 'results/' + self.dataset + '/' + model_name
+        self.best_model_dir = data_path + 'best_models/' + self.dataset + '/' + model_name
+        self.test_res_dir = data_path + 'test/res/' + self.dataset + '/' + model_name
         mkdirs(self.model_dir)
         mkdirs(data_path + 'dev/ref')
         mkdirs(self.dev_res_dir)
         mkdirs(data_path + 'test/ref')
         mkdirs(self.result_dir)
+        mkdirs(self.best_model_dir)
+        mkdirs(self.test_res_dir)
         if not os.path.exists(data_path + 'dev/ref/truth-%s.txt' % self.dataset):
             with open(os.path.join(self.dev_root, 'behaviors.tsv'), 'r', encoding='utf-8') as dev_f:
                 with open(data_path + 'dev/ref/truth-%s.txt' % self.dataset, 'w', encoding='utf-8') as truth_f:

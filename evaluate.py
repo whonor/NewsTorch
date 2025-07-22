@@ -47,12 +47,13 @@ def scoring(truth_f, sub_f):
 
         y_true = torch.tensor(labels, dtype=torch.float32)
         y_score = torch.tensor([1. / rank for rank in sub_ranks], dtype=torch.float32)
+        indexes = torch.arange(len(labels))
 
         # Update metrics
         auc_metric.update(y_score, y_true.int())
-        mrr_metric.update(y_score, y_true.int())
-        ndcg5_metric.update(y_score, y_true.int())
-        ndcg10_metric.update(y_score, y_true.int())
+        mrr_metric.update(y_score, y_true.int(), indexes)
+        ndcg5_metric.update(y_score, y_true.int(), indexes)
+        ndcg10_metric.update(y_score, y_true.int(), indexes)
 
         line_index += 1
 
