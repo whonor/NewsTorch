@@ -48,7 +48,10 @@ def process_dataset(base_dir: Path, splits: dict, include_wikidata: bool = False
         wikidata_filename = Path(wikidata_url).name
         wikidata_zip = download_dir / wikidata_filename
         # download_file(wikidata_url, wikidata_zip)
-        extract_zip(wikidata_zip, download_dir / 'wikidata-graph')
+        if wikidata_zip.exists():
+            extract_zip(wikidata_zip, download_dir / 'wikidata-graph')
+
+
 
 def main():
     datasets = {
