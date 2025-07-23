@@ -87,7 +87,7 @@ class Config:
     Usage:
         config = config(model='TANR')
     '''
-    def __init__(self, model='IPNR'):
+    def __init__(self, model='LSTUR'):
         self.model = model.upper()
         self.wandb = 'offline'  # Whether to use Weights & Biases for experiment tracking
         self.mode = 'train'
@@ -106,7 +106,8 @@ class Config:
         self.max_abstract_length = 128
         self.negative_sample_num = 4
         self.max_history_num = 50
-        self.epoch = 1
+        self.candidate_news_num = 5
+        self.epoch = 20
 
         self.batch_size = 64
         self.lr = 1e-4

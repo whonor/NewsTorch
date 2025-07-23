@@ -79,30 +79,37 @@ class SUE(UserEncoder):
         news_num = candidate_news_representation.size(1)
         batch_news_num = batch_size * news_num
         user_history_category_mask[:, -1] = 1
-        user_history_category_mask = user_history_category_mask.unsqueeze(dim=1).expand(-1, news_num, -1).contiguous()                                  # [batch_size, news_num, category_num]
-        user_history_category_indices = user_history_category_indices.unsqueeze(dim=1).expand(-1, news_num, -1)                                         # [batch_size, news_num, max_history_num]
+        # [batch_size, news_num, category_num]
+        user_history_category_mask = user_history_category_mask.unsqueeze(dim=1).expand(-1, news_num, -1).contiguous()
+        # [batch_size, news_num, max_history_num]
+        user_history_category_indices = user_history_category_indices.unsqueeze(dim=1).expand(-1, news_num, -1)
+        # [batch_size, max_history_num, news_embedding_dim]
         history_embedding = self.news_encoder(user_title_text, user_title_mask, user_title_entity, \
                                               user_content_text, user_content_mask, user_content_entity, \
-                                              user_category, user_subCategory, user_embedding)                                                          # [batch_size, max_history_num, news_embedding_dim]
-        # 1. GCN
-        history_embedding = torch.cat([history_embedding, self.dropout_(self.proxy_node_embedding.unsqueeze(dim=0).expand(batch_size, -1, -1))], dim=1) # [batch_size, max_history_num + category_num, news_embedding_dim]
-        gcn_feature = self.gcn(history_embedding, user_history_graph) + history_embedding                                                               # [batch_size, max_history_num + category_num, news_embedding_dim]
-        gcn_feature = gcn_feature[:, :self.max_history_num, :]                                                                                          # [batch_size, max_history_num, news_embedding_dim]
-        gcn_feature = gcn_feature.unsqueeze(dim=1).expand(-1, news_num, -1, -1)                                                                         # [batch_size, news_num, max_history_num, news_embedding_dim]
+                                              user_category, user_subCategory, user_embedding)
+        # 1. GCN # [batch_size, max_history_num + category_num, news_embedding_dim]
+        history_embedding = torch.cat([history_embedding, self.dropout_(self.proxy_node_embedding.unsqueeze(dim=0).expand(batch_size, -1, -1))], dim=1)
+        # [batch_size, max_history_num + category_num, news_embedding_dim]
+        gcn_feature = self.gcn(history_embedding, user_history_graph) + history_embedding
+        gcn_feature = gcn_feature[:, :self.max_history_num, :]
+        #  [batch_size, news_num, max_history_num, news_embedding_dim]
+        gcn_feature = gcn_feature.unsqueeze(dim=1).expand(-1, news_num, -1, -1)
         # 2. Intra-cluster attention
-        K = self.intraCluster_K(gcn_feature).view([batch_news_num, self.max_history_num, self.attention_dim])                                           # [batch_size * news_num, max_history_num, attention_dim]
-        Q = self.intraCluster_Q(candidate_news_representation).view([batch_news_num, self.attention_dim, 1])                                            # [batch_size * news_num, attention_dim, 1]
-        a = torch.bmm(K, Q).view([batch_size, news_num, self.max_history_num]) / self.attention_scalar                                                  # [batch_size, news_num, max_history_num]
-        alpha_intra = scatter_softmax(a, user_history_category_indices, 2).unsqueeze(dim=3)                                                             # [batch_size, news_num, max_history_num, 1]
-        intra_cluster_feature = scatter_sum(alpha_intra * gcn_feature, user_history_category_indices, dim=2, dim_size=self.category_num)                # [batch_size, news_num, category_num, news_embedding_dim]
-        # perform nonlinear transformation on intra-cluster features
-        intra_cluster_feature = self.dropout(F.relu(self.clusterFeatureAffine(intra_cluster_feature), inplace=True) + intra_cluster_feature)            # [batch_size, news_num, category_num, news_embedding_dim]
+        K = self.intraCluster_K(gcn_feature).view([batch_news_num, self.max_history_num, self.attention_dim])
+        Q = self.intraCluster_Q(candidate_news_representation).view([batch_news_num, self.attention_dim, 1])
+        a = torch.bmm(K, Q).view([batch_size, news_num, self.max_history_num]) / self.attention_scalar
+        alpha_intra = scatter_softmax(a, user_history_category_indices, 2).unsqueeze(dim=3)
+        # [batch_size, news_num, max_history_num, 1]
+        intra_cluster_feature = scatter_sum(alpha_intra * gcn_feature, user_history_category_indices, dim=2, dim_size=self.category_num)
+        # perform nonlinear transformation on intra-cluster features  # [batch_size, news_num, category_num, news_embedding_dim]
+        intra_cluster_feature = self.dropout(F.relu(self.clusterFeatureAffine(intra_cluster_feature), inplace=True) + intra_cluster_feature)
         # 3. Inter-cluster attention
         inter_cluster_feature = self.interClusterAttention(
             intra_cluster_feature.view([batch_news_num, self.category_num, self.news_embedding_dim]),
             candidate_news_representation.view([batch_news_num, self.news_embedding_dim]),
             mask=user_history_category_mask.view([batch_news_num, self.category_num])
-        ).view([batch_size, news_num, self.news_embedding_dim])                                                                                         # [batch_size, news_num, news_embedding_dim]
+        ).view([batch_size, news_num, self.news_embedding_dim])
+        # [batch_size, news_num, news_embedding_dim]
         return inter_cluster_feature
 
 ########################################################################################################################
@@ -124,36 +131,38 @@ class LSTUR(UserEncoder):
                 user_history_mask, user_history_graph, user_history_category_mask, user_history_category_indices, user_embedding, candidate_news_representation):
         batch_size = user_title_text.size(0)
         news_num = candidate_news_representation.size(1)
-        user_history_num = user_history_mask.sum(dim=1, keepdim=False).long()                                                                           # [batch_size]
+        user_history_num = user_history_mask.sum(dim=1, keepdim=False).long()
         history_embedding = self.news_encoder(user_title_text, user_title_mask, user_title_entity, \
                                               user_content_text, user_content_mask, user_content_entity, \
-                                              user_category, user_subCategory, user_embedding)                                                          # [batch_size, max_history_num, news_embedding_dim]
-        sorted_user_history_num, sorted_indices = torch.sort(user_history_num, descending=True)                                                         # [batch_size]
-        _, desorted_indices = torch.sort(sorted_indices, descending=False)                                                                              # [batch_size]
+                                              user_category, user_subCategory, user_embedding)
+        sorted_user_history_num, sorted_indices = torch.sort(user_history_num, descending=True)
+        _, desorted_indices = torch.sort(sorted_indices, descending=False)
         nonzero_indices = sorted_user_history_num.nonzero(as_tuple=False).squeeze(dim=1)
         if nonzero_indices.size(0) == 0:
-            user_representation = user_embedding.unsqueeze(dim=1).expand(-1, news_num, -1)                                                              # [batch_size, news_num, news_embedding_dim]  
+            user_representation = user_embedding.unsqueeze(dim=1).expand(-1, news_num, -1)
             return user_representation
         index = nonzero_indices[-1]
         if index + 1 == batch_size:
-            sorted_user_embedding = user_embedding.index_select(0, sorted_indices)                                                                      # [batch_size, user_embedding_dim]
+            sorted_user_embedding = user_embedding.index_select(0, sorted_indices)
             if self.training and self.masking_probability != 1.0:
-                sorted_user_embedding *= torch.bernoulli(torch.empty([batch_size, 1], device=self.device).fill_(self.masking_probability))              # [batch_size, user_embedding_dim]
-            sorted_history_embedding = history_embedding.index_select(0, sorted_indices)                                                                # [batch_size, max_history_num, news_embedding_dim]
-            packed_sorted_history_embedding = pack_padded_sequence(sorted_history_embedding, sorted_user_history_num.cpu(), batch_first=True)           # [batch_size, max_history_num, news_embedding_dim]
-            _, h = self.gru(packed_sorted_history_embedding, sorted_user_embedding.unsqueeze(dim=0))                                                    # [1, batch_size, news_embedding_dim]
-            user_representation = h.squeeze(dim=0).index_select(0, desorted_indices)                                                                    # [batch_size, news_embedding_dim]
+                sorted_user_embedding *= torch.bernoulli(torch.empty([batch_size, 1], device=self.device).fill_(self.masking_probability))
+            sorted_history_embedding = history_embedding.index_select(0, sorted_indices)
+            packed_sorted_history_embedding = pack_padded_sequence(sorted_history_embedding, sorted_user_history_num.cpu(), batch_first=True)
+            _, h = self.gru(packed_sorted_history_embedding, sorted_user_embedding.unsqueeze(dim=0))
+            user_representation = h.squeeze(dim=0).index_select(0, desorted_indices)
         else:
             non_empty_indices = sorted_indices[:index+1]
             empty_indices = sorted_indices[index+1:]
-            sorted_user_embedding = user_embedding.index_select(0, non_empty_indices)                                                                   # [batch_size, user_embedding_dim]
+            sorted_user_embedding = user_embedding.index_select(0, non_empty_indices)
             if self.training and self.masking_probability != 1.0:
-                sorted_user_embedding *= torch.bernoulli(torch.empty([index + 1, 1], device=self.device).fill_(self.masking_probability))               # [batch_size, user_embedding_dim]
-            sorted_history_embedding = history_embedding.index_select(0, non_empty_indices)                                                             # [batch_size, max_history_num, news_embedding_dim]
-            packed_sorted_history_embedding = pack_padded_sequence(sorted_history_embedding, sorted_user_history_num[:index+1].cpu(), batch_first=True) # [batch_size, max_history_num, news_embedding_dim]
-            _, h = self.gru(packed_sorted_history_embedding, sorted_user_embedding.unsqueeze(dim=0))                                                    # [1, batch_size, news_embedding_dim]
-            user_representation = torch.cat([h.squeeze(dim=0), user_embedding.index_select(0, empty_indices)], dim=0).index_select(0, desorted_indices) # [batch_size, news_embedding_dim]
-
+                sorted_user_embedding *= torch.bernoulli(torch.empty([index + 1, 1], device=self.device).fill_(self.masking_probability))
+            sorted_history_embedding = history_embedding.index_select(0, non_empty_indices)
+            # [batch_size, max_history_num, news_embedding_dim]
+            packed_sorted_history_embedding = pack_padded_sequence(sorted_history_embedding, sorted_user_history_num[:index+1].cpu(), batch_first=True)
+            _, h = self.gru(packed_sorted_history_embedding, sorted_user_embedding.unsqueeze(dim=0))
+            # [batch_size, news_embedding_dim]
+            user_representation = torch.cat([h.squeeze(dim=0), user_embedding.index_select(0, empty_indices)], dim=0).index_select(0, desorted_indices)
+        # user_representation = user_representation.unsqueeze(dim=1).expand(-1, news_num, -1)
         return user_representation
 
 ########################################################################################################################
@@ -174,12 +183,16 @@ class MHSA(UserEncoder):
     def forward(self, user_title_text, user_title_mask, user_title_entity, user_content_text, user_content_mask, user_content_entity, user_category, user_subCategory, \
                 user_history_mask, user_history_graph, user_history_category_mask, user_history_category_indices, user_embedding, candidate_news_representation):
         news_num = candidate_news_representation.size(1)
+        # [batch_size, max_history_num, news_embedding_dim]
         history_embedding = self.news_encoder(user_title_text, user_title_mask, user_title_entity, \
                                               user_content_text, user_content_mask, user_content_entity, \
-                                              user_category, user_subCategory, user_embedding)                  # [batch_size, max_history_num, news_embedding_dim]
-        h = self.multiheadAttention(history_embedding, history_embedding, history_embedding, user_history_mask) # [batch_size, max_history_num, head_num * head_dim]
-        h = F.relu(F.dropout(self.affine(h), training=self.training, inplace=True), inplace=True)               # [batch_size, max_history_num, news_embedding_dim]
-        user_representation = self.attention(h)                        # [batch_size, news_num, news_embedding_dim]
+                                              user_category, user_subCategory, user_embedding)
+        # [batch_size, max_history_num, head_num * head_dim]
+        h = self.multiheadAttention(history_embedding, history_embedding, history_embedding, user_history_mask)
+        # [batch_size, max_history_num, news_embedding_dim]
+        h = F.relu(F.dropout(self.affine(h), training=self.training, inplace=True), inplace=True)
+        # [batch_size, news_num, news_embedding_dim]
+        user_representation = self.attention(h)
         return user_representation
 
 
@@ -195,9 +208,10 @@ class ATT(UserEncoder):
 
     def forward(self, user_title_text, user_title_mask, user_title_entity, user_content_text, user_content_mask, user_content_entity, user_category, user_subCategory, \
                 user_history_mask, user_history_graph, user_history_category_mask, user_history_category_indices, user_embedding, candidate_news_representation):
+        # [batch_size, max_history_num, news_embedding_dim]
         history_embedding = self.news_encoder(user_title_text, user_title_mask, user_title_entity, \
                                               user_content_text, user_content_mask, user_content_entity, \
-                                              user_category, user_subCategory, user_embedding)            # [batch_size, max_history_num, news_embedding_dim]
+                                              user_category, user_subCategory, user_embedding)
         user_representation = self.attention(history_embedding)
         return user_representation
 
@@ -219,17 +233,26 @@ class CATT(UserEncoder):
     def forward(self, user_title_text, user_title_mask, user_title_entity, user_content_text, user_content_mask, user_content_entity, user_category, user_subCategory, \
                 user_history_mask, user_history_graph, user_history_category_mask, user_history_category_indices, user_embedding, candidate_news_representation):
         news_num = candidate_news_representation.size(1)
+        # [batch_size, max_history_num, news_embedding_dim]
         history_embedding = self.news_encoder(user_title_text, user_title_mask, user_title_entity, \
                                               user_content_text, user_content_mask, user_content_entity, \
-                                              user_category, user_subCategory, user_embedding)                                  # [batch_size, max_history_num, news_embedding_dim]
-        user_history_mask = user_history_mask.unsqueeze(dim=1).expand(-1, news_num, -1)                                         # [batch_size, news_num, max_history_num]
-        candidate_news_representation = candidate_news_representation.unsqueeze(dim=2).expand(-1, -1, self.max_history_num, -1) # [batch_size, news_num, max_history_num, news_embedding_dim]
-        history_embedding = history_embedding.unsqueeze(dim=1).expand(-1, news_num, -1, -1)                                     # [batch_size, news_num, max_history_num, news_embedding_dim]
-        concat_embeddings = torch.cat([candidate_news_representation, history_embedding], dim=3)                                # [batch_size, news_num, max_history_num, news_embedding_dim * 2]
-        hidden = F.relu(self.affine1(concat_embeddings), inplace=True)                                                          # [batch_size, news_num, max_history_num, attention_dim]
-        a = self.affine2(hidden).squeeze(dim=3)                                                                                 # [batch_size, news_num, max_history_num]
-        alpha = F.softmax(a.masked_fill(user_history_mask == 0, -1e9), dim=2)                                                   # [batch_size, news_num, max_history_num]
-        user_representation = (alpha.unsqueeze(dim=3) * history_embedding).sum(dim=2, keepdim=False)                            # [batch_size, news_num, news_embedding_dim]
+                                              user_category, user_subCategory, user_embedding)
+        # [batch_size, news_num, max_history_num]
+        user_history_mask = user_history_mask.unsqueeze(dim=1).expand(-1, news_num, -1)
+        # [batch_size, news_num, max_history_num, news_embedding_dim]
+        candidate_news_representation = candidate_news_representation.unsqueeze(dim=2).expand(-1, -1, self.max_history_num, -1)
+        # [batch_size, news_num, max_history_num, news_embedding_dim]
+        history_embedding = history_embedding.unsqueeze(dim=1).expand(-1, news_num, -1, -1)
+        # [batch_size, news_num, max_history_num, news_embedding_dim * 2]
+        concat_embeddings = torch.cat([candidate_news_representation, history_embedding], dim=3)
+        # [batch_size, news_num, max_history_num, attention_dim]
+        hidden = F.relu(self.affine1(concat_embeddings), inplace=True)
+        # [batch_size, news_num, max_history_num]
+        a = self.affine2(hidden).squeeze(dim=3)
+        # [batch_size, news_num, max_history_num]
+        alpha = F.softmax(a.masked_fill(user_history_mask == 0, -1e9), dim=2)
+        # [batch_size, news_num, news_embedding_dim]
+        user_representation = (alpha.unsqueeze(dim=3) * history_embedding).sum(dim=2, keepdim=False)
         return user_representation
 
 ########################################################################################################################
@@ -257,21 +280,29 @@ class FIM(UserEncoder):
         batch_size = candidate_news_d0.size(0)
         news_num = candidate_news_d0.size(1)
         batch_news_num = batch_size * news_num
-        # 1. compute 3D matching images
-        candidate_news_d0 = candidate_news_d0.unsqueeze(dim=2).permute(0, 1, 2, 4 ,3)                                                       # [batch_size, news_num, 1, HDC_sequence_length, HDC_filter_num]
-        candidate_news_dL = candidate_news_dL.unsqueeze(dim=2).permute(0, 1, 2, 3 ,5, 4)                                                    # [batch_size, news_num, 1, 3, HDC_sequence_length, HDC_filter_num]
-        history_embedding_d0 = history_embedding_d0.unsqueeze(dim=1)                                                                        # [batch_size, 1, max_history_num, HDC_filter_num, HDC_sequence_length]
-        history_embedding_dL = history_embedding_dL.unsqueeze(dim=1)                                                                        # [batch_size, 1, max_history_num, 3, HDC_filter_num, HDC_sequence_length]
-        matching_images_d0 = torch.matmul(candidate_news_d0, history_embedding_d0) / self.scalar                                            # [batch_size, news_num, max_history_num, HDC_sequence_length, HDC_sequence_length]
-        matching_images_dL = torch.matmul(candidate_news_dL, history_embedding_dL) / self.scalar                                            # [batch_size, news_num, max_history_num, 3, HDC_sequence_length, HDC_sequence_length]
-        matching_images = torch.cat([matching_images_d0.unsqueeze(dim=3), matching_images_dL], dim=3).permute(0, 1, 3, 2, 4, 5)             # [batch_size, news_num, 4, max_history_num, HDC_sequence_length, HDC_sequence_length]
-        matching_images = matching_images.view(batch_news_num, 4, self.max_history_num, self.HDC_sequence_length, self.HDC_sequence_length) # [batch_size * news_num, 4, max_history_num, HDC_sequence_length, HDC_sequence_length]
+        # 1. compute 3D matching images # [batch_size, news_num, 1, HDC_sequence_length, HDC_filter_num]
+        candidate_news_d0 = candidate_news_d0.unsqueeze(dim=2).permute(0, 1, 2, 4 ,3)
+        # [batch_size, news_num, 1, 3, HDC_sequence_length, HDC_filter_num]
+        candidate_news_dL = candidate_news_dL.unsqueeze(dim=2).permute(0, 1, 2, 3 ,5, 4)
+        # [batch_size, 1, max_history_num, HDC_filter_num, HDC_sequence_length]
+        history_embedding_d0 = history_embedding_d0.unsqueeze(dim=1)
+        # [batch_size, 1, max_history_num, 3, HDC_filter_num, HDC_sequence_length]
+        history_embedding_dL = history_embedding_dL.unsqueeze(dim=1)
+        # [batch_size, news_num, max_history_num, HDC_sequence_length, HDC_sequence_length]
+        matching_images_d0 = torch.matmul(candidate_news_d0, history_embedding_d0) / self.scalar
+        # [batch_size, news_num, max_history_num, 3, HDC_sequence_length, HDC_sequence_length]
+        matching_images_dL = torch.matmul(candidate_news_dL, history_embedding_dL) / self.scalar
+        # [batch_size, news_num, 4, max_history_num, HDC_sequence_length, HDC_sequence_length]
+        matching_images = torch.cat([matching_images_d0.unsqueeze(dim=3), matching_images_dL], dim=3).permute(0, 1, 3, 2, 4, 5)
+        # [batch_size * news_num, 4, max_history_num, HDC_sequence_length, HDC_sequence_length]
+        matching_images = matching_images.view(batch_news_num, 4, self.max_history_num, self.HDC_sequence_length, self.HDC_sequence_length)
         # 2. 3D convolution layers
-        Q1 = F.elu(self.conv_3D_a(matching_images), inplace=True)                                                                           # [batch_size * news_num, conv3D_filter_num_first, max_history_num, HDC_sequence_length, HDC_sequence_length]
-        Q1 = self.maxpool_3D(Q1)                                                                                                            # [batch_size * news_num, conv3D_filter_num_first, max_history_num_conv1_size, HDC_sequence_length_conv1_size, HDC_sequence_length_conv1_size]
-        Q2 = F.elu(self.conv_3D_b(Q1), inplace=True)                                                                                        # [batch_size * news_num, conv3D_filter_num_second, max_history_num_pool1_size, HDC_sequence_length_pool1_size, HDC_sequence_length_pool1_size]
-        Q2 = self.maxpool_3D(Q2)                                                                                                            # [batch_size * news_num, conv3D_filter_num_second, max_history_num_conv2_size, HDC_sequence_length_conv2_size, HDC_sequence_length_conv2_size]
-        salient_signals = Q2.view([batch_size, news_num, -1])                                                                               # [batch_size * news_num, feature_size]
+        Q1 = F.elu(self.conv_3D_a(matching_images), inplace=True)
+        Q1 = self.maxpool_3D(Q1)
+        Q2 = F.elu(self.conv_3D_b(Q1), inplace=True)
+        Q2 = self.maxpool_3D(Q2)
+        # [batch_size * news_num, feature_size]
+        salient_signals = Q2.view([batch_size, news_num, -1])
         return salient_signals
 
 ########################################################################################################################
@@ -290,10 +321,12 @@ class PUE(UserEncoder):
     def forward(self, user_title_text, user_title_mask, user_title_entity, user_content_text, user_content_mask, user_content_entity, user_category, user_subCategory, \
                 user_history_mask, user_history_graph, user_history_category_mask, user_history_category_indices, user_embedding, candidate_news_representation):
         news_num = candidate_news_representation.size(1)
+        # [batch_size, max_history_num, news_embedding_dim]
         history_embedding = self.news_encoder(user_title_text, user_title_mask, user_title_entity, \
                                               user_content_text, user_content_mask, user_content_entity, \
-                                              user_category, user_subCategory, user_embedding)                                                # [batch_size, max_history_num, news_embedding_dim]
-        q_d = F.relu(self.dense(user_embedding), inplace=True)                                                                                # [batch_size, personalized_embedding_dim]
+                                              user_category, user_subCategory, user_embedding)
+        # [batch_size, personalized_embedding_dim]
+        q_d = F.relu(self.dense(user_embedding), inplace=True)
         user_representation = self.personalizedAttention(history_embedding, q_d, user_history_mask)
         return user_representation
 
@@ -496,15 +529,16 @@ class IPNR(UserEncoder):
         batch_size = user_title_text.size(0)
         news_num = candidate_news_representation.size(1)
         batch_news_num = batch_size * news_num
-        # user reading preference
+        # user reading preference # [batch_size, max_history_num, news_embedding_dim]
         history_embedding = self.news_encoder(user_title_text, user_title_mask, user_title_entity, \
                                               user_content_text, user_content_mask, user_content_entity, \
-                                              user_category, user_subCategory, user_embedding)                  # [batch_size, max_history_num, news_embedding_dim]
+                                              user_category, user_subCategory, user_embedding)
         h = self.fastformer(history_embedding.view(batch_size, -1, self.news_embedding_dim))
-        user_representation = h.unsqueeze(dim=1).repeat(1, news_num, 1)  # [batch_size, news_num, news_embedding_dim]
-        # user reading intention
+        # [batch_size, news_num, news_embedding_dim]
+        user_representation = h.unsqueeze(dim=1).repeat(1, news_num, 1)
+        # user reading intention # [batch_size, max_history_num, concept_length, word_embedding_dim]
         clicked_concept_emebedding = self.dropout(
-            self.word_embedding(user_concept_text)).reshape(batch_size*self.max_history_num, -1, self.word_embedding_dim)  # [batch_size, max_history_num, concept_length, word_embedding_dim]
+            self.word_embedding(user_concept_text)).reshape(batch_size*self.max_history_num, -1, self.word_embedding_dim)
         # batch_size*max_history_num*num_concepts, word_embedding_dim
         c = self.dropout_(self.conv(clicked_concept_emebedding))
         # batch_size*max_history_num*concept_length, word_embedding_dim
@@ -519,9 +553,11 @@ class IPNR(UserEncoder):
         # [batch_size, max_history_num*num_concepts, news_embedding_dim]
         gcn_feature = self.gcn(personalized_concept_vector,
                                user_history_graph)
-        gcn_feature = gcn_feature[:, :self.max_history_num, :]  # [batch_size, max_history_num, news_embedding_dim]
+        # [batch_size, max_history_num, news_embedding_dim]
+        gcn_feature = gcn_feature[:, :self.max_history_num, :]
+        # [batch_size, news_num, max_history_num, news_embedding_dim]
         gcn_feature = gcn_feature.unsqueeze(dim=1).expand(-1, news_num, -1,
-                                                          -1)  # [batch_size, news_num, max_history_num, news_embedding_dim]
+                                                          -1)
         # [batch_size*news_num=5, news_embedding_dim]
         user_vector = self.attention_decoder(gcn_feature.reshape(batch_news_num, -1, self.word_embedding_dim)).reshape(batch_size, -1, self.word_embedding_dim)
         # [batch_size, news_num=5, news_embedding_dim+word_embedding_dim]

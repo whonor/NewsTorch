@@ -138,8 +138,6 @@ class Trainer:
                                    news_content_text, news_content_mask,
                                    news_content_entity)  # [batch_size, 1 + negative_sample_num]
                     loss = self.loss(logits)
-
-
                 if model.news_encoder.auxiliary_loss is not None:
                     news_auxiliary_loss = model.news_encoder.auxiliary_loss.mean()
                     loss += news_auxiliary_loss
@@ -158,14 +156,9 @@ class Trainer:
             self.wandb.log({'train epoch': e, 'loss': epoch_loss / len(self.train_dataset)})
 
             # validation
-            if config.model == "IPNR":
-                auc, mrr, ndcg5, ndcg10 = compute_scores_IPNR(self.config, model, self.mind_corpus, self.batch_size * 3 // 2,
-                                                         'dev', self.dev_res_dir + '/' + self.config.model + '-' + str(
-                        e) + '.txt', self._dataset)
-            else:
-                auc, mrr, ndcg5, ndcg10 = compute_scores(self.config, model, self.mind_corpus, self.batch_size * 3 // 2,
-                                                         'dev', self.dev_res_dir + '/' + self.config.model + '-' + str(
-                        e) + '.txt', self._dataset)
+            auc, mrr, ndcg5, ndcg10 = compute_scores(self.config, model, self.mind_corpus, self.batch_size,
+                                                     'dev', self.dev_res_dir + '/' + self.config.model + '-' + str(
+                    e) + '.txt', self._dataset)
 
             self.auc_results.append(auc)
             self.mrr_results.append(mrr)
@@ -240,13 +233,7 @@ def train(config: Config, mind_corpus: MIND_Corpus, wandb):
         trainer = Trainer(model, config, mind_corpus, wandb, run_index)
 
     trainer.train()
-    trainer = None
-    del trainer
     config.run_index = run_index
-    model = None
-    del model
-    gc.collect()
-    torch.cuda.empty_cache()
 
 
 def dev(config: Config, mind_corpus: MIND_Corpus):
@@ -279,10 +266,10 @@ def dev(config: Config, mind_corpus: MIND_Corpus):
     if not os.path.exists(dev_res_dir):
         os.mkdir(dev_res_dir)
     if config.model == 'IPNR':
-        auc, mrr, ndcg5, ndcg10 = compute_scores_IPNR(config, model, mind_corpus, config.batch_size * 2 // config.world_size, 'dev',
+        auc, mrr, ndcg5, ndcg10 = compute_scores_IPNR(config, model, mind_corpus, config.batch_size, 'dev',
                                              dev_res_dir + '/' + config.model + '.txt', config.dataset)
     else:
-        auc, mrr, ndcg5, ndcg10 = compute_scores(config, model, mind_corpus, config.batch_size * 2 // config.world_size,
+        auc, mrr, ndcg5, ndcg10 = compute_scores(config, model, mind_corpus, config.batch_size,
                                                  'dev',
                                                  dev_res_dir + '/' + config.model + '.txt', config.dataset)
 
@@ -325,10 +312,10 @@ def test(config: Config, mind_corpus: MIND_Corpus):
     print('test model path  : ' + config.test_model_path)
     print('test output file : ' + test_res_dir + '/' + config.model + '.txt')
     if config.model == 'IPNR':
-        auc, mrr, ndcg5, ndcg10 = compute_scores_IPNR(config, model, mind_corpus, config.batch_size * 2 // config.world_size, 'test',
+        auc, mrr, ndcg5, ndcg10 = compute_scores_IPNR(config, model, mind_corpus, config.batch_size, 'test',
                                              test_res_dir + '/' + config.model + '.txt', config.dataset)
     else:
-        auc, mrr, ndcg5, ndcg10 = compute_scores(config, model, mind_corpus, config.batch_size * 2 // config.world_size,
+        auc, mrr, ndcg5, ndcg10 = compute_scores(config, model, mind_corpus, config.batch_size,
                                                  'test',
                                                  test_res_dir + '/' + config.model + '.txt', config.dataset)
     if config.dataset != 'large':

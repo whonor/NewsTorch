@@ -87,7 +87,6 @@ def compute_scores(config: Config, model: nn.Module, mind_corpus: MIND_Corpus, b
     indices = (mind_corpus.dev_indices if mode == 'dev' else mind_corpus.test_indices)
     scores = torch.zeros([len(indices)]).cuda()
     index = 0
-    torch.cuda.empty_cache()
     model.eval()
     with torch.no_grad():
         for (user_ID, user_category, user_subCategory, user_title_text, user_title_mask, user_title_entity, user_content_text, user_content_mask, user_content_entity, user_history_mask, user_history_graph, user_history_category_mask, user_history_category_indices, \
@@ -147,7 +146,6 @@ def compute_scores(config: Config, model: nn.Module, mind_corpus: MIND_Corpus, b
                                                           news_category, news_subCategory, news_title_text,
                                                           news_title_mask, news_title_entity, news_content_text,
                                                           news_content_mask, news_content_entity) # [batch_size, 5]
-                # scores[index: index + batch_size] = logits[:, 0]
             index += batch_size
     scores = scores.tolist()
     sub_scores = [[] for _ in range(indices[-1] + 1)]

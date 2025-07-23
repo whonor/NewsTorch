@@ -15,6 +15,7 @@ class NPA(nn.Module):
         self.config = config
         self.user_embedding = nn.Embedding(num_embeddings=config.user_num, embedding_dim=config.user_embedding_dim)
         self.use_user_embedding = True
+        self.dropout = nn.Dropout(p=config.dropout_rate)
 
     def initialize(self):
         self.news_encoder.initialize()
