@@ -56,3 +56,4 @@ cache/user_history_graph-50-self-normalize-symmetric-small.pkl
 cache/user_ID-small.json
 cache/vocabulary-3-MIND-32-128-small.json
 cache/word_embedding-3-300-MIND-32-128-small.pkl
+.idea/deployment.xml
