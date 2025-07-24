@@ -87,8 +87,8 @@ class Trainer:
 
     def train(self):
         model = self.model
-        if torch.cuda.device_count() > 1:
-            model = nn.DataParallel(model)
+        if self.config.multi_gpu:
+            model = nn.DataParallel(model, device_ids=self.config.device_id)
             self.loss = nn.DataParallel(self.loss)
         for e in tqdm(range(1, self.epoch + 1)):
             self.train_dataset.negative_sampling()

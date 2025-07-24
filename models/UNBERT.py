@@ -17,7 +17,7 @@
 from typing import List, Tuple, Dict, Any
 import torch
 import torch.nn as nn
-from transformers import AutoTokenizer, get_linear_schedule_with_warmup
+from transformers import AutoTokenizer, get_linear_schedule_with_warmup, AutoModel
 
 from config import Config
 from models.modules.unbert.configuration_bert import BertConfig

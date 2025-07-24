@@ -97,8 +97,8 @@ def main(config: Config):
                     num_warmup_steps=len(train_set)//config.batch_size*2,
                     num_training_steps=len(train_set)*config.epoch//config.batch_size)
         loss_fn.to(device)
-        if torch.cuda.device_count() > 1:
-            model = nn.DataParallel(model)
+        if config.multi_gpu:
+            model = nn.DataParallel(model, device_ids=config.device_id)
             loss_fn = nn.DataParallel(loss_fn)
         print("start training...")
 

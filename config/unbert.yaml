@@ -1,6 +1,6 @@
 
 mode: train # mode: train, dev, test
-dataset_path: '/home/wanro238/Pypro/NewsRecTorch/MIND-small' # Path to the dataset
+dataset_path: '/tmp/pycharm_project_403/MIND-small' # Path to the dataset
 split: small # split: small, large
 pretrain: './bert-base-uncased'
 level_sate: 'both' # level_sate: category, subCategory, both
@@ -10,7 +10,7 @@ hist_max_len: 20
 seq_max_len: 300
 output: './logs/unbert'
 restore: None
-epoch: 2 # 5 in small dataset, 2 in large
-batch_size: 32
+epoch: 5 # 5 in small dataset, 2 in large
+batch_size: 64
 lr: 0.00002
 eval_every: 10000

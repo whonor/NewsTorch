@@ -4,12 +4,15 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="d7693a56-5c44-498b-ba31-629b35906ee1" name="Changes" comment="Add UNBERT model and change config files">
-      <change beforePath="$PROJECT_DIR$/.idea/NewsRecTorch.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/NewsRecTorch.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+    <list default="true" id="d7693a56-5c44-498b-ba31-629b35906ee1" name="Changes" comment="Update README">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/dataset_download_prepare/download_mind.py" beforeDir="false" afterPath="$PROJECT_DIR$/dataset_download_prepare/download_mind.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/config.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/config/unbert.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/config/unbert.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dataset_corpus_preprocessing/data_loader_unbert.py" beforeDir="false" afterPath="$PROJECT_DIR$/dataset_corpus_preprocessing/data_loader_unbert.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dataset_download_prepare/MIND_dataset_prepare.py" beforeDir="false" afterPath="$PROJECT_DIR$/dataset_download_prepare/MIND_dataset_prepare.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/general_runner.py" beforeDir="false" afterPath="$PROJECT_DIR$/general_runner.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/models/UNBERT.py" beforeDir="false" afterPath="$PROJECT_DIR$/models/UNBERT.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/unbert_runner.py" beforeDir="false" afterPath="$PROJECT_DIR$/unbert_runner.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -57,6 +60,7 @@
   <component name="PropertiesComponent">{
   &quot;keyToString&quot;: {
     &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;Python.MIND_dataset_prepare.executor&quot;: &quot;Run&quot;,
     &quot;Python.download_mind.executor&quot;: &quot;Run&quot;,
     &quot;Python.general_runner.executor&quot;: &quot;Run&quot;,
     &quot;Python.main.executor&quot;: &quot;Run&quot;,
@@ -92,7 +96,30 @@
       <recent name="$PROJECT_DIR$" />
     </key>
   </component>
-  <component name="RunManager" selected="Python.download_mind">
+  <component name="RunManager" selected="Python.unbert_runner">
+    <configuration name="MIND_dataset_prepare" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="NewsRecTorch" />
+      <option name="ENV_FILES" value="" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/dataset_download_prepare" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/dataset_download_prepare/MIND_dataset_prepare.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
     <configuration name="download_mind" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="NewsRecTorch" />
       <option name="ENV_FILES" value="" />
@@ -187,10 +214,11 @@
     </configuration>
     <recent_temporary>
       <list>
+        <item itemvalue="Python.unbert_runner" />
+        <item itemvalue="Python.MIND_dataset_prepare" />
         <item itemvalue="Python.download_mind" />
         <item itemvalue="Python.general_runner" />
         <item itemvalue="Python.main" />
-        <item itemvalue="Python.unbert_runner" />
       </list>
     </recent_temporary>
   </component>
@@ -214,6 +242,8 @@
       <workItem from="1752988961736" duration="1255000" />
       <workItem from="1752990657618" duration="2236000" />
       <workItem from="1753266129231" duration="4070000" />
+      <workItem from="1753310063391" duration="6151000" />
+      <workItem from="1753317240378" duration="505000" />
     </task>
     <task id="LOCAL-00001" summary="rebuild config code and add new models CenNewsRec">
       <option name="closed" value="true" />
@@ -295,7 +325,15 @@
       <option name="project" value="LOCAL" />
       <updated>1752818403443</updated>
     </task>
-    <option name="localTasksCounter" value="11" />
+    <task id="LOCAL-00011" summary="Update README">
+      <option name="closed" value="true" />
+      <created>1753310153099</created>
+      <option name="number" value="00011" />
+      <option name="presentableId" value="LOCAL-00011" />
+      <option name="project" value="LOCAL" />
+      <updated>1753310153099</updated>
+    </task>
+    <option name="localTasksCounter" value="12" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -330,12 +368,15 @@
     <MESSAGE value="MINS model pass test" />
     <MESSAGE value="Reconstruct the data preprocessing" />
     <MESSAGE value="Add UNBERT model and change config files" />
-    <option name="LAST_COMMIT_MESSAGE" value="Add UNBERT model and change config files" />
+    <MESSAGE value="Update README" />
+    <option name="LAST_COMMIT_MESSAGE" value="Update README" />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/NewsRecTorch$main.coverage" NAME="main Coverage Results" MODIFIED="1752988971062" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/NewsRecTorch$general_runner.coverage" NAME="general_runner Coverage Results" MODIFIED="1752992375569" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/NewsRecTorch$unbert_runner.coverage" NAME="unbert_runner Coverage Results" MODIFIED="1753316411474" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/NewsRecTorch$run.coverage" NAME="unbert_runner Coverage Results" MODIFIED="1752818973541" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/NewsRecTorch$MIND_dataset_prepare.coverage" NAME="MIND_dataset_prepare Coverage Results" MODIFIED="1753310419743" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/dataset_download_prepare" />
     <SUITE FILE_PATH="coverage/NewsRecTorch$download_mind.coverage" NAME="download_mind Coverage Results" MODIFIED="1753270177577" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/dataset_download_prepare" />
   </component>
 </project>

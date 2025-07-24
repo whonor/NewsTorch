@@ -87,18 +87,19 @@ class Config:
     Usage:
         config = config(model='TANR')
     '''
-    def __init__(self, model='LSTUR'):
+    def __init__(self, model='UNBERT'):
         self.model = model.upper()
+        self.multi_gpu = False  # Whether to use multiple GPUs
         self.wandb = 'offline'  # Whether to use Weights & Biases for experiment tracking
         self.mode = 'train'
         self.dev_model_path = ''
         self.test_model_path = ''
         self.test_output_file = ''
-        self.device_id = 0
+        self.device_id = [0, 1]  # Default to GPU 0, can be set to a list for multi-GPU training
         self.seed = 0
         self.config_file = ''
 
-        self.root = "/home/wanro238/Pypro/NewsRecTorch"
+        self.root = "/tmp/pycharm_project_403"
         self.dataset = 'small'
         self.tokenizer = 'MIND'
         self.word_threshold = 3
@@ -184,7 +185,17 @@ class Config:
     def set_cuda(self):
         gpu_available = torch.cuda.is_available()
         assert gpu_available, 'GPU is not available'
-        torch.cuda.set_device(self.device_id)
+        #torch.cuda.set_device(self.device_id)
+        if isinstance(self.device_id, list):
+            self.device = torch.device("cuda")
+            if len(self.device_id) > 1:
+                # DataParallel
+                self.multi_gpu = True
+        else:
+            # 单GPU设置
+            torch.cuda.set_device(self.device_id)
+            self.device = torch.device(f"cuda:{self.device_id}")
+            self.multi_gpu = False
         torch.manual_seed(self.seed)
         torch.cuda.manual_seed(self.seed)
         random.seed(self.seed)
