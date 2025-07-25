@@ -87,7 +87,7 @@ class Config:
     Usage:
         config = config(model='TANR')
     '''
-    def __init__(self, model='UNBERT'):
+    def __init__(self, model='CNE-SUE'):
         self.model = model.upper()
         self.multi_gpu = False  # Whether to use multiple GPUs
         self.wandb = 'offline'  # Whether to use Weights & Biases for experiment tracking
@@ -95,11 +95,12 @@ class Config:
         self.dev_model_path = ''
         self.test_model_path = ''
         self.test_output_file = ''
-        self.device_id = [0, 1]  # Default to GPU 0, can be set to a list for multi-GPU training
+        self.device_id = 0 # [0, 1]  # Default to GPU 0, can be set to a list for multi-GPU training
         self.seed = 0
         self.config_file = ''
 
-        self.root = "/tmp/pycharm_project_403"
+        self.root = "."
+        self.data_path = "cache/"
         self.dataset = 'small'
         self.tokenizer = 'MIND'
         self.word_threshold = 3
@@ -110,7 +111,7 @@ class Config:
         self.candidate_news_num = 5
         self.epoch = 20
 
-        self.batch_size = 64
+        self.batch_size = 32
         self.lr = 1e-4
         self.weight_decay = 0
         self.gradient_clip_norm = 4
@@ -126,8 +127,11 @@ class Config:
         self.no_adjacent_normalization = False
         self.Alpha = 0.1
         self.gcn_normalization_type = 'symmetric'
+        if self.model == 'FIM':
+            self.click_predictor = 'FIM'
+        else:
+            self.click_predictor = 'dot_product'
 
-        self.click_predictor = 'dot_product'
 
         self.train_root = self.root + '/MIND-%s/train' % self.dataset
         self.dev_root = self.root + '/MIND-%s/dev' % self.dataset
@@ -215,7 +219,7 @@ class Config:
             print("Please prepare the dataset first!!!")
 
         model_name = self.model
-        data_path = "cache/"
+        data_path = self.data_path
         mkdirs = lambda x: os.makedirs(x) if not os.path.exists(x) else None
         self.model_dir = data_path + 'models/' + self.dataset + '/' + model_name
         self.dev_res_dir = data_path + 'dev/res/' + self.dataset + '/' + model_name
@@ -229,6 +233,8 @@ class Config:
         mkdirs(self.result_dir)
         mkdirs(self.best_model_dir)
         mkdirs(self.test_res_dir)
+        if model_name == 'IPNR':
+            mkdirs("cache/IPNR/")
         if not os.path.exists(data_path + 'dev/ref/truth-%s.txt' % self.dataset):
             with open(os.path.join(self.dev_root, 'behaviors.tsv'), 'r', encoding='utf-8') as dev_f:
                 with open(data_path + 'dev/ref/truth-%s.txt' % self.dataset, 'w', encoding='utf-8') as truth_f:

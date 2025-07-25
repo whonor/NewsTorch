@@ -1,6 +1,6 @@
 
 mode: train # mode: train, dev, test
-dataset_path: '/tmp/pycharm_project_403/MIND-small' # Path to the dataset
+dataset_path: './MIND-small' # Path to the dataset
 split: small # split: small, large
 pretrain: './bert-base-uncased'
 level_sate: 'both' # level_sate: category, subCategory, both

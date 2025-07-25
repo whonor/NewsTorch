@@ -1,10 +1,10 @@
 
 
-"word_embedding_dim": 300
-"category_embedding_dim": 50
-"subCategory_embedding_dim": 50
-"num_attention_heads": 15
-"query_vector_dim": 200
-"num_filters": 300
-"layers": 6
-"attention_dim": 200
+word_embedding_dim: 300
+category_embedding_dim: 50
+subCategory_embedding_dim: 50
+num_attention_heads: 15
+query_vector_dim: 200
+num_filters: 300
+layers: 6
+attention_dim: 200

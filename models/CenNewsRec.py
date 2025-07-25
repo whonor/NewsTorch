@@ -25,8 +25,6 @@ class CenNewsRec(nn.Module):
         user_embedding = self.dropout(self.user_embedding(user_ID)) if self.use_user_embedding else None
         # [batch, 400]
         news_representation = self.news_encoder(news_title_text, news_title_mask, news_title_entity, news_content_text, news_content_mask, news_content_entity, news_category, news_subCategory, user_embedding)
-        # [batch, 5, 400]
-        # news_representation = news_representation.unsqueeze(dim=1).expand(-1, self.config.negative_sample_num+1, -1)
         # [batch, 400]
         user_representation = self.user_encoder(user_title_text, user_title_mask, user_title_entity, user_content_text, user_content_mask, user_content_entity, user_category, user_subCategory, \
                                                 user_history_mask, user_history_graph, user_history_category_mask, user_history_category_indices, user_embedding, news_representation)

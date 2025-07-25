@@ -51,18 +51,18 @@ pat = re.compile(r"[\w]+|[.,!?;|]")
 class MIND_Corpus_IPNR:
     @staticmethod
     def preprocess(config: Config):
-        user_ID_file = 'cache/user_ID-%s.json' % config.dataset
-        news_ID_file = 'cache/news_ID-%s.json' % config.dataset
-        category_file = 'cache/category-%s.json' % config.dataset
-        subCategory_file = 'cache/subCategory-%s.json' % config.dataset
-        vocabulary_file = 'cache/vocabulary-' + str(config.word_threshold) + '-' + config.tokenizer + '-' + str(config.max_title_length) + '-' + str(config.max_abstract_length) + '-' + config.dataset + '.json'
-        word_embedding_file = 'cache/word_embedding-' + str(config.word_threshold) + '-' + str(config.word_embedding_dim) + '-' + config.tokenizer + '-' + str(config.max_title_length) + '-' + str(config.max_abstract_length) + '-' + config.dataset + '.pkl'
-        entity_file = 'cache/entity-%s.json' % config.dataset
-        entity_embedding_file = 'cache/entity_embedding-%s.pkl' % config.dataset
-        context_embedding_file = 'cache/context_embedding-%s.pkl' % config.dataset
-        user_history_graph_file = 'cache/user_history_graph-' + str(config.max_history_num) + ('' if config.no_self_connection else '-self') + ('' if config.no_adjacent_normalization else '-normalize-' + config.gcn_normalization_type) + '-' + config.dataset + '.pkl'
+        user_ID_file = 'cache/IPNR/user_ID-%s.json' % config.dataset
+        news_ID_file = 'cache/IPNR/news_ID-%s.json' % config.dataset
+        category_file = 'cache/IPNR/category-%s.json' % config.dataset
+        subCategory_file = 'cache/IPNR/subCategory-%s.json' % config.dataset
+        vocabulary_file = 'cache/IPNR/vocabulary-' + str(config.word_threshold) + '-' + config.tokenizer + '-' + str(config.max_title_length) + '-' + str(config.max_abstract_length) + '-' + config.dataset + '.json'
+        word_embedding_file = 'cache/IPNR/word_embedding-' + str(config.word_threshold) + '-' + str(config.word_embedding_dim) + '-' + config.tokenizer + '-' + str(config.max_title_length) + '-' + str(config.max_abstract_length) + '-' + config.dataset + '.pkl'
+        entity_file = 'cache/IPNR//entity-%s.json' % config.dataset
+        entity_embedding_file = 'cache/IPNR/entity_embedding-%s.pkl' % config.dataset
+        context_embedding_file = 'cache/IPNR/context_embedding-%s.pkl' % config.dataset
+        user_history_graph_file = 'cache/IPNR/user_history_graph-' + str(config.max_history_num) + ('' if config.no_self_connection else '-self') + ('' if config.no_adjacent_normalization else '-normalize-' + config.gcn_normalization_type) + '-' + config.dataset + '.pkl'
         preprocessed_data_files = [user_ID_file, news_ID_file, category_file, subCategory_file, vocabulary_file, word_embedding_file, entity_file, entity_embedding_file, context_embedding_file, user_history_graph_file]
-        content_file = 'cache/content-%s.json' % config.dataset
+        content_file = 'cache/IPNR/content-%s.json' % config.dataset
 
         if not all(list(map(os.path.exists, preprocessed_data_files))):
             user_ID_dict = {'<UNK>': 0}
@@ -287,25 +287,25 @@ class MIND_Corpus_IPNR:
     def __init__(self, config: Config):
         # preprocess data
         MIND_Corpus_IPNR.preprocess(config)
-        with open('cache/user_ID-%s.json' % config.dataset, 'r', encoding='utf-8') as user_ID_f:
+        with open('cache/IPNR/user_ID-%s.json' % config.dataset, 'r', encoding='utf-8') as user_ID_f:
             self.user_ID_dict = json.load(user_ID_f)
             config.user_num = len(self.user_ID_dict)
-        with open('cache/news_ID-%s.json' % config.dataset, 'r', encoding='utf-8') as news_ID_f:
+        with open('cache/IPNR/news_ID-%s.json' % config.dataset, 'r', encoding='utf-8') as news_ID_f:
             self.news_ID_dict = json.load(news_ID_f)
             self.news_num = len(self.news_ID_dict)
-        with open('cache/category-%s.json' % config.dataset, 'r', encoding='utf-8') as category_f:
+        with open('cache/IPNR/category-%s.json' % config.dataset, 'r', encoding='utf-8') as category_f:
             self.category_dict = json.load(category_f)
             config.category_num = len(self.category_dict)
-        with open('cache/subCategory-%s.json' % config.dataset, 'r', encoding='utf-8') as subCategory_f:
+        with open('cache/IPNR/subCategory-%s.json' % config.dataset, 'r', encoding='utf-8') as subCategory_f:
             self.subCategory_dict = json.load(subCategory_f)
             config.subCategory_num = len(self.subCategory_dict)
-        with open('cache/vocabulary-' + str(config.word_threshold) + '-' + config.tokenizer + '-' + str(config.max_title_length) + '-' + str(config.max_abstract_length) + '-' + config.dataset + '.json', 'r', encoding='utf-8') as vocabulary_f:
+        with open('cache/IPNR/vocabulary-' + str(config.word_threshold) + '-' + config.tokenizer + '-' + str(config.max_title_length) + '-' + str(config.max_abstract_length) + '-' + config.dataset + '.json', 'r', encoding='utf-8') as vocabulary_f:
             self.word_dict = json.load(vocabulary_f)
             config.vocabulary_size = len(self.word_dict)
-        with open('cache/entity-%s.json' % config.dataset, 'r', encoding='utf-8') as entity_f:
+        with open('cache/IPNR/entity-%s.json' % config.dataset, 'r', encoding='utf-8') as entity_f:
             self.entity_dict = json.load(entity_f)
             config.entity_size = len(self.entity_dict)
-        with open('cache/user_history_graph-' + str(config.max_history_num) + ('' if config.no_self_connection else '-self') + ('' if config.no_adjacent_normalization else '-normalize-' + config.gcn_normalization_type) + '-' + config.dataset + '.pkl', 'rb') as user_history_graph_f:
+        with open('cache/IPNR/user_history_graph-' + str(config.max_history_num) + ('' if config.no_self_connection else '-self') + ('' if config.no_adjacent_normalization else '-normalize-' + config.gcn_normalization_type) + '-' + config.dataset + '.pkl', 'rb') as user_history_graph_f:
             user_history_data = pickle.load(user_history_graph_f)
             self.train_user_history_graph = user_history_data['train_user_history_graph']
             # self.train_user_history_category_mask = user_history_data['train_user_history_category_mask']
