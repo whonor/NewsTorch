@@ -14,81 +14,53 @@ class Config:
     news recommendation models. It initializes the configuration based on the specified model
     and loads additional parameters from a JSON file if provided.
     Attributes:
-        model (str): The name of the model to be used, can be 'LSTUR', 'NRMS', 'NPA', 'TANR', 'FIM', 'DKN', 'NAML',
-        'CNE-SUE', 'MINS', 'MINER', 'UNBERT', 'CenNewsRec', 'MANNeR'.
-        mode (str): The mode of operation, can be 'train', 'dev', or 'test'.
-        dev_model_path (str): Path to the development model.
-        test_model_path (str): Path to the test model.
+        model (str): The name of the model to be used.
+        multi_gpu (bool): Whether to use multiple GPUs for training.
+        wandb (str): Whether to use Weights & Biases for experiment tracking.
+        mode (str): The mode of operation, e.g., 'train', 'dev', 'test'.
+        dev_model_path (str): Path to the model for development.
+        test_model_path (str): Path to the model for testing.
         test_output_file (str): Output file for test results.
-        device_id (int): ID of the GPU device to use.
+        device_id (int or list): The ID(s) of the GPU(s) to be used.
         seed (int): Random seed for reproducibility.
-        config_file (str): Path to a JSON configuration file for additional settings.
-        root (str): Root directory of the project.
-        dataset (str): Dataset type, can be 'small', '200k', or 'large'.
-        tokenizer (str): Tokenizer type, can be 'MIND' or 'NLTK'.
-        word_threshold (int): Minimum frequency threshold for words in the vocabulary.
-        max_title_length (int): Maximum length of news titles.
-        max_abstract_length (int): Maximum length of news abstracts.
-        negative_sample_num (int): Number of negative samples per positive sample.
-        max_history_num (int): Maximum number of history news items per user.
+        config_file (str): Path to the configuration file.
+        root (str): Root directory for the dataset.
+        data_path (str): Path to the dataset.
+        dataset (str): Name of the dataset to be used.
+        tokenizer (str): Tokenizer to be used for text processing.
+        word_threshold (int): Minimum frequency of words to be included in the vocabulary.
+        max_title_length (int): Maximum length of the news title.
+        max_abstract_length (int): Maximum length of the news abstract.
+        negative_sample_num (int): Number of negative samples for training.
+        max_history_num (int): Maximum number of historical news items to consider.
+        candidate_news_num (int): Number of candidate news items for recommendation.
         epoch (int): Number of training epochs.
-        batch_size (int): Batch size for training and evaluation.
+        batch_size (int): Batch size for training.
         lr (float): Learning rate for the optimizer.
-        weight_decay (float): Weight decay for the optimizer.
-        gradient_clip_norm (float): Gradient clipping norm, non-positive value means no clipping.
-        world_size (int): Number of processes in multi-GPU training.
-        dev_criterion (str): Criterion for selecting the best model during development, can be 'avg', 'auc', 'mrr', etc.
-        early_stopping_epoch (int): Number of epochs without improvement before stopping training early.
-        word_embedding_dim (int): Dimension of word embeddings.
-        entity_embedding_dim (int): Dimension of entity embeddings.
-        context_embedding_dim (int): Dimension of context embeddings.
-        cnn_method (str): Method for CNN, can be 'naive', 'group3', 'group4', or 'group5'.
-        cnn_kernel_num (int): Number of CNN kernels.
-        cnn_window_size (int): Window size for CNN kernels.
-        attention_dim (int): Dimension of attention mechanism.
-        head_num (int): Number of heads in multi-head attention.
-        head_dim (int): Dimension of each head in multi-head attention.
-        user_embedding_dim (int): Dimension of user embeddings.
+        weight_decay (float): Weight decay for regularization.
+        gradient_clip_norm (float): Gradient clipping norm.
+        world_size (int): Number of processes for distributed training.
+        dev_criterion (str): Criterion for development evaluation.
+        early_stopping_epoch (int): Number of epochs for early stopping.
         category_embedding_dim (int): Dimension of category embeddings.
         subCategory_embedding_dim (int): Dimension of sub-category embeddings.
+        entity_embedding_dim (int): Dimension of entity embeddings.
+        context_embedding_dim (int): Dimension of context embeddings.
         dropout_rate (float): Dropout rate for regularization.
-        no_self_connection (bool): Whether to disable self-connection in the graph.
-        no_adjacent_normalization (bool): Whether to disable normalization of the adjacency matrix.
-        gcn_normalization_type (str): Type of normalization for GCN, can be 'symmetric' or 'asymmetric'.
-        gcn_layer_num (int): Number of layers in GCN.
-        no_gcn_residual (bool): Whether to disable residual connections in GCN.
-        gcn_layer_norm (bool): Whether to apply layer normalization in GCN.
-        hidden_dim (int): Hidden dimension for encoders.
-        Alpha (float): Weight for reconstruction loss in DAE.
-        long_term_masking_probability (float): Probability of masking long-term representation for LSTUR.
-        personalized_embedding_dim (int): Dimension of personalized embeddings for NPA.
-        HDC_window_size (int): Window size for HDC in FIM.
-        HDC_filter_num (int): Number of filters in HDC for FIM.
-        conv3D_filter_num_first (int): Number of filters in the first layer of 3D convolution for FIM.
-        conv3D_kernel_size_first (int): Kernel size of the first layer of 3D convolution for FIM.
-        conv3D_filter_num_second (int): Number of filters in the second layer of 3D convolution for FIM.
-        conv3D_kernel_size_second (int): Kernel size of the second layer of 3D convolution for FIM.
-        maxpooling3D_size (int): Size of 3D max pooling for FIM.
-        maxpooling3D_stride (int): Stride of 3D max pooling for FIM.
-        click_predictor (str): Type of click predictor, can be 'dot_product', 'mlp', 'sigmoid', or 'FIM'.
-        train_root (str): Root directory for training cache.
-        dev_root (str): Root directory for development cache.
-        test_root (str): Root directory for test cache.
-        config_dir (str): Directory for saving configuration files.
-        model_dir (str): Directory for saving model checkpoints.
-        best_model_dir (str): Directory for saving the best model.
-        dev_res_dir (str): Directory for saving development results.
-        test_res_dir (str): Directory for saving test results.
-        result_dir (str): Directory for saving final results.
-    Methods:
-        __init__(model='TANR'): Initializes the configuration with default values and loads model-specific parameters.
-        set_cuda(): Sets up the CUDA environment for GPU training.
-        preliminary_setup(): Prepares the dataset and checks for necessary files.
-    Usage:
-        config = config(model='TANR')
+        no_self_connection (bool): Whether to disable self-connections in the graph.
+        no_adjacent_normalization (bool): Whether to disable adjacent normalization in the graph.
+        Alpha (float): Hyperparameter for the model.
+        gcn_normalization_type (str): Type of normalization for GCN layers.
+        click_predictor (str): Type of click predictor to be used.
+    """
+
     '''
-    def __init__(self, model='CNE-SUE'):
-        self.model = model.upper()
+
+    def __init__(self):
+        parser = argparse.ArgumentParser()
+        parser.add_argument('--model', type=str, default='CNE-SUE', help='Model name')
+        args, _ = parser.parse_known_args()
+        self.model = args.model
         self.multi_gpu = False  # Whether to use multiple GPUs
         self.wandb = 'offline'  # Whether to use Weights & Biases for experiment tracking
         self.mode = 'train'
@@ -151,7 +123,7 @@ class Config:
 
         import yaml
 
-        yaml_path = f'config/{model.lower()}.yaml'
+        yaml_path = f'config/{args.model.lower()}.yaml'
         if os.path.exists(yaml_path):
             with open(yaml_path, 'r') as f:
                 model_params = yaml.safe_load(f)
@@ -196,7 +168,7 @@ class Config:
                 # DataParallel
                 self.multi_gpu = True
         else:
-            # 单GPU设置
+            # single GPU
             torch.cuda.set_device(self.device_id)
             self.device = torch.device(f"cuda:{self.device_id}")
             self.multi_gpu = False
