@@ -10,7 +10,7 @@ import collections
 random.seed(0)
 np.random.seed(0)
 
-root = "."
+root = "../"
 # 数据集根路径
 MIND_small_dataset_root = root + '/MIND-small'
 MIND_large_dataset_root = root + '/MIND-large'

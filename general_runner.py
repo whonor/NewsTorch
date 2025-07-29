@@ -335,8 +335,8 @@ def test(config: Config, mind_corpus: MIND_Corpus):
 
 
 if __name__ == '__main__':
-    wandb.login()
     config = Config()
+    wandb.login(anonymous="allow", key=config.wandb_key)  # Login to Weights & Biases
     run = wandb.init(
         project="NewsRecTorch-project",  # Specify your project
         config=config.attribute_dict,

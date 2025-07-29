@@ -58,11 +58,13 @@ class Config:
 
     def __init__(self):
         parser = argparse.ArgumentParser()
-        parser.add_argument('--model', type=str, default='CNE-SUE', help='Model name')
+        parser.add_argument('--model', type=str, default='IPNR', help='Model name')
+        parser.add_argument('--batch_size', type=int, default='64', help='Batfhch size for training')
         args, _ = parser.parse_known_args()
         self.model = args.model
         self.multi_gpu = False  # Whether to use multiple GPUs
         self.wandb = 'offline'  # Whether to use Weights & Biases for experiment tracking
+        self.wandb_key = None
         self.mode = 'train'
         self.dev_model_path = ''
         self.test_model_path = ''
@@ -83,7 +85,7 @@ class Config:
         self.candidate_news_num = 5
         self.epoch = 20
 
-        self.batch_size = 32
+        self.batch_size = args.batch_size
         self.lr = 1e-4
         self.weight_decay = 0
         self.gradient_clip_norm = 4
