@@ -6,20 +6,19 @@ import random
 import numpy as np
 import collections
 
-# 设置随机种子以保证可复现
+# setup random seed for reproducibility
 random.seed(0)
 np.random.seed(0)
 
 root = "../"
-# 数据集根路径
+# root
 MIND_small_dataset_root = root + '/MIND-small'
 MIND_large_dataset_root = root + '/MIND-large'
 MIND_200k_dataset_root = root + '/MIND-200k'
 
 def confirm_overwrite(path: str) -> bool:
-    """如果文件或文件夹已存在，询问用户是否覆盖。"""
     if os.path.exists(path):
-        choice = input(f"发现已存在: {path}，是否覆盖？(y/N): ").strip().lower()
+        choice = input(f"already existed: {path}，recovered？(y/N): ").strip().lower()
         return choice == 'y'
     return True
 
@@ -28,7 +27,7 @@ def split_training_behaviors():
     MIND_small_train_ratio = 0.9
     behavior_file = os.path.join(MIND_small_dataset_root, 'download', 'train', 'behaviors.tsv')
     if not os.path.exists(behavior_file):
-        raise FileNotFoundError(f"行为文件不存在: {behavior_file}")
+        raise FileNotFoundError(f"behavior file no exist: {behavior_file}")
 
     with open(behavior_file, 'r', encoding='utf-8') as f:
         behavior_lines = [line for line in f if line.strip()]
@@ -62,7 +61,7 @@ def preprocess_MIND_small():
         out_dir = os.path.join(MIND_small_dataset_root, mode)
         if os.path.exists(out_dir):
             if not confirm_overwrite(out_dir):
-                print(f"跳过 {mode} 集准备")
+                print(f"jump {mode} dataset prepare")
                 continue
             shutil.rmtree(out_dir)
         os.makedirs(out_dir)
@@ -76,14 +75,14 @@ def preprocess_MIND_small():
         dst_news = os.path.join(out_dir, 'news.tsv')
         if confirm_overwrite(dst_news):
             if not os.path.exists(src_news):
-                raise FileNotFoundError(f"新闻文件不存在: {src_news}")
+                raise FileNotFoundError(f"news file no exist: {src_news}")
             shutil.copyfile(src_news, dst_news)
 
     # test set
     test_dir = os.path.join(MIND_small_dataset_root, 'test')
     if os.path.exists(test_dir):
         if not confirm_overwrite(test_dir):
-            print("跳过 test 集准备")
+            print("jump test dataset prepare")
             return
         shutil.rmtree(test_dir)
     os.makedirs(test_dir)
@@ -93,7 +92,7 @@ def preprocess_MIND_small():
         dst = os.path.join(test_dir, fname)
         if confirm_overwrite(dst):
             if not os.path.exists(src):
-                raise FileNotFoundError(f"文件不存在: {src}")
+                raise FileNotFoundError(f"no exist: {src}")
             shutil.copyfile(src, dst)
 
 
@@ -103,14 +102,14 @@ def sampling_MIND_dataset(sample_num=200000):
     for split in ('train', 'dev'):
         path = os.path.join(MIND_200k_dataset_root, 'download', split, 'behaviors.tsv')
         if not os.path.exists(path):
-            raise FileNotFoundError(f"行为文件不存在: {path}")
+            raise FileNotFoundError(f"behaviors.tsv no exist: {path}")
         with open(path, 'r', encoding='utf-8') as f:
             for line in f:
                 _, user_ID, *_ = line.strip().split('\t')
                 user_set.add(user_ID)
 
     if sample_num > len(user_set):
-        raise ValueError(f"采样数 {sample_num} 超过总用户数 {len(user_set)}")
+        raise ValueError(f"The number of sample {sample_num} exceed total {len(user_set)}")
 
     sample_users = set(random.sample(list(user_set), sample_num))
     with open(os.path.join(MIND_200k_dataset_root, 'sample_users.json'), 'w', encoding='utf-8') as f:
@@ -164,7 +163,7 @@ def generate_knowledge_entity_embedding(data_mode):
     else:
         shutil.copyfile(root + '/MIND-large/download/test/entity_embedding.vec', root + '/MIND-large/test/entity_embedding.vec')
 
-    # 构建上下文嵌入同原版
+
     entity_embeddings = {}
     entity_embedding_files = [root + '/MIND-%s/%s/entity_embedding.vec' % (data_mode, mode) for mode in
                               ['train', 'dev', 'test']]
@@ -223,13 +222,13 @@ def prepare_MIND_200k():
     generate_knowledge_entity_embedding('200k')
 
 def main():
-    print("准备 MIND-small...")
+    print("Prepare MIND-small...")
     prepare_MIND_small()
     # print("准备 MIND-200k...")
     # prepare_MIND_200k()
     # print("准备 MIND-large...")
     # prepare_MIND_large()
-    print("所有数据集准备完成。")
+    print("All datasets are finished。")
 
 
 if __name__ == '__main__':

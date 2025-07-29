@@ -7,10 +7,9 @@ from zipfile import ZipFile
 from tqdm import tqdm
 
 def download_file(url: str, dest: Path, chunk_size: int = 1024):
-    """从 url 下载文件到 dest（带进度条），如果已存在则跳过。"""
     dest.parent.mkdir(parents=True, exist_ok=True)
     if dest.exists() and dest.stat().st_size > 0:
-        print(f"已存在，跳过下载: {dest}")
+        print(f"already existed，skip download: {dest}")
         return
     resp = requests.get(url, stream=True)
     resp.raise_for_status()
@@ -21,23 +20,21 @@ def download_file(url: str, dest: Path, chunk_size: int = 1024):
         for chunk in resp.iter_content(chunk_size=chunk_size):
             f.write(chunk)
             bar.update(len(chunk))
-    print(f"下载完成: {dest}")
+    print(f"download complete: {dest}")
 
 def extract_zip(zip_path: Path, extract_to: Path):
-    """解压 zip_path 到 extract_to，如果目标目录已存在且非空则跳过。"""
     if extract_to.exists() and any(extract_to.iterdir()):
-        print(f"目标已存在且非空，跳过解压: {extract_to}")
+        print(f"existed and no empty，skip extracted: {extract_to}")
         return
     print(f"Extracting {zip_path} → {extract_to}")
     extract_to.mkdir(parents=True, exist_ok=True)
     with ZipFile(zip_path, 'r') as z:
         z.extractall(extract_to)
-    print(f"解压完成: {extract_to}")
+    print(f"extract complete: {extract_to}")
 
 def process_dataset(base_dir: Path, splits: dict, include_wikidata: bool = False):
     download_dir = base_dir / 'download'
     for split, url in splits.items():
-        # 使用原始文件名
         filename = Path(url).name
         zip_path = download_dir / filename
         download_file(url, zip_path)
@@ -85,6 +82,6 @@ if __name__ == '__main__':
         import requests
         from tqdm import tqdm
     except ImportError:
-        print("请先安装依赖：pip install requests tqdm", file=sys.stderr)
+        print("Please install dependencies：pip install requests tqdm", file=sys.stderr)
         sys.exit(1)
     main()
