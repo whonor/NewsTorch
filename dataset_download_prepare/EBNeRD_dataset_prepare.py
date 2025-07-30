@@ -154,7 +154,7 @@ def _load_behaviors(source_file_path, dst_dir):
 
 
 def main():
-
+    pass
 
 
 if __name__ == "__main__":
