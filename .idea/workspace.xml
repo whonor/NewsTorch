@@ -5,8 +5,22 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="d7693a56-5c44-498b-ba31-629b35906ee1" name="Changes" comment="Add graph repreparing codes for IPNR">
+      <change afterPath="$PROJECT_DIR$/dataset_corpus_preprocessing/EBNeRD_corpus_main.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/dataset_corpus_preprocessing/download_utils.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/dataset_download_prepare/EBNeRD_dataset_prepare.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/ebrec/utils/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/ebrec/utils/_articles.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/ebrec/utils/_articles_behaviors.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/ebrec/utils/_behaviors.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/ebrec/utils/_constants.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/ebrec/utils/_decay.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/ebrec/utils/_descriptive_analysis.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/ebrec/utils/_nlp.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/ebrec/utils/_polars.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/ebrec/utils/_python.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/ebrec/utils/_torch.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/config.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/install_packages.sh" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/install_packages.sh" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -51,35 +65,37 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
-    &quot;Python.MIND_dataset_prepare.executor&quot;: &quot;Run&quot;,
-    &quot;Python.download_mind.executor&quot;: &quot;Run&quot;,
-    &quot;Python.evaluate.executor&quot;: &quot;Run&quot;,
-    &quot;Python.general_runner.executor&quot;: &quot;Run&quot;,
-    &quot;Python.main.executor&quot;: &quot;Run&quot;,
-    &quot;Python.run.executor&quot;: &quot;Run&quot;,
-    &quot;Python.unbert_runner.executor&quot;: &quot;Run&quot;,
-    &quot;Python.userEncoders.executor&quot;: &quot;Debug&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
-    &quot;last_opened_file_path&quot;: &quot;/home/wanro238/Pypro/NewsRecTorch/models/modules/unbert&quot;,
-    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
-    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
-    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
-    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
-    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.pluginManager&quot;,
-    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "Python.EBNeRD_dataset_prepare.executor": "Run",
+    "Python.MIND_dataset.executor": "Run",
+    "Python.MIND_dataset_prepare.executor": "Run",
+    "Python.download_mind.executor": "Run",
+    "Python.evaluate.executor": "Run",
+    "Python.general_runner.executor": "Run",
+    "Python.main.executor": "Run",
+    "Python.run.executor": "Run",
+    "Python.unbert_runner.executor": "Run",
+    "Python.userEncoders.executor": "Debug",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "git-widget-placeholder": "master",
+    "last_opened_file_path": "/home/wanro238/Pypro/NewsRecTorch/dataset_corpus_preprocessing",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "settings.editor.selected.configurable": "preferences.pluginManager",
+    "vue.rearranger.settings.migration": "true"
   }
-}</component>
+}]]></component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
-      <recent name="$PROJECT_DIR$/models/modules/unbert" />
-      <recent name="$PROJECT_DIR$" />
       <recent name="$PROJECT_DIR$/dataset_corpus_preprocessing" />
+      <recent name="$PROJECT_DIR$" />
+      <recent name="$PROJECT_DIR$/models/modules/unbert" />
       <recent name="$PROJECT_DIR$/models/modules" />
       <recent name="$PROJECT_DIR$/Config" />
     </key>
@@ -91,8 +107,8 @@
       <recent name="$PROJECT_DIR$/dataset corpus preprocessing" />
     </key>
   </component>
-  <component name="RunManager" selected="Python.general_runner">
-    <configuration name="MIND_dataset_prepare" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+  <component name="RunManager" selected="Python.EBNeRD_dataset_prepare">
+    <configuration name="EBNeRD_dataset_prepare" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="NewsRecTorch" />
       <option name="ENV_FILES" value="" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -106,7 +122,7 @@
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/dataset_download_prepare/MIND_dataset_prepare.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/dataset_download_prepare/EBNeRD_dataset_prepare.py" />
       <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
@@ -115,7 +131,7 @@
       <option name="INPUT_FILE" value="" />
       <method v="2" />
     </configuration>
-    <configuration name="download_mind" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+    <configuration name="MIND_dataset" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="NewsRecTorch" />
       <option name="ENV_FILES" value="" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -124,12 +140,12 @@
         <env name="PYTHONUNBUFFERED" value="1" />
       </envs>
       <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/dataset_download_prepare" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/dataset_corpus_preprocessing" />
       <option name="IS_MODULE_SDK" value="true" />
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/dataset_download_prepare/download_mind.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/dataset_corpus_preprocessing/MIND_dataset.py" />
       <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
@@ -209,11 +225,11 @@
     </configuration>
     <recent_temporary>
       <list>
+        <item itemvalue="Python.EBNeRD_dataset_prepare" />
+        <item itemvalue="Python.MIND_dataset" />
         <item itemvalue="Python.general_runner" />
         <item itemvalue="Python.evaluate" />
         <item itemvalue="Python.unbert_runner" />
-        <item itemvalue="Python.MIND_dataset_prepare" />
-        <item itemvalue="Python.download_mind" />
       </list>
     </recent_temporary>
   </component>
@@ -364,7 +380,15 @@
       <option name="project" value="LOCAL" />
       <updated>1753767465004</updated>
     </task>
-    <option name="localTasksCounter" value="16" />
+    <task id="LOCAL-00016" summary="Add graph repreparing codes for IPNR">
+      <option name="closed" value="true" />
+      <created>1753843801631</created>
+      <option name="number" value="00016" />
+      <option name="presentableId" value="LOCAL-00016" />
+      <option name="project" value="LOCAL" />
+      <updated>1753843801631</updated>
+    </task>
+    <option name="localTasksCounter" value="17" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -406,7 +430,9 @@
     <option name="LAST_COMMIT_MESSAGE" value="Add graph repreparing codes for IPNR" />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
-    <SUITE FILE_PATH="coverage/NewsRecTorch$general_runner.coverage" NAME="general_runner Coverage Results" MODIFIED="1753504411313" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/NewsRecTorch$MIND_dataset.coverage" NAME="MIND_dataset Coverage Results" MODIFIED="1753845616588" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/dataset_corpus_preprocessing" />
+    <SUITE FILE_PATH="coverage/NewsRecTorch$general_runner.coverage" NAME="general_runner Coverage Results" MODIFIED="1753844467770" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/NewsRecTorch$EBNeRD_dataset_prepare.coverage" NAME="EBNeRD_dataset_prepare Coverage Results" MODIFIED="1753856607542" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/dataset_download_prepare" />
     <SUITE FILE_PATH="coverage/NewsRecTorch$evaluate.coverage" NAME="evaluate Coverage Results" MODIFIED="1753326418375" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/NewsRecTorch$download_mind.coverage" NAME="download_mind Coverage Results" MODIFIED="1753270177577" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/dataset_download_prepare" />
     <SUITE FILE_PATH="coverage/NewsRecTorch$unbert_runner.coverage" NAME="unbert_runner Coverage Results" MODIFIED="1753316411474" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
