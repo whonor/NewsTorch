@@ -2,6 +2,7 @@ import os
 import gc
 import shutil
 
+from dataset_corpus_preprocessing.EBNeRD_corpus_main import EBNeRD_Corpus
 from dataset_corpus_preprocessing.MIND_corpus_IPNR import MIND_Corpus_IPNR
 from models.CNE_SUE import Model
 from models.DKN import DKN
@@ -14,6 +15,7 @@ from models.NPA import NPA
 from models.NRMS import NRMS
 from models.TANR import TANR
 from models.CenNewsRec import CenNewsRec
+from models.UNBERT import UNBERT
 from models.modules.ipnr.trainer import TrainerIPNR
 from util import get_run_index, compute_scores_IPNR
 from datetime import datetime
@@ -28,6 +30,203 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
+from torch.utils.data import Dataset
+from transformers import AutoTokenizer, get_linear_schedule_with_warmup
+from dataset_corpus_preprocessing.data_loader_unbert import MindDataset
+from models.modules.unbert.eval import dev, test
+
+
+class DataLoader(DataLoader):
+    def __init__(
+        self,
+        dataset: Dataset,
+        batch_size: int,
+        shuffle: str = False,
+        num_workers: int = 0
+    ) -> None:
+        super().__init__(
+            dataset = dataset,
+            batch_size = batch_size,
+            shuffle = shuffle,
+            num_workers = num_workers,
+            collate_fn = dataset.collate
+        )
+
+def run_unbert(config: Config):
+    dataset_path = config.dataset_path
+    model = UNBERT(config)
+    if config.restore is not None and os.path.isfile(config.restore):
+        print("restore model from {}".format(config.restore))
+        state_dict = torch.load(config.restore, map_location=torch.device('cpu'))
+        st = {}
+        for k in state_dict:
+            if k.startswith('bert'):
+                st['_model'+k[len('bert'):]] = state_dict[k]
+            elif k.startswith('classifier'):
+                st['_dense'+k[len('classifier'):]] = state_dict[k]
+            else:
+                st[k] = state_dict[k]
+        model.load_state_dict(st)
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model.to(device)
+
+    tokenizer = AutoTokenizer.from_pretrained(config.pretrain)
+    if config.mode == "train":
+        print('reading training cache...')
+        train_set = MindDataset(
+            dataset_path,
+            tokenizer=tokenizer,
+            mode='train',
+            split=config.split,
+            news_max_len=config.news_max_len,
+            hist_max_len=config.hist_max_len,
+            seq_max_len=config.seq_max_len
+        )
+        train_loader = DataLoader(
+            dataset=train_set,
+            batch_size=config.batch_size,
+            shuffle=True,
+            num_workers=8
+        )
+        print('reading dev cache...')
+        dev_set = MindDataset(
+            dataset_path,
+            tokenizer=tokenizer,
+            mode='dev',
+            split=config.split,
+            news_max_len=config.news_max_len,
+            hist_max_len=config.hist_max_len,
+            seq_max_len=config.seq_max_len
+        )
+        dev_loader = DataLoader(
+            dataset=dev_set,
+            batch_size=config.batch_size,
+            shuffle=False,
+            num_workers=8
+        )
+
+        loss_fn = nn.CrossEntropyLoss()
+        m_optim = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=config.lr)
+        m_scheduler = get_linear_schedule_with_warmup(m_optim,
+                    num_warmup_steps=len(train_set)//config.batch_size*2,
+                    num_training_steps=len(train_set)*config.epoch//config.batch_size)
+        loss_fn.to(device)
+        if config.multi_gpu:
+            model = nn.DataParallel(model, device_ids=config.device_id)
+            loss_fn = nn.DataParallel(loss_fn)
+        print("start training...")
+
+        best_auc = 0.0
+        best_dev_epoch = 0
+        epoch_not_increase = 0
+        for epoch in range(config.epoch):
+            avg_loss = 0.0
+            batch_iterator = tqdm(train_loader, disable=False)
+            for step, train_batch in enumerate(batch_iterator):
+                batch_score = model(train_batch['input_ids'].to(device),
+                                    train_batch['input_mask'].to(device),
+                                    train_batch['segment_ids'].to(device),
+                                    train_batch['news_segment_ids'].to(device),
+                                    train_batch['sentence_ids'].to(device),
+                                    train_batch['sentence_mask'].to(device),
+                                    train_batch['sentence_segment_ids'].to(device),
+                                    )
+                batch_loss = loss_fn(batch_score, train_batch['label'].to(device))
+                if torch.cuda.device_count() > 1:
+                    batch_loss = batch_loss.mean()
+                avg_loss += batch_loss.item()
+                batch_loss.backward()
+                m_optim.step()
+                m_scheduler.step()
+                m_optim.zero_grad()
+
+            auc, mrr, ndcg5, ndcg10 = dev(model, dev_loader, device, config.output, is_epoch=True)
+            wandb.log({"epoch": epoch + 1, "loss": avg_loss / len(train_loader)})
+            wandb.log({"epoch": epoch + 1, "AUC": auc, "MRR": mrr, "nDCG@5": ndcg5, "nDCG@10": ndcg10})
+            if auc > best_auc:
+                best_auc = auc
+                best_dev_epoch = epoch
+                epoch_not_increase = 0
+
+            else:
+                epoch_not_increase += 1
+
+            print("Epoch {}: \n".format(epoch+1))
+            print('AUC : %.4f\nMRR : %.4f\nnDCG@5 : %.4f\nnDCG@10 : %.4f' % (auc, mrr, ndcg5, ndcg10))
+            print('Best epoch :', best_dev_epoch)
+            print('Best ' + config.dev_criterion + ' : ' + str('best_dev_' + config.dev_criterion))
+            if epoch_not_increase == 0:
+                torch.save({config.model: model.state_dict()}, config.model_dir + '/' + config.model + '-' + str(best_dev_epoch))
+            if epoch_not_increase == config.early_stopping_epoch:
+                break
+
+        print("train success!")
+        print('reading test cache...')
+        test_set = MindDataset(
+            dataset_path,
+            tokenizer=tokenizer,
+            mode='test',
+            news_max_len=config.news_max_len,
+            hist_max_len=config.hist_max_len,
+            seq_max_len=config.seq_max_len
+        )
+        test_loader = DataLoader(
+            dataset=test_set,
+            batch_size=config.batch_size,
+            shuffle=False,
+            num_workers=8
+        )
+
+        # if torch.cuda.device_count() > 1:
+        #     model = nn.DataParallel(model)
+        auc, mrr, ndcg5, ndcg10 = dev(model, test_loader, device, config.output, is_epoch=True)
+        print('AUC : %.4f\nMRR : %.4f\nnDCG@5 : %.4f\nnDCG@10 : %.4f' % (auc, mrr, ndcg5, ndcg10))
+        print("test success!")
+    elif config.mode == "dev":
+        print('reading dev cache...')
+        dev_set = MindDataset(
+            dataset_path,
+            tokenizer=tokenizer,
+            mode='dev',
+            split=config.split,
+            news_max_len=config.news_max_len,
+            hist_max_len=config.hist_max_len,
+            seq_max_len=config.seq_max_len
+        )
+        dev_loader = DataLoader(
+            dataset=dev_set,
+            batch_size=config.batch_size,
+            shuffle=False,
+            num_workers=8
+        )
+
+        if torch.cuda.device_count() > 1:
+            model = nn.DataParallel(model)
+        auc, mrr, ndcg5, ndcg10 = dev(model, dev_loader, device, config.output, is_epoch=True)
+        print('AUC : %.4f\nMRR : %.4f\nnDCG@5 : %.4f\nnDCG@10 : %.4f' % (auc, mrr, ndcg5, ndcg10))
+        print("dev success!")
+    else:
+        print('reading test cache...')
+        test_set = MindDataset(
+            dataset_path,
+            tokenizer=tokenizer,
+            mode='test',
+            news_max_len=config.news_max_len,
+            hist_max_len=config.hist_max_len,
+            seq_max_len=config.seq_max_len
+        )
+        test_loader = DataLoader(
+            dataset=test_set,
+            batch_size=config.batch_size,
+            shuffle=False,
+            num_workers=8
+        )
+
+        if torch.cuda.device_count() > 1:
+            model = nn.DataParallel(model)
+        auc, mrr, ndcg5, ndcg10 = dev(model, test_loader, device, config.output, is_epoch=True)
+        print('AUC : %.4f\nMRR : %.4f\nnDCG@5 : %.4f\nnDCG@10 : %.4f' % (auc, mrr, ndcg5, ndcg10))
+        print("test success!")
 
 
 class Trainer:
@@ -202,7 +401,7 @@ def negative_log_sigmoid(logits):
     return loss
 
 
-def train(config: Config, mind_corpus: MIND_Corpus, wandb):
+def train(config: Config, wandb):
     if config.model == 'TANR':
         model = TANR(config)
     elif config.model == 'NAML':
@@ -227,16 +426,23 @@ def train(config: Config, mind_corpus: MIND_Corpus, wandb):
         model = Model(config)
     model.initialize()
     run_index = get_run_index(config.result_dir)
-    if config.model == 'IPNR':
-        trainer = TrainerIPNR(model, config, mind_corpus, wandb, run_index)
-    else:
-        trainer = Trainer(model, config, mind_corpus, wandb, run_index)
+    if config.dataset_name == 'MIND':
+        if config.model == 'IPNR':
+            trainer = TrainerIPNR(model, config, MIND_Corpus_IPNR, wandb, run_index)
+        else:
+            trainer = Trainer(model, config, MIND_Corpus, wandb, run_index)
+    elif config.dataset_name == 'ebnerd':
+        if config.model == 'IPNR':
+            trainer = TrainerIPNR(model, config, EBNeRD_Corpus, wandb, run_index)
+        else:
+            trainer = Trainer(model, config, EBNeRD_Corpus, wandb, run_index)
+
 
     trainer.train()
     config.run_index = run_index
 
 
-def dev(config: Config, mind_corpus: MIND_Corpus):
+def dev(config: Config):
     if config.model == 'TANR':
         model = TANR(config)
     elif config.model == 'NAML':
@@ -265,13 +471,23 @@ def dev(config: Config, mind_corpus: MIND_Corpus):
     dev_res_dir = os.path.join(config.dev_res_dir, config.dev_model_path.replace('\\', '_').replace('/', '_'))
     if not os.path.exists(dev_res_dir):
         os.mkdir(dev_res_dir)
-    if config.model == 'IPNR':
-        auc, mrr, ndcg5, ndcg10 = compute_scores_IPNR(config, model, mind_corpus, config.batch_size, 'dev',
-                                             dev_res_dir + '/' + config.model + '.txt', config.dataset)
-    else:
-        auc, mrr, ndcg5, ndcg10 = compute_scores(config, model, mind_corpus, config.batch_size,
-                                                 'dev',
-                                                 dev_res_dir + '/' + config.model + '.txt', config.dataset)
+    if config.dataset_name == 'MIND':
+        if config.model == 'IPNR':
+            auc, mrr, ndcg5, ndcg10 = compute_scores_IPNR(config, model, MIND_Corpus_IPNR, config.batch_size, 'dev',
+                                                          dev_res_dir + '/' + config.model + '.txt', config.dataset)
+        else:
+            auc, mrr, ndcg5, ndcg10 = compute_scores(config, model, MIND_Corpus, config.batch_size,
+                                                     'dev',
+                                                     dev_res_dir + '/' + config.model + '.txt', config.dataset)
+    elif config.dataset_name == 'ebnerd':
+        if config.model == 'IPNR':
+            auc, mrr, ndcg5, ndcg10 = compute_scores_IPNR(config, model, EBNeRD_Corpus, config.batch_size, 'dev',
+                                                          dev_res_dir + '/' + config.model + '.txt', config.dataset)
+        else:
+            auc, mrr, ndcg5, ndcg10 = compute_scores(config, model, EBNeRD_Corpus, config.batch_size,
+                                                     'dev',
+                                                     dev_res_dir + '/' + config.model + '.txt', config.dataset)
+
 
 
     print('Dev : ' + config.dev_model_path)
@@ -280,7 +496,7 @@ def dev(config: Config, mind_corpus: MIND_Corpus):
 
 
 
-def test(config: Config, mind_corpus: MIND_Corpus):
+def test(config: Config):
     if config.model == 'TANR':
         model = TANR(config)
     elif config.model == 'NAML':
@@ -311,13 +527,23 @@ def test(config: Config, mind_corpus: MIND_Corpus):
         os.mkdir(test_res_dir)
     print('test model path  : ' + config.test_model_path)
     print('test output file : ' + test_res_dir + '/' + config.model + '.txt')
-    if config.model == 'IPNR':
-        auc, mrr, ndcg5, ndcg10 = compute_scores_IPNR(config, model, mind_corpus, config.batch_size, 'test',
-                                             test_res_dir + '/' + config.model + '.txt', config.dataset)
-    else:
-        auc, mrr, ndcg5, ndcg10 = compute_scores(config, model, mind_corpus, config.batch_size,
-                                                 'test',
-                                                 test_res_dir + '/' + config.model + '.txt', config.dataset)
+    if config.dataset_name == 'MIND':
+        if config.model == 'IPNR':
+            auc, mrr, ndcg5, ndcg10 = compute_scores_IPNR(config, model, MIND_Corpus, config.batch_size, 'test',
+                                                          test_res_dir + '/' + config.model + '.txt', config.dataset)
+        else:
+            auc, mrr, ndcg5, ndcg10 = compute_scores(config, model, MIND_Corpus, config.batch_size,
+                                                     'test',
+                                                     test_res_dir + '/' + config.model + '.txt', config.dataset)
+    elif config.dataset_name == 'ebnerd':
+        if config.model == 'IPNR':
+            auc, mrr, ndcg5, ndcg10 = compute_scores_IPNR(config, model, EBNeRD_Corpus, config.batch_size, 'test',
+                                                          test_res_dir + '/' + config.model + '.txt', config.dataset)
+        else:
+            auc, mrr, ndcg5, ndcg10 = compute_scores(config, model, EBNeRD_Corpus, config.batch_size,
+                                                     'test',
+                                                     test_res_dir + '/' + config.model + '.txt', config.dataset)
+
     if config.dataset != 'large':
         print('AUC : %.4f\nMRR : %.4f\nnDCG@5 : %.4f\nnDCG@10 : %.4f' % (auc, mrr, ndcg5, ndcg10))
         if config.mode == 'train':
@@ -342,24 +568,30 @@ if __name__ == '__main__':
         config=config.attribute_dict,
         mode=config.wandb  # Set mode based on config
     )
-    if config.model == 'IPNR':
-        mind_corpus = MIND_Corpus_IPNR(config)
-    else:
-        mind_corpus = MIND_Corpus(config)
 
-    if config.mode == 'train':
-        print("Start training at: ", datetime.now())
-        train(config, mind_corpus, wandb)
-        print("Finish training at: ", datetime.now())
-        config.test_model_path = config.best_model_dir + '/#' + str(config.run_index) + '/' + config.model
-        print("Start testing at: ", datetime.now())
-        test(config, mind_corpus)
-        print("Finish testing at: ", datetime.now())
-    elif config.mode == 'dev':
-        print("Start dev at: ", datetime.now())
-        dev(config, mind_corpus)
-        print("Finish dev at: ", datetime.now())
-    elif config.mode == 'test':
-        print("Start testing at: ", datetime.now())
-        test(config, mind_corpus)
-        print("Finish testing at: ", datetime.now())
+    if config.dataset_name == 'MIND':
+        corpus = MIND_Corpus(config)
+    elif config.dataset_name == 'ebnerd':
+        corpus = EBNeRD_Corpus(config)
+
+    if config.model == 'UNBERT':
+        run_unbert(config)
+    else:
+        if config.mode == 'train':
+            print("Start training at: ", datetime.now())
+            train(config, wandb)
+            print("Finish training at: ", datetime.now())
+            config.test_model_path = config.best_model_dir + '/#' + str(config.run_index) + '/' + config.model
+            print("Start testing at: ", datetime.now())
+            test(config)
+            print("Finish testing at: ", datetime.now())
+        elif config.mode == 'dev':
+            print("Start dev at: ", datetime.now())
+            dev(config)
+            print("Finish dev at: ", datetime.now())
+        elif config.mode == 'test':
+            print("Start testing at: ", datetime.now())
+            test(config)
+            print("Finish testing at: ", datetime.now())
+
+

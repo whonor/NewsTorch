@@ -58,13 +58,13 @@ class Config:
 
     def __init__(self):
         parser = argparse.ArgumentParser()
-        parser.add_argument('--model', type=str, default='IPNR', help='Model name')
+        parser.add_argument('--model', type=str, default='NRMS', help='Model name')
         parser.add_argument('--batch_size', type=int, default='64', help='Batfhch size for training')
         args, _ = parser.parse_known_args()
         self.model = args.model
         self.multi_gpu = False  # Whether to use multiple GPUs
         self.wandb = 'offline'  # Whether to use Weights & Biases for experiment tracking
-        self.wandb_key = None
+        self.wandb_key = '510e44ae3bcf9efc088d88e2c85dcf2a5f0960b1'  # Key for Weights & Biases, if needed
         self.mode = 'train'
         self.dev_model_path = ''
         self.test_model_path = ''
@@ -75,7 +75,8 @@ class Config:
 
         self.root = "."
         self.data_path = "cache/"
-        self.dataset = 'small'
+        self.dataset_name = 'ebnerd'  # Name of the dataset to be used
+        self.dataset = 'demo'
         self.tokenizer = 'MIND'
         self.word_threshold = 3
         self.max_title_length = 32
@@ -106,10 +107,13 @@ class Config:
         else:
             self.click_predictor = 'dot_product'
 
+        self.train_root = self.root + '/%s_%s/train' % (self.dataset_name, self.dataset)
+        self.dev_root = self.root + '/%s_%s/dev' % (self.dataset_name, self.dataset)
+        self.test_root = self.root + '/%s_%s/test' % (self.dataset_name, self.dataset)
+        # self.train_root = self.root + '/MIND-%s/train' % self.dataset
+        # self.dev_root = self.root + '/MIND-%s/dev' % self.dataset
+        # self.test_root = self.root + '/MIND-%s/test' % self.dataset
 
-        self.train_root = self.root + '/MIND-%s/train' % self.dataset
-        self.dev_root = self.root + '/MIND-%s/dev' % self.dataset
-        self.test_root = self.root + '/MIND-%s/test' % self.dataset
         # if self.dataset == 'small': # suggested configuration for MIND-small
         #     self.dropout_rate = 0.25
         #     self.gcn_layer_num = 3
@@ -188,10 +192,11 @@ class Config:
             self.dev_root + '/news.tsv', self.dev_root + '/behaviors.tsv', self.dev_root + '/entity_embedding.vec', self.dev_root + '/context_embedding.vec',
             self.test_root + '/news.tsv', self.test_root + '/behaviors.tsv', self.test_root + '/entity_embedding.vec', self.test_root + '/context_embedding.vec'
         ]
-        if not all(list(map(os.path.exists, dataset_files))):
-            exec('prepare_MIND_%s()' % self.dataset)
-            print("Please prepare the dataset first!!!")
+        # if not all(list(map(os.path.exists, dataset_files))):
+        #     # exec('prepare_MIND_%s()' % self.dataset)
+        #     print("Please prepare the dataset first!!!")
 
+        dataset_name = self.dataset_name
         model_name = self.model
         data_path = self.data_path
         mkdirs = lambda x: os.makedirs(x) if not os.path.exists(x) else None
@@ -209,23 +214,38 @@ class Config:
         mkdirs(self.test_res_dir)
         if model_name == 'IPNR':
             mkdirs("cache/IPNR/")
+        mkdirs("cache/%s/" % self.dataset_name)
         if not os.path.exists(data_path + 'dev/ref/truth-%s.txt' % self.dataset):
             with open(os.path.join(self.dev_root, 'behaviors.tsv'), 'r', encoding='utf-8') as dev_f:
                 with open(data_path + 'dev/ref/truth-%s.txt' % self.dataset, 'w', encoding='utf-8') as truth_f:
                     for dev_ID, line in enumerate(dev_f):
                         # impression_ID, user_ID, time, history, impressions, is_fake = line.split('\t')
-                        impression_ID, user_ID, time, history, impressions = line.split('\t')
-                        labels = [int(impression[-1]) for impression in impressions.strip().split(' ')]
-                        truth_f.write(('' if dev_ID == 0 else '\n') + str(dev_ID + 1) + ' ' + str(labels).replace(' ', ''))
+                        if dataset_name == 'ebnerd':
+                            impression_ID, user_ID, time, history, labels, impressions = line.split('\t')
+                            truth_f.write(
+                                ('' if dev_ID == 0 else '\n') + str(dev_ID + 1) + ' ' + str(labels).replace(' ', ''))
+                        elif dataset_name == 'MIND':
+                            impression_ID, user_ID, time, history, impressions = line.split('\t')
+                            labels = [int(impression[-1]) for impression in impressions.strip().split(' ')]
+                            truth_f.write(('' if dev_ID == 0 else '\n') + str(dev_ID + 1) + ' ' + str(labels).replace(' ', ''))
         if self.dataset != 'large':
             if not os.path.exists(data_path + 'test/ref/truth-%s.txt' % self.dataset):
                 with open(os.path.join(self.test_root, 'behaviors.tsv'), 'r', encoding='utf-8') as test_f:
                     with open(data_path + 'test/ref/truth-%s.txt' % self.dataset, 'w', encoding='utf-8') as truth_f:
                         for test_ID, line in enumerate(test_f):
-                            # impression_ID, user_ID, time, history, impressions, is_fake = line.split('\t')
-                            impression_ID, user_ID, time, history, impressions = line.split('\t')
-                            labels = [int(impression[-1]) for impression in impressions.strip().split(' ')]
-                            truth_f.write(('' if test_ID == 0 else '\n') + str(test_ID + 1) + ' ' + str(labels).replace(' ', ''))
+                            if dataset_name == 'ebnerd':
+                                impression_ID, user_ID, time, history, labels, impressions = line.split('\t')
+                                truth_f.write(
+                                    ('' if test_ID == 0 else '\n') + str(test_ID + 1) + ' ' + str(labels).replace(' ',
+                                                                                                                  ''))
+                            elif dataset_name == 'MIND':
+                                impression_ID, user_ID, time, history, impressions = line.split('\t')
+                                labels = [int(impression[-1]) for impression in impressions.strip().split(' ')]
+                                truth_f.write(
+                                    ('' if test_ID == 0 else '\n') + str(test_ID + 1) + ' ' + str(labels).replace(' ',
+                                                                                                                  ''))
+                                # impression_ID, user_ID, time, history, impressions, is_fake = line.split('\t')
+
         else:
             self.prediction_dir = data_path + 'prediction/large/' + model_name
             mkdirs(self.prediction_dir)

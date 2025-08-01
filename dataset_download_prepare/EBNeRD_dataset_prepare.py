@@ -1,171 +1,111 @@
-import json
+#!/usr/bin/env python3
 import os
-import re
-import tarfile
-from ast import literal_eval
-from collections import Counter, defaultdict
-from datetime import datetime
-from pathlib import Path
-from random import shuffle
-from typing import Any, Dict, List, Optional, Tuple
-
-import datetime as dt
+import json
+import shutil
+import random
 import numpy as np
-import pandas as pd
-import requests
-import torch.nn as nn
-import polars as pl
-from sympy.printing.tree import print_node
+import collections
 
-from torch.utils.data import Dataset
-from tqdm import tqdm
-from transformers import AutoModel, AutoTokenizer
+# setup random seed for reproducibility
+random.seed(0)
+np.random.seed(0)
 
-from dataset_corpus_preprocessing.download_utils import download_path, maybe_download, extract_file
+root = "../"
+# root
+ebnerd_demo_dataset_root = root + '/ebnerd_demo'
+ebnerd_small_dataset_root = root + '/ebnerd_small'
+ebnerd_large_dataset_root = root + '/ebnerd_large'
 
-from ebrec.utils._behaviors import ebnerd_from_path, sampling_strategy_wu2019, create_binary_labels_column
-
-def to_tsv(df: pd.DataFrame, fpath: str) -> None:
-    """Stores a dataframe in `.tsv` format."""
-    df.to_csv(fpath, sep="\t", index=False)
-
-
-def _load_news(dst_dir):
-    """加载新闻数据"""
-    parsed_news_file = os.path.join(dst_dir, "news.tsv")
-    article_file = os.path.join(dst_dir, "articles.parquet")
-    print("News not parsed. Loading and parsing raw data.")
-    '''
-    Articles:
-    ['article_id', 'title', 'subtitle', 'last_modified_time', 'premium', 'body', 
-    'published_time', 'image_ids', 'article_type', 'url', 'ner_clusters', 'entity_groups', 
-    'topics', 'category', 'subcategory', 'category_str', 'total_inviews', 'total_pageviews', 
-    'total_read_time', 'sentiment_score', 'sentiment_label']
-
-    '''
-    df_articles = pl.read_parquet(article_file,
-                                  columns=[
-                                      "article_id",
-                                      "category",
-                                      "subcategory",
-                                      "title",
-                                      "subtitle",
-                                      "body",
-                                      "entity_groups",
-                                  ])
-
-    news = df_articles.to_pandas()
-
-    news = news.rename(columns={
-        "article_id": "nid",
-        "subtitle": "abstract"
-    })
-    news = news.set_index("nid", drop=True)
-    to_tsv(news, parsed_news_file)
-
-    return news
+def confirm_overwrite(path: str) -> bool:
+    if os.path.exists(path):
+        choice = input(f"already existed: {path}，recovered？(y/N): ").strip().lower()
+        return choice == 'y'
+    return True
 
 
-def _load_behaviors(source_file_path, dst_dir):
-    """加载用户行为数据"""
-    file_prefix = ""
-    parsed_bhv_file = os.path.join(
-        dst_dir + "behaviors.tsv"
-    )
-    print("User behaviors not parsed. Loading and parsing raw data.")
-    '''
-    Histories:
-    ['user_id', 'impression_time_fixed', 'scroll_percentage_fixed', 'article_id_fixed', 
-    'read_time_fixed']
-    Behaviors:
-    ['impression_id', 'article_id', 'impression_time', 'read_time', 'scroll_percentage', 
-    'device_type', 'article_ids_inview', 'article_ids_clicked', 'user_id', 'is_sso_user', 
-    'gender', 'postcode', 'age', 'is_subscriber', 'session_id', 'next_read_time', 
-    'next_scroll_percentage']
-    '''
-    # load behaviors
-    print("Parsing behaviors.")
-    PATH = Path(source_file_path)
-    df_behaviors = (
-        ebnerd_from_path(
-            PATH,
-            history_size=20,
-            padding=0,
-        )
-        .sample(fraction=1.0, shuffle=True, seed=42)
-        .select([
-            "impression_time",
-            "article_id_fixed",
-            "article_ids_inview",
-            "article_ids_clicked",
-            "impression_id",
-            "user_id"
-        ])
-        .pipe(create_binary_labels_column)
-    )
-    '''
-                    .pipe(
-            sampling_strategy_wu2019,
-            npratio=self.neg_num,
-            shuffle=True,
-            with_replacement=True,
-            seed=42,
-        )
-    '''
-    column_names = ["impression_id", "user_id", "impression_time", "article_id_fixed", "article_ids_inview",
-                    "article_ids_clicked", "labels"]
-    new_names = ["impid", "uid", "time", "history", "impressions", "labels"]
-    behaviors = df_behaviors.to_pandas()
-    behaviors = behaviors.rename(columns={"impression_id": "impid",
-                                          "user_id": "uid",
-                                          "impression_time": "time",
-                                          "article_id_fixed": "history",
-                                          "article_ids_inview": "impressions"})
-    behaviors = behaviors[new_names]
+def split_training_behaviors(size='ebnerd_demo'):
+    MIND_small_train_ratio = 0.9
+    behavior_file = os.path.join(ebnerd_demo_dataset_root, 'download', size, 'train', 'behaviors.tsv')
+    if not os.path.exists(behavior_file):
+        raise FileNotFoundError(f"behavior file no exist: {behavior_file}")
 
-    """
-    === behaviors 时间范围分析 ===
-    起始时间: 2023-05-18 07:00:03
-    结束时间: 2023-05-25 06:59:52
-    总跨度: 6 days, 23:59:49
-    """
-    last_dt = behaviors["time"].max() - dt.timedelta(days=1)
+    with open(behavior_file, 'r', encoding='utf-8') as f:
+        behavior_lines = [line for line in f if line.strip()]
 
-    # behaviors["time"] = pd.to_datetime(behaviors["time"], format="%m/%d/%Y %I:%M:%S %p")
+    random.shuffle(behavior_lines)
+    total = len(behavior_lines)
+    train_num = int(total * MIND_small_train_ratio)
+    indices = list(range(total))
+    random.shuffle(indices)
+    train_idx = set(indices[:train_num])
 
-    # Apply the conversion to the 'history' column
-    behaviors["candidates"] = behaviors["impressions"]
-    behaviors = behaviors.drop(columns=["impressions"])
+    train_behavior_lines = []
+    dev_behavior_lines = []
+    for i, line in enumerate(behavior_lines):
+        if i in train_idx:
+            train_behavior_lines.append(line)
+        else:
+            dev_behavior_lines.append(line)
 
-    behaviors["history"] = behaviors["history"].apply(lambda x: [y for y in x.tolist()])
-    behaviors["candidates"] = behaviors["candidates"].apply(lambda x: [y for y in x.tolist()])
+    return train_behavior_lines, dev_behavior_lines
 
-    cnt_bhv = len(behaviors)
-    behaviors = behaviors[behaviors["history"].apply(len) > 0]
-    dropped_bhv = cnt_bhv - len(behaviors)
-    print(
-        f"Removed {dropped_bhv} ({dropped_bhv / cnt_bhv}%) behaviors without user history"
-    )
 
-    behaviors = behaviors.reset_index(drop=True)
-    to_tsv(behaviors, parsed_bhv_file)
+def preprocess_ebnerd_demo(size='ebnerd_demo'):
+    train_behavior_lines, dev_behavior_lines = split_training_behaviors(size=size)
 
-    return behaviors
+    # train/dev sets
+    for mode, lines, src_news_split in [
+        ('train', train_behavior_lines, 'train'),
+        ('dev', dev_behavior_lines, 'train')
+    ]:
+        out_dir = os.path.join(ebnerd_demo_dataset_root, mode)
+        if os.path.exists(out_dir):
+            if not confirm_overwrite(out_dir):
+                print(f"jump {mode} dataset prepare")
+                continue
+            shutil.rmtree(out_dir)
+        os.makedirs(out_dir)
+
+        # 写 behaviors
+        with open(os.path.join(out_dir, 'behaviors.tsv'), 'w', encoding='utf-8') as f:
+            f.writelines(lines)
+
+        # 拷贝 news
+        src_news = os.path.join(ebnerd_demo_dataset_root, 'download', size, 'news.tsv')
+        dst_news = os.path.join(out_dir, 'news.tsv')
+        if confirm_overwrite(dst_news):
+            if not os.path.exists(src_news):
+                raise FileNotFoundError(f"news file no exist: {src_news}")
+            shutil.copyfile(src_news, dst_news)
+
+    # test set
+    test_dir = os.path.join(ebnerd_demo_dataset_root, 'test')
+    if os.path.exists(test_dir):
+        if not confirm_overwrite(test_dir):
+            print("jump test dataset prepare")
+            return
+        shutil.rmtree(test_dir)
+    os.makedirs(test_dir)
+
+    for fname in ('behaviors.tsv', 'news.tsv'):
+        if fname == 'behaviors.tsv':
+            src = os.path.join(ebnerd_demo_dataset_root, 'download', size, 'validation', fname)
+        else:
+            src = os.path.join(ebnerd_demo_dataset_root, 'download', size, fname)
+
+        dst = os.path.join(test_dir, fname)
+        if confirm_overwrite(dst):
+            if not os.path.exists(src):
+                raise FileNotFoundError(f"no exist: {src}")
+            shutil.copyfile(src, dst)
 
 
 def main():
-    pass
+    print("Prepare ebnerd_demo...")
+    preprocess_ebnerd_demo(size="ebnerd_demo")
+
+    print("All datasets are finished。")
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
-
-
-
-
-
-
-
-
-
-
