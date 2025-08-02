@@ -25,7 +25,7 @@ def confirm_overwrite(path: str) -> bool:
 
 def split_training_behaviors(size='ebnerd_demo'):
     MIND_small_train_ratio = 0.9
-    behavior_file = os.path.join(ebnerd_demo_dataset_root, 'download', size, 'train', 'behaviors.tsv')
+    behavior_file = os.path.join(ebnerd_demo_dataset_root, 'download', size, 'train', 'behaviors_.tsv')
     if not os.path.exists(behavior_file):
         raise FileNotFoundError(f"behavior file no exist: {behavior_file}")
 
@@ -71,7 +71,7 @@ def preprocess_ebnerd_demo(size='ebnerd_demo'):
             f.writelines(lines)
 
         # 拷贝 news
-        src_news = os.path.join(ebnerd_demo_dataset_root, 'download', size, 'news.tsv')
+        src_news = os.path.join(ebnerd_demo_dataset_root, 'download', size, 'news_.tsv')
         dst_news = os.path.join(out_dir, 'news.tsv')
         if confirm_overwrite(dst_news):
             if not os.path.exists(src_news):
@@ -87,17 +87,23 @@ def preprocess_ebnerd_demo(size='ebnerd_demo'):
         shutil.rmtree(test_dir)
     os.makedirs(test_dir)
 
-    for fname in ('behaviors.tsv', 'news.tsv'):
-        if fname == 'behaviors.tsv':
+    for fname in ('behaviors_.tsv', 'news_.tsv'):
+        if fname == 'behaviors_.tsv':
             src = os.path.join(ebnerd_demo_dataset_root, 'download', size, 'validation', fname)
+            dst = os.path.join(test_dir, 'behaviors.tsv')
+            if confirm_overwrite(dst):
+                if not os.path.exists(src):
+                    raise FileNotFoundError(f"no exist: {src}")
+                shutil.copyfile(src, dst)
         else:
             src = os.path.join(ebnerd_demo_dataset_root, 'download', size, fname)
+            dst = os.path.join(test_dir, 'news.tsv')
+            if confirm_overwrite(dst):
+                if not os.path.exists(src):
+                    raise FileNotFoundError(f"no exist: {src}")
+                shutil.copyfile(src, dst)
 
-        dst = os.path.join(test_dir, fname)
-        if confirm_overwrite(dst):
-            if not os.path.exists(src):
-                raise FileNotFoundError(f"no exist: {src}")
-            shutil.copyfile(src, dst)
+
 
 
 def main():

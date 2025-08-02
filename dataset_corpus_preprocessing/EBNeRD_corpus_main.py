@@ -22,62 +22,68 @@ def is_number(s):
 
 pat = re.compile(r"[\w]+|[.,!?;|]")
 
-def load_fasttext_embeddings(word_dict, bin_path, embedding_dim, vec_path=None, std=0.1):
-    """
-    Convert FastText .bin to .vec (if needed), load with Gensim, and create PyTorch embedding matrix.
+import urllib.request
+import gzip
+import shutil
 
-    Args:
-        word_dict (dict): Mapping from word to index.
-        bin_path (str): Path to FastText .bin model file.
-        embedding_dim (int): Dimension of word vectors (should match model).
-        vec_path (str, optional): Path to save .vec file. Default is same as .bin basename.
-        std (float): Stddev for random OOV initialization.
+# Step 1: Auto-download and extract FastText Danish vector
+def download_fasttext_vec_if_needed(vec_file_path):
+    if os.path.exists(vec_file_path):
+        print(f"✅ Vector file already exists at: {vec_file_path}")
+        return
 
-    Returns:
-        word_embedding_vectors (torch.Tensor): [vocab_size, embedding_dim]
-        fasttext_model (KeyedVectors): Loaded FastText embeddings
-    """
-    if vec_path is None:
-        vec_path = os.path.splitext(bin_path)[0] + ".vec"
+    vec_gz_url = "https://dl.fbaipublicfiles.com/fasttext/vectors-crawl/cc.da.300.vec.gz"
+    vec_gz_path = vec_file_path + ".gz"
 
-    # Convert .bin to .vec if needed
-    if not os.path.exists(vec_path):
-        print(f"[INFO] .vec not found. Converting '{bin_path}' to '{vec_path}'...")
-        ft_bin_model = fasttext.load_model(bin_path)
-        words = ft_bin_model.get_words()
-        dim = ft_bin_model.get_dimension()
+    print(f"⬇️ Downloading FastText Danish vectors from {vec_gz_url} ...")
+    urllib.request.urlretrieve(vec_gz_url, vec_gz_path)
 
-        with open(vec_path, "w", encoding="utf-8") as f:
-            f.write(f"{len(words)} {dim}\n")
-            for word in words:
-                vector = ft_bin_model.get_word_vector(word)
-                f.write(f"{word} {' '.join(str(x) for x in vector)}\n")
-        print("[INFO] Conversion complete.")
+    print(f"📦 Extracting {vec_gz_path} ...")
+    with gzip.open(vec_gz_path, 'rb') as f_in:
+        with open(vec_file_path, 'wb') as f_out:
+            shutil.copyfileobj(f_in, f_out)
 
-    # Load .vec with Gensim
-    print(f"[INFO] Loading .vec from '{vec_path}'...")
-    fasttext_model = KeyedVectors.load_word2vec_format(vec_path, binary=False)
-    print(f"[INFO] Loaded {len(fasttext_model)} vectors.")
+    os.remove(vec_gz_path)
+    print(f"✅ Extracted to {vec_file_path}")
 
-    # Calculate mean vector for fallback
-    fasttext_mean_vector = torch.tensor(np.mean(fasttext_model.vectors, axis=0))
+# Step 2: Load FastText .vec file into dictionary
+def load_fasttext_vec(filepath):
+    word_to_vec = {}
+    with open(filepath, 'r', encoding='utf-8') as f:
+        first_line = f.readline()  # Skip header
+        for line in f:
+            parts = line.rstrip().split(' ')
+            word = parts[0]
+            vec = torch.tensor([float(x) for x in parts[1:]], dtype=torch.float32)
+            word_to_vec[word] = vec
+    return word_to_vec
 
-    # Build PyTorch embedding matrix
-    vocab_size = len(word_dict)
-    word_embedding_vectors = torch.zeros((vocab_size, embedding_dim))
+# Step 3: Build embedding matrix from word_dict
+def build_danish_word_embedding(word_dict, vec_file, embedding_dim, output_pkl_path):
+    # Auto-download if file missing
+    download_fasttext_vec_if_needed(vec_file)
 
-    for word, idx in word_dict.items():
-        if idx == 0:
-            continue  # usually padding
-        if word in fasttext_model:
-            word_embedding_vectors[idx] = torch.tensor(fasttext_model[word])
+    print("📥 Loading FastText Danish vectors...")
+    word_to_vec = load_fasttext_vec(vec_file)
+
+    print("🛠️ Building word embedding matrix...")
+    all_vecs = torch.stack(list(word_to_vec.values()))
+    mean_vector = torch.mean(all_vecs, dim=0)
+
+    word_embedding_vectors = torch.zeros([len(word_dict), embedding_dim])
+    for word, index in word_dict.items():
+        if index == 0:
+            continue
+        if word in word_to_vec:
+            word_embedding_vectors[index, :] = word_to_vec[word]
         else:
-            # OOV: random vector + mean
-            random_vector = torch.empty(embedding_dim).normal_(mean=0, std=std)
-            word_embedding_vectors[idx] = random_vector + fasttext_mean_vector
+            random_vec = torch.randn(embedding_dim) * 0.1
+            word_embedding_vectors[index, :] = random_vec + mean_vector
 
-    print("[INFO] Embedding matrix ready.")
-    return word_embedding_vectors, fasttext_model
+    with open(output_pkl_path, 'wb') as f:
+        pickle.dump(word_embedding_vectors, f)
+
+    print(f"✅ Saved to {output_pkl_path}, shape: {word_embedding_vectors.shape}")
 
 
 class EBNeRD_Corpus:
@@ -119,6 +125,7 @@ class EBNeRD_Corpus:
                 with open(os.path.join(prefix, 'news.tsv'), 'r', encoding='utf-8') as news_f:
                     for line in news_f:
                         news_ID, category, subCategory, title, abstract, topics = line.split('\t')
+                        news_ID = news_ID.strip()
                         if news_ID not in news_ID_dict:
                             news_ID_dict[news_ID] = len(news_ID_dict)
                             if category not in category_dict:
@@ -163,73 +170,74 @@ class EBNeRD_Corpus:
                 json.dump(word_dict, vocabulary_f)
 
             # 4. Danish word embedding using fastText
-            word_embedding_vectors, ft_model = load_fasttext_embeddings(word_dict, '../../fastext', embedding_dim=300)
-
-            # Save embeddings
-            with open(word_embedding_file, 'wb') as word_embedding_f:
-                pickle.dump(word_embedding_vectors, word_embedding_f)
+            build_danish_word_embedding(
+                word_dict,
+                vec_file='cc.da.300.vec',
+                embedding_dim=300,
+                output_pkl_path=word_embedding_file
+            )
 
 
             # 6. user history graph for CNE-SUE
-            category_num = len(category_dict)
-            graph_size = config.max_history_num + category_num # graph size of |V_{n}|+|V_{p}|
-            prefix_mode = ['train', 'dev', 'test']
-            user_history_graph_data = {}
-            for prefix_index, prefix in enumerate([config.train_root, config.dev_root, config.test_root]):
-                mode = prefix_mode[prefix_index]
-                user_history_num = 0
-                with open(os.path.join(prefix, 'behaviors.tsv'), 'r', encoding='utf-8') as behaviors_f:
-                    for line in behaviors_f:
-                        user_history_num += 1
-                user_history_graph = np.zeros([user_history_num, graph_size, graph_size], dtype=np.float32)
-                user_history_category_mask = np.zeros([user_history_num, category_num + 1], dtype=np.float32)
-                user_history_category_indices = np.zeros([user_history_num, config.max_history_num], dtype=np.int64)
-                with open(os.path.join(prefix, 'behaviors.tsv'), 'r', encoding='utf-8') as behaviors_f:
-                    for line_index, line in enumerate(behaviors_f):
-                        impression_ID, user_ID, time, history, labels, impressions = line.split('\t')
-                        if config.no_self_connection:
-                            history_graph = np.zeros([graph_size, graph_size], dtype=np.float32)
-                        else:
-                            history_graph = np.identity(graph_size, dtype=np.float32)
-                        history_category_mask = np.zeros(category_num + 1, dtype=np.float32) # extra one category index for padding news
-                        history_category_indices = np.full([config.max_history_num], category_num, dtype=np.int64)
-                        if len(history.strip()) > 0:
-                            history_news_ID = history.split(' ')
-                            offset = max(0, len(history_news_ID) - config.max_history_num)
-                            history_news_num = min(len(history_news_ID), config.max_history_num)
-                            for i in range(history_news_num):
-                                category_index = news_category_dict[history_news_ID[i + offset]]
-                                history_category_mask[category_index] = 1.0
-                                history_category_indices[i] = category_index
-                                history_graph[i, config.max_history_num + category_index] = 1 # edge of E_{p}^{1} in inter-cluster graph G2
-                                history_graph[config.max_history_num + category_index, i] = 1 # edge of E_{p}^{1} in inter-cluster graph G2
-                                for j in range(i + 1, history_news_num):
-                                    _category_index = news_category_dict[history_news_ID[j + offset]]
-                                    if category_index == _category_index:
-                                        history_graph[i, j] = 1 # edge of E_{n} in intra-cluster graph G1
-                                        history_graph[j, i] = 1 # edge of E_{n} in intra-cluster graph G1
-                                    else:
-                                        history_graph[config.max_history_num + category_index, config.max_history_num + _category_index] = 1 # edge of E_{p}^{2} in inter-cluster graph G2
-                                        history_graph[config.max_history_num + _category_index, config.max_history_num + category_index] = 1 # edge of E_{p}^{2} in inter-cluster graph G2
-                            if not config.no_adjacent_normalization:
-                                if config.gcn_normalization_type == 'asymmetric':
-                                    # Asymmetric adjacent matrix normalization: D^{-\frac{1}{2}}A
-                                    D_inv = np.zeros([graph_size, graph_size], dtype=np.float32)
-                                    np.fill_diagonal(D_inv, 1 / history_graph.sum(axis=1, keepdims=False))
-                                    history_graph = np.matmul(D_inv, history_graph)
-                                else:
-                                    # Symmetric adjacent matrix normalization: D^{-\frac{1}{2}}AD^{-\frac{1}{2}}
-                                    D_inv_sqrt = np.zeros([graph_size, graph_size], dtype=np.float32)
-                                    np.fill_diagonal(D_inv_sqrt, np.sqrt(1 / history_graph.sum(axis=1, keepdims=False)))
-                                    history_graph = np.matmul(np.matmul(D_inv_sqrt, history_graph), D_inv_sqrt)
-                        user_history_graph[line_index] = history_graph
-                        user_history_category_mask[line_index] = history_category_mask
-                        user_history_category_indices[line_index] = history_category_indices
-                    user_history_graph_data[mode + '_user_history_graph'] = user_history_graph
-                    user_history_graph_data[mode + '_user_history_category_mask'] = user_history_category_mask
-                    user_history_graph_data[mode + '_user_history_category_indices'] = user_history_category_indices
-            with open(user_history_graph_file, 'wb') as user_history_graph_f:
-                pickle.dump(user_history_graph_data, user_history_graph_f)
+            # category_num = len(category_dict)
+            # graph_size = config.max_history_num + category_num # graph size of |V_{n}|+|V_{p}|
+            # prefix_mode = ['train', 'dev', 'test']
+            # user_history_graph_data = {}
+            # for prefix_index, prefix in enumerate([config.train_root, config.dev_root, config.test_root]):
+            #     mode = prefix_mode[prefix_index]
+            #     user_history_num = 0
+            #     with open(os.path.join(prefix, 'behaviors.tsv'), 'r', encoding='utf-8') as behaviors_f:
+            #         for line in behaviors_f:
+            #             user_history_num += 1
+            #     user_history_graph = np.zeros([user_history_num, graph_size, graph_size], dtype=np.float32)
+            #     user_history_category_mask = np.zeros([user_history_num, category_num + 1], dtype=np.float32)
+            #     user_history_category_indices = np.zeros([user_history_num, config.max_history_num], dtype=np.int64)
+            #     with open(os.path.join(prefix, 'behaviors.tsv'), 'r', encoding='utf-8') as behaviors_f:
+            #         for line_index, line in enumerate(behaviors_f):
+            #             impression_ID, user_ID, time, history, labels, impressions = line.split('\t')
+            #             if config.no_self_connection:
+            #                 history_graph = np.zeros([graph_size, graph_size], dtype=np.float32)
+            #             else:
+            #                 history_graph = np.identity(graph_size, dtype=np.float32)
+            #             history_category_mask = np.zeros(category_num + 1, dtype=np.float32) # extra one category index for padding news
+            #             history_category_indices = np.full([config.max_history_num], category_num, dtype=np.int64)
+            #             if len(history.strip('[] ')) > 0:
+            #                 history_news_ID = history.strip('[] ').strip().split(',')
+            #                 offset = max(0, len(history_news_ID) - config.max_history_num)
+            #                 history_news_num = min(len(history_news_ID), config.max_history_num)
+            #                 for i in range(history_news_num):
+            #                     category_index = news_category_dict[history_news_ID[i + offset]]
+            #                     history_category_mask[category_index] = 1.0
+            #                     history_category_indices[i] = category_index
+            #                     history_graph[i, config.max_history_num + category_index] = 1 # edge of E_{p}^{1} in inter-cluster graph G2
+            #                     history_graph[config.max_history_num + category_index, i] = 1 # edge of E_{p}^{1} in inter-cluster graph G2
+            #                     for j in range(i + 1, history_news_num):
+            #                         _category_index = news_category_dict[history_news_ID[j + offset]]
+            #                         if category_index == _category_index:
+            #                             history_graph[i, j] = 1 # edge of E_{n} in intra-cluster graph G1
+            #                             history_graph[j, i] = 1 # edge of E_{n} in intra-cluster graph G1
+            #                         else:
+            #                             history_graph[config.max_history_num + category_index, config.max_history_num + _category_index] = 1 # edge of E_{p}^{2} in inter-cluster graph G2
+            #                             history_graph[config.max_history_num + _category_index, config.max_history_num + category_index] = 1 # edge of E_{p}^{2} in inter-cluster graph G2
+            #                 if not config.no_adjacent_normalization:
+            #                     if config.gcn_normalization_type == 'asymmetric':
+            #                         # Asymmetric adjacent matrix normalization: D^{-\frac{1}{2}}A
+            #                         D_inv = np.zeros([graph_size, graph_size], dtype=np.float32)
+            #                         np.fill_diagonal(D_inv, 1 / history_graph.sum(axis=1, keepdims=False))
+            #                         history_graph = np.matmul(D_inv, history_graph)
+            #                     else:
+            #                         # Symmetric adjacent matrix normalization: D^{-\frac{1}{2}}AD^{-\frac{1}{2}}
+            #                         D_inv_sqrt = np.zeros([graph_size, graph_size], dtype=np.float32)
+            #                         np.fill_diagonal(D_inv_sqrt, np.sqrt(1 / history_graph.sum(axis=1, keepdims=False)))
+            #                         history_graph = np.matmul(np.matmul(D_inv_sqrt, history_graph), D_inv_sqrt)
+            #             user_history_graph[line_index] = history_graph
+            #             user_history_category_mask[line_index] = history_category_mask
+            #             user_history_category_indices[line_index] = history_category_indices
+            #         user_history_graph_data[mode + '_user_history_graph'] = user_history_graph
+            #         user_history_graph_data[mode + '_user_history_category_mask'] = user_history_category_mask
+            #         user_history_graph_data[mode + '_user_history_category_indices'] = user_history_category_indices
+            # with open(user_history_graph_file, 'wb') as user_history_graph_f:
+            #     pickle.dump(user_history_graph_data, user_history_graph_f)
 
     def __init__(self, config: Config):
         # preprocess cache
@@ -252,17 +260,17 @@ class EBNeRD_Corpus:
         # with open('cache/entity-%s.json' % config.dataset, 'r', encoding='utf-8') as entity_f:
         #     self.entity_dict = json.load(entity_f)
         #     config.entity_size = len(self.entity_dict)
-        with open('cache/ebnerd/user_history_graph-' + str(config.max_history_num) + ('' if config.no_self_connection else '-self') + ('' if config.no_adjacent_normalization else '-normalize-' + config.gcn_normalization_type) + '-' + config.dataset + '.pkl', 'rb') as user_history_graph_f:
-            user_history_data = pickle.load(user_history_graph_f)
-            self.train_user_history_graph = user_history_data['train_user_history_graph']
-            self.train_user_history_category_mask = user_history_data['train_user_history_category_mask']
-            self.train_user_history_category_indices = user_history_data['train_user_history_category_indices']
-            self.dev_user_history_graph = user_history_data['dev_user_history_graph']
-            self.dev_user_history_category_mask = user_history_data['dev_user_history_category_mask']
-            self.dev_user_history_category_indices = user_history_data['dev_user_history_category_indices']
-            self.test_user_history_graph = user_history_data['test_user_history_graph']
-            self.test_user_history_category_mask = user_history_data['test_user_history_category_mask']
-            self.test_user_history_category_indices = user_history_data['test_user_history_category_indices']
+        # with open('cache/ebnerd/user_history_graph-' + str(config.max_history_num) + ('' if config.no_self_connection else '-self') + ('' if config.no_adjacent_normalization else '-normalize-' + config.gcn_normalization_type) + '-' + config.dataset + '.pkl', 'rb') as user_history_graph_f:
+        #     user_history_data = pickle.load(user_history_graph_f)
+        #     self.train_user_history_graph = user_history_data['train_user_history_graph']
+        #     self.train_user_history_category_mask = user_history_data['train_user_history_category_mask']
+        #     self.train_user_history_category_indices = user_history_data['train_user_history_category_indices']
+        #     self.dev_user_history_graph = user_history_data['dev_user_history_graph']
+        #     self.dev_user_history_category_mask = user_history_data['dev_user_history_category_mask']
+        #     self.dev_user_history_category_indices = user_history_data['dev_user_history_category_indices']
+        #     self.test_user_history_graph = user_history_data['test_user_history_graph']
+        #     self.test_user_history_category_mask = user_history_data['test_user_history_category_mask']
+        #     self.test_user_history_category_indices = user_history_data['test_user_history_category_indices']
 
         # meta cache
         self.negative_sample_num = config.negative_sample_num                                           # negative sample number for training
@@ -369,14 +377,14 @@ class EBNeRD_Corpus:
                 impression_ID, user_ID, time, history, labels, impressions = line.split('\t')
                 click_impressions = []
                 non_click_impressions = []
-                for impression, label in zip(impressions.strip().split(','), labels.strip().split(' ')):
+                for impression, label in zip(impressions.strip('[]').split(','), labels.strip('[]').split(' ')):
                     if label == '0':
-                        non_click_impressions.append(self.news_ID_dict[impression])
+                        non_click_impressions.append(self.news_ID_dict[impression.strip()])
                     else:
-                        click_impressions.append(self.news_ID_dict[impression])
+                        click_impressions.append(self.news_ID_dict[impression.strip()])
 
                 if len(history) != 0:
-                    history = list(map(lambda x: self.news_ID_dict[x], history.strip().split(',')))
+                    history = list(map(lambda x: self.news_ID_dict[x], history.strip('[]').split(',')))
                     padding_num = max(0, self.max_history_num - len(history))
                     user_history = history[-self.max_history_num:] + [0] * padding_num
                     user_history_mask = np.zeros([self.max_history_num], dtype=np.float32)
@@ -390,23 +398,23 @@ class EBNeRD_Corpus:
             for dev_ID, line in enumerate(dev_behaviors_f):
                 impression_ID, user_ID, time, history, labels, impressions = line.split('\t')
                 if len(history) != 0:
-                    history = list(map(lambda x: self.news_ID_dict[x], history.strip().split(',')))
+                    history = list(map(lambda x: self.news_ID_dict[x], history.strip('[]').split(',')))
                     padding_num = max(0, self.max_history_num - len(history))
                     user_history = history[-self.max_history_num:] + [0] * padding_num
                     user_history_mask = np.zeros([self.max_history_num], dtype=np.float32)
                     user_history_mask[:min(len(history), self.max_history_num)] = 1.0
-                    for impression in impressions.strip().split(' '):
+                    for impression in impressions.strip('[]').split(','):
                         self.dev_indices.append(dev_ID)
                         self.dev_behaviors.append([self.user_ID_dict[user_ID] if user_ID in self.user_ID_dict else 0, user_history, user_history_mask, self.news_ID_dict[impression[:-2]], dev_ID])
                 else:
-                    for impression in impressions.strip().split(' '):
+                    for impression in impressions.strip('[]').split(','):
                         self.dev_indices.append(dev_ID)
                         self.dev_behaviors.append([self.user_ID_dict[user_ID] if user_ID in self.user_ID_dict else 0, [0 for _ in range(self.max_history_num)], np.zeros([self.max_history_num], dtype=np.float32), self.news_ID_dict[impression[:-2]], dev_ID])
         with open(os.path.join(config.test_root, 'behaviors.tsv'), 'r', encoding='utf-8') as test_behaviors_f:
             for test_ID, line in enumerate(test_behaviors_f):
                 impression_ID, user_ID, time, history, impressions = line.split('\t')
                 if len(history) != 0:
-                    history = list(map(lambda x: self.news_ID_dict[x], history.strip().split(',')))
+                    history = list(map(lambda x: self.news_ID_dict[x], history.strip('[]').split(',')))
                     padding_num = max(0, self.max_history_num - len(history))
                     user_history = history[-self.max_history_num:] + [0] * padding_num
                     user_history_mask = np.zeros([self.max_history_num], dtype=np.float32)
@@ -442,7 +450,7 @@ class Ebnerd_Train_Dataset(data.Dataset):
         self.news_abstract_text =  corpus.news_abstract_text
         self.news_abstract_mask = corpus.news_abstract_mask
         self.news_abstract_entity = corpus.news_abstract_entity
-        self.user_history_graph = corpus.train_user_history_graph
+        # self.user_history_graph = corpus.train_user_history_graph
         self.user_history_category_mask = corpus.train_user_history_category_mask
         self.user_history_category_indices = corpus.train_user_history_category_indices
         self.train_behaviors = corpus.train_behaviors
@@ -497,7 +505,7 @@ class Ebnerd_Train_Dataset(data.Dataset):
         history_index = train_behavior[1]
         sample_index = self.train_samples[index]
         behavior_index = train_behavior[5]
-        return train_behavior[0], self.news_category[history_index], self.news_subCategory[history_index], self.news_title_text[history_index], self.news_title_mask[history_index], self.news_title_entity[history_index], self.news_abstract_text[history_index], self.news_abstract_mask[history_index], self.news_abstract_entity[history_index], train_behavior[2], self.user_history_graph[behavior_index], self.user_history_category_mask[behavior_index], self.user_history_category_indices[behavior_index], \
+        return train_behavior[0], self.news_category[history_index], self.news_subCategory[history_index], self.news_title_text[history_index], self.news_title_mask[history_index], self.news_title_entity[history_index], self.news_abstract_text[history_index], self.news_abstract_mask[history_index], self.news_abstract_entity[history_index], train_behavior[2], self.user_history_category_mask[behavior_index], self.user_history_category_indices[behavior_index], \
                self.news_category[sample_index], self.news_subCategory[sample_index], self.news_title_text[sample_index], self.news_title_mask[sample_index], self.news_title_entity[sample_index], self.news_abstract_text[sample_index], self.news_abstract_mask[sample_index], self.news_abstract_entity[sample_index]
     def __len__(self):
         return self.num
@@ -546,7 +554,7 @@ class Ebnerd_DevTest_Dataset(data.Dataset):
         history_index = behavior[1]
         candidate_news_index = behavior[3]
         behavior_index = behavior[4]
-        return behavior[0], self.news_category[history_index], self.news_subCategory[history_index], self.news_title_text[history_index], self.news_title_mask[history_index], self.news_title_entity[history_index], self.news_abstract_text[history_index], self.news_abstract_mask[history_index], self.news_abstract_entity[history_index], behavior[2], self.user_history_graph[behavior_index], self.user_history_category_mask[behavior_index], self.user_history_category_indices[behavior_index], \
+        return behavior[0], self.news_category[history_index], self.news_subCategory[history_index], self.news_title_text[history_index], self.news_title_mask[history_index], self.news_title_entity[history_index], self.news_abstract_text[history_index], self.news_abstract_mask[history_index], self.news_abstract_entity[history_index], behavior[2], self.user_history_category_mask[behavior_index], self.user_history_category_indices[behavior_index], \
                self.news_category[candidate_news_index], self.news_subCategory[candidate_news_index], self.news_title_text[candidate_news_index], self.news_title_mask[candidate_news_index], self.news_title_entity[candidate_news_index], self.news_abstract_text[candidate_news_index], self.news_abstract_mask[candidate_news_index], self.news_abstract_entity[candidate_news_index]
 
     def __len__(self):

@@ -71,7 +71,6 @@ def _load_news(source_file_path, dst_dir):
                                       "subcategory",
                                       "title",
                                       "subtitle",
-                                      "body",
                                       "topics",
                                   ])
 
@@ -81,6 +80,15 @@ def _load_news(source_file_path, dst_dir):
         "article_id": "nid",
         "subtitle": "abstract"
     })
+
+    news.dropna(subset=["nid"], inplace=True)
+    news.drop_duplicates(subset=["nid"], inplace=True)
+
+    # remove empty strings in important columns
+    for col in ["nid", "title", "abstract", "category", "subcategory"]:
+        if col in news.columns:
+            news[col] = news[col].astype(str).str.strip()
+
     news = news.set_index("nid", drop=False)
     to_tsv(news, parsed_news_file)
 
@@ -172,10 +180,10 @@ def _load_behaviors(source_file_path, dst_dir, split="train"):
 
     behaviors = behaviors.reset_index(drop=True)
     # clean up behaviors
+    for col in ["impid", "uid", "time", "history", "labels", "candidates"]:
+        behaviors[col] = behaviors[col].astype(str).str.strip('[] ')
+
     behaviors = behaviors.dropna(subset=["impid", "uid", "time", "history", "labels", "candidates"])
-    # behaviors = behaviors.dropna(subset=["history", "candidates"])
-    # behaviors = behaviors[behaviors["history"].apply(len) > 0]
-    # behaviors = behaviors[behaviors["candidates"].apply(len) > 0]
 
     to_tsv(behaviors, parsed_bhv_file)
 
@@ -200,13 +208,13 @@ def main():
 
     print("\n===Preparing EB-NeRD news data. ===")
     _load_news(source_file_path=str(root / "ebnerd_demo/download/ebnerd_demo/"), dst_dir=str(root / "ebnerd_demo/download/ebnerd_demo/"))
-    clean_data(input_path=str(root / "ebnerd_demo/download/ebnerd_demo/news.tsv"), output_path=str(root / "ebnerd_demo/download/ebnerd_demo/news.tsv"))
+    # clean_data(input_path=str(root / "ebnerd_demo/download/ebnerd_demo/news.tsv"), output_path=str(root / "ebnerd_demo/download/ebnerd_demo/news_.tsv"))
     print("\n=== Preparing EB-NeRD users behaviour data. ===")
     _load_behaviors(source_file_path=str(root / "ebnerd_demo/download/ebnerd_demo/"), dst_dir=str(root / "ebnerd_demo/download/ebnerd_demo/"), split="train")
-    clean_data(input_path=str(root / "ebnerd_demo/download/ebnerd_demo/train/behaviors.tsv"), output_path=str(root / "ebnerd_demo/download/ebnerd_demo/train/behaviors.tsv"))
+    # clean_data(input_path=str(root / "ebnerd_demo/download/ebnerd_demo/train/behaviors.tsv"), output_path=str(root / "ebnerd_demo/download/ebnerd_demo/train/behaviors_.tsv"))
     _load_behaviors(source_file_path=str(root / "ebnerd_demo/download/ebnerd_demo/"), dst_dir=str(root / "ebnerd_demo/download/ebnerd_demo/"), split="validation")
-    clean_data(input_path=str(root / "ebnerd_demo/download/ebnerd_demo/validation/behaviors.tsv"),
-               output_path=str(root / "ebnerd_demo/download/ebnerd_demo/validation/behaviors.tsv"))
+    # clean_data(input_path=str(root / "ebnerd_demo/download/ebnerd_demo/validation/behaviors.tsv"),
+               # output_path=str(root / "ebnerd_demo/download/ebnerd_demo/validation/behaviors_.tsv"))
 
 
 
