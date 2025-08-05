@@ -3,6 +3,7 @@ import gc
 import shutil
 
 from dataset_corpus_preprocessing.EBNeRD_corpus_main import EBNeRD_Corpus
+from dataset_corpus_preprocessing.EBNeRD_dataset import Ebnerd_Train_Dataset
 from dataset_corpus_preprocessing.MIND_corpus_IPNR import MIND_Corpus_IPNR
 from models.CNE_SUE import Model
 from models.DKN import DKN
@@ -36,7 +37,7 @@ from dataset_corpus_preprocessing.data_loader_unbert import MindDataset
 from models.modules.unbert.eval import dev, test
 
 
-class DataLoader(DataLoader):
+class DataLoader_unbert(DataLoader):
     def __init__(
         self,
         dataset: Dataset,
@@ -230,7 +231,7 @@ def run_unbert(config: Config):
 
 
 class Trainer:
-    def __init__(self, model: nn.Module, config: Config, mind_corpus: MIND_Corpus, wandb, run_index: int):
+    def __init__(self, model: nn.Module, config: Config, _corpus: EBNeRD_Corpus, wandb, run_index: int):
         self.wandb = wandb
         self.config = config
         self.model = model
@@ -240,9 +241,13 @@ class Trainer:
         self.negative_sample_num = config.negative_sample_num
         self.loss = self.negative_log_softmax if config.click_predictor in ['dot_product', 'mlp', 'FIM'] else self.negative_log_sigmoid
         self.optimizer = optim.Adam(filter(lambda p: p.requires_grad, self.model.parameters()), lr=config.lr, weight_decay=config.weight_decay)
-        self._dataset = config.dataset
-        self.mind_corpus = mind_corpus
-        self.train_dataset = MIND_Train_Dataset(mind_corpus)
+        self._dataset = config.dataset_name
+        self._corpus = _corpus
+        # if self.mind_corpus == MIND_Corpus or MIND_Corpus_IPNR:
+        #     self.train_dataset = MIND_Train_Dataset(_corpus)
+        # elif self.mind_corpus == EBNeRD_Corpus:
+        self.train_dataset = Ebnerd_Train_Dataset(_corpus)
+
         self.run_index = run_index
         self.model_dir = config.model_dir + '/#' + str(self.run_index)
         self.dev_res_dir = config.dev_res_dir + '/#' + str(self.run_index)
@@ -290,7 +295,7 @@ class Trainer:
             model = nn.DataParallel(model, device_ids=self.config.device_id)
             self.loss = nn.DataParallel(self.loss)
         for e in tqdm(range(1, self.epoch + 1)):
-            self.train_dataset.negative_sampling()
+            # self.train_dataset.negative_sampling()
             train_dataloader = DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.batch_size // 16, pin_memory=True)
             model.train()
             epoch_loss = 0
@@ -355,7 +360,7 @@ class Trainer:
             self.wandb.log({'train epoch': e, 'loss': epoch_loss / len(self.train_dataset)})
 
             # validation
-            auc, mrr, ndcg5, ndcg10 = compute_scores(self.config, model, self.mind_corpus, self.batch_size,
+            auc, mrr, ndcg5, ndcg10 = compute_scores(self.config, model, self._corpus, self.batch_size,
                                                      'dev', self.dev_res_dir + '/' + self.config.model + '-' + str(
                     e) + '.txt', self._dataset)
 
@@ -401,7 +406,7 @@ def negative_log_sigmoid(logits):
     return loss
 
 
-def train(config: Config, wandb):
+def train(config: Config, corpus, wandb):
     if config.model == 'TANR':
         model = TANR(config)
     elif config.model == 'NAML':
@@ -428,21 +433,21 @@ def train(config: Config, wandb):
     run_index = get_run_index(config.result_dir)
     if config.dataset_name == 'MIND':
         if config.model == 'IPNR':
-            trainer = TrainerIPNR(model, config, MIND_Corpus_IPNR, wandb, run_index)
+            trainer = TrainerIPNR(model, config, corpus, wandb, run_index)
         else:
-            trainer = Trainer(model, config, MIND_Corpus, wandb, run_index)
+            trainer = Trainer(model, config, corpus, wandb, run_index)
     elif config.dataset_name == 'ebnerd':
         if config.model == 'IPNR':
-            trainer = TrainerIPNR(model, config, EBNeRD_Corpus, wandb, run_index)
+            trainer = TrainerIPNR(model, config, corpus, wandb, run_index)
         else:
-            trainer = Trainer(model, config, EBNeRD_Corpus, wandb, run_index)
+            trainer = Trainer(model, config, corpus, wandb, run_index)
 
 
     trainer.train()
     config.run_index = run_index
 
 
-def dev(config: Config):
+def dev(config: Config, corpus):
     if config.model == 'TANR':
         model = TANR(config)
     elif config.model == 'NAML':
@@ -473,18 +478,18 @@ def dev(config: Config):
         os.mkdir(dev_res_dir)
     if config.dataset_name == 'MIND':
         if config.model == 'IPNR':
-            auc, mrr, ndcg5, ndcg10 = compute_scores_IPNR(config, model, MIND_Corpus_IPNR, config.batch_size, 'dev',
+            auc, mrr, ndcg5, ndcg10 = compute_scores_IPNR(config, model, corpus, config.batch_size, 'dev',
                                                           dev_res_dir + '/' + config.model + '.txt', config.dataset)
         else:
-            auc, mrr, ndcg5, ndcg10 = compute_scores(config, model, MIND_Corpus, config.batch_size,
+            auc, mrr, ndcg5, ndcg10 = compute_scores(config, model, corpus, config.batch_size,
                                                      'dev',
                                                      dev_res_dir + '/' + config.model + '.txt', config.dataset)
     elif config.dataset_name == 'ebnerd':
         if config.model == 'IPNR':
-            auc, mrr, ndcg5, ndcg10 = compute_scores_IPNR(config, model, EBNeRD_Corpus, config.batch_size, 'dev',
+            auc, mrr, ndcg5, ndcg10 = compute_scores_IPNR(config, model, corpus, config.batch_size, 'dev',
                                                           dev_res_dir + '/' + config.model + '.txt', config.dataset)
         else:
-            auc, mrr, ndcg5, ndcg10 = compute_scores(config, model, EBNeRD_Corpus, config.batch_size,
+            auc, mrr, ndcg5, ndcg10 = compute_scores(config, model, corpus, config.batch_size,
                                                      'dev',
                                                      dev_res_dir + '/' + config.model + '.txt', config.dataset)
 
@@ -496,7 +501,7 @@ def dev(config: Config):
 
 
 
-def test(config: Config):
+def test(config: Config, corpus):
     if config.model == 'TANR':
         model = TANR(config)
     elif config.model == 'NAML':
@@ -529,18 +534,18 @@ def test(config: Config):
     print('test output file : ' + test_res_dir + '/' + config.model + '.txt')
     if config.dataset_name == 'MIND':
         if config.model == 'IPNR':
-            auc, mrr, ndcg5, ndcg10 = compute_scores_IPNR(config, model, MIND_Corpus, config.batch_size, 'test',
+            auc, mrr, ndcg5, ndcg10 = compute_scores_IPNR(config, model, corpus, config.batch_size, 'test',
                                                           test_res_dir + '/' + config.model + '.txt', config.dataset)
         else:
-            auc, mrr, ndcg5, ndcg10 = compute_scores(config, model, MIND_Corpus, config.batch_size,
+            auc, mrr, ndcg5, ndcg10 = compute_scores(config, model, corpus, config.batch_size,
                                                      'test',
                                                      test_res_dir + '/' + config.model + '.txt', config.dataset)
     elif config.dataset_name == 'ebnerd':
         if config.model == 'IPNR':
-            auc, mrr, ndcg5, ndcg10 = compute_scores_IPNR(config, model, EBNeRD_Corpus, config.batch_size, 'test',
+            auc, mrr, ndcg5, ndcg10 = compute_scores_IPNR(config, model, corpus, config.batch_size, 'test',
                                                           test_res_dir + '/' + config.model + '.txt', config.dataset)
         else:
-            auc, mrr, ndcg5, ndcg10 = compute_scores(config, model, EBNeRD_Corpus, config.batch_size,
+            auc, mrr, ndcg5, ndcg10 = compute_scores(config, model, corpus, config.batch_size,
                                                      'test',
                                                      test_res_dir + '/' + config.model + '.txt', config.dataset)
 
@@ -579,15 +584,15 @@ if __name__ == '__main__':
     else:
         if config.mode == 'train':
             print("Start training at: ", datetime.now())
-            train(config, wandb)
+            train(config, corpus, wandb)
             print("Finish training at: ", datetime.now())
             config.test_model_path = config.best_model_dir + '/#' + str(config.run_index) + '/' + config.model
             print("Start testing at: ", datetime.now())
-            test(config)
+            test(config, corpus)
             print("Finish testing at: ", datetime.now())
         elif config.mode == 'dev':
             print("Start dev at: ", datetime.now())
-            dev(config)
+            dev(config, corpus)
             print("Finish dev at: ", datetime.now())
         elif config.mode == 'test':
             print("Start testing at: ", datetime.now())

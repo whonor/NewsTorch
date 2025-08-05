@@ -6,6 +6,8 @@ import random
 import numpy as np
 import collections
 
+import pandas as pd
+
 # setup random seed for reproducibility
 random.seed(0)
 np.random.seed(0)
@@ -23,85 +25,70 @@ def confirm_overwrite(path: str) -> bool:
     return True
 
 
-def split_training_behaviors(size='ebnerd_demo'):
-    MIND_small_train_ratio = 0.9
-    behavior_file = os.path.join(ebnerd_demo_dataset_root, 'download', size, 'train', 'behaviors_.tsv')
+def split_training_behaviors(size='ebnerd_demo', train_ratio=0.9):
+    behavior_file = os.path.join(ebnerd_demo_dataset_root, 'download', size, 'train', 'behaviors_.parquet')
     if not os.path.exists(behavior_file):
-        raise FileNotFoundError(f"behavior file no exist: {behavior_file}")
+        raise FileNotFoundError(f"behavior file does not exist: {behavior_file}")
 
-    with open(behavior_file, 'r', encoding='utf-8') as f:
-        behavior_lines = [line for line in f if line.strip()]
+    #  pandas  parquet
+    df = pd.read_parquet(behavior_file)
 
-    random.shuffle(behavior_lines)
-    total = len(behavior_lines)
-    train_num = int(total * MIND_small_train_ratio)
-    indices = list(range(total))
-    random.shuffle(indices)
-    train_idx = set(indices[:train_num])
+    #
+    df = df.sample(frac=1, random_state=42).reset_index(drop=True)
 
-    train_behavior_lines = []
-    dev_behavior_lines = []
-    for i, line in enumerate(behavior_lines):
-        if i in train_idx:
-            train_behavior_lines.append(line)
-        else:
-            dev_behavior_lines.append(line)
+    #
+    train_num = int(len(df) * train_ratio)
+    train_df = df.iloc[:train_num]
+    dev_df = df.iloc[train_num:]
 
-    return train_behavior_lines, dev_behavior_lines
+    return train_df, dev_df
 
 
 def preprocess_ebnerd_demo(size='ebnerd_demo'):
-    train_behavior_lines, dev_behavior_lines = split_training_behaviors(size=size)
+    train_df, dev_df = split_training_behaviors(size=size)
 
     # train/dev sets
-    for mode, lines, src_news_split in [
-        ('train', train_behavior_lines, 'train'),
-        ('dev', dev_behavior_lines, 'train')
-    ]:
+    for mode, df in [('train', train_df), ('dev', dev_df)]:
         out_dir = os.path.join(ebnerd_demo_dataset_root, mode)
         if os.path.exists(out_dir):
             if not confirm_overwrite(out_dir):
-                print(f"jump {mode} dataset prepare")
+                print(f"Jump {mode} dataset preparation")
                 continue
             shutil.rmtree(out_dir)
         os.makedirs(out_dir)
 
-        # 写 behaviors
-        with open(os.path.join(out_dir, 'behaviors.tsv'), 'w', encoding='utf-8') as f:
-            f.writelines(lines)
+        # save behaviors.parquet
+        df.to_parquet(os.path.join(out_dir, 'behaviors.parquet'), index=False)
 
-        # 拷贝 news
-        src_news = os.path.join(ebnerd_demo_dataset_root, 'download', size, 'news_.tsv')
-        dst_news = os.path.join(out_dir, 'news.tsv')
+        # copy news.parquet
+        src_news = os.path.join(ebnerd_demo_dataset_root, 'download', size, 'news.parquet')
+        dst_news = os.path.join(out_dir, 'news.parquet')
         if confirm_overwrite(dst_news):
             if not os.path.exists(src_news):
-                raise FileNotFoundError(f"news file no exist: {src_news}")
+                raise FileNotFoundError(f"news file does not exist: {src_news}")
             shutil.copyfile(src_news, dst_news)
 
     # test set
     test_dir = os.path.join(ebnerd_demo_dataset_root, 'test')
     if os.path.exists(test_dir):
         if not confirm_overwrite(test_dir):
-            print("jump test dataset prepare")
+            print("Jump test dataset preparation")
             return
         shutil.rmtree(test_dir)
     os.makedirs(test_dir)
 
-    for fname in ('behaviors_.tsv', 'news_.tsv'):
-        if fname == 'behaviors_.tsv':
+    for fname in ('behaviors_.parquet', 'news.parquet'):
+        if fname == 'behaviors_.parquet':
             src = os.path.join(ebnerd_demo_dataset_root, 'download', size, 'validation', fname)
-            dst = os.path.join(test_dir, 'behaviors.tsv')
-            if confirm_overwrite(dst):
-                if not os.path.exists(src):
-                    raise FileNotFoundError(f"no exist: {src}")
-                shutil.copyfile(src, dst)
+            dst = os.path.join(test_dir, 'behaviors.parquet')
         else:
             src = os.path.join(ebnerd_demo_dataset_root, 'download', size, fname)
-            dst = os.path.join(test_dir, 'news.tsv')
-            if confirm_overwrite(dst):
-                if not os.path.exists(src):
-                    raise FileNotFoundError(f"no exist: {src}")
-                shutil.copyfile(src, dst)
+            dst = os.path.join(test_dir, 'news.parquet')
+
+        if confirm_overwrite(dst):
+            if not os.path.exists(src):
+                raise FileNotFoundError(f"File does not exist: {src}")
+            shutil.copyfile(src, dst)
 
 
 

@@ -1,6 +1,8 @@
 import os
 import torch
 import torch.nn as nn
+
+from dataset_corpus_preprocessing.EBNeRD_corpus_main import EBNeRD_Corpus
 from dataset_corpus_preprocessing.MIND_corpus_main import MIND_Corpus
 from dataset_corpus_preprocessing.MIND_dataset import MIND_DevTest_Dataset
 from torch.utils.data import DataLoader
@@ -79,12 +81,16 @@ def compute_scores_IPNR(config, model: nn.Module, mind_corpus: MIND_Corpus, batc
         return None, None, None, None
 
 
-def compute_scores(config: Config, model: nn.Module, mind_corpus: MIND_Corpus, batch_size: int, mode: str, result_file: str, dataset: str):
+def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mode: str, result_file: str, dataset: str):
     assert mode in ['dev', 'test'], 'mode must be chosen from \'dev\' or \'test\''
-    dataloader = DataLoader(MIND_DevTest_Dataset(mind_corpus, mode), batch_size=batch_size, shuffle=False,
-                                num_workers=batch_size // 16, pin_memory=True)
+    if config.dataset_name == 'EBNeRD':
+        corpus = EBNeRD_Corpus(config)
+    elif config.dataset_name == 'MIND':
+        corpus = MIND_Corpus(config)
+    dataloader = DataLoader(MIND_DevTest_Dataset(corpus, mode), batch_size=batch_size, shuffle=False,
+                            num_workers=batch_size // 16, pin_memory=True)
+    indices = (corpus.dev_indices if mode == 'dev' else corpus.test_indices)
 
-    indices = (mind_corpus.dev_indices if mode == 'dev' else mind_corpus.test_indices)
     scores = torch.zeros([len(indices)]).cuda()
     index = 0
     model.eval()
@@ -157,7 +163,7 @@ def compute_scores(config: Config, model: nn.Module, mind_corpus: MIND_Corpus, b
             result = [0 for _ in range(len(sub_score))]
             for j in range(len(sub_score)):
                 result[sub_score[j][1]] = j + 1
-            result_f.write(('' if i == 0 else '\n') + str(i + 1) + ' ' + str(result).replace(' ', ''))
+            result_f.write(('' if i == 0 else '\n') + str(i + 1) + ' ' + str(result).replace(' ', ','))
     if dataset != 'large' or mode != 'test':
         with open("./cache/" + mode + '/ref/truth-%s.txt' % dataset, 'r', encoding='utf-8') as truth_f, open(result_file, 'r', encoding='utf-8') as result_f:
             auc, mrr, ndcg5, ndcg10 = scoring(truth_f, result_f)

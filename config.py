@@ -1,6 +1,8 @@
 import os
 import argparse
 import time
+
+import pandas as pd
 import torch
 import random
 import numpy as np
@@ -215,39 +217,43 @@ class Config:
         if model_name == 'IPNR':
             mkdirs("cache/IPNR/")
         mkdirs("cache/%s/" % self.dataset_name)
-        if not os.path.exists(data_path + 'dev/ref/truth-%s.txt' % self.dataset):
-            with open(os.path.join(self.dev_root, 'behaviors.tsv'), 'r', encoding='utf-8') as dev_f:
-                with open(data_path + 'dev/ref/truth-%s.txt' % self.dataset, 'w', encoding='utf-8') as truth_f:
-                    for dev_ID, line in enumerate(dev_f):
-                        # impression_ID, user_ID, time, history, impressions, is_fake = line.split('\t')
-                        if dataset_name == 'ebnerd':
-                            impression_ID, user_ID, time, history, labels, impressions = line.split('\t')
-                            truth_f.write(
-                                ('' if dev_ID == 0 else '\n') + str(dev_ID + 1) + ' ' + str(labels).replace(' ', ''))
-                        elif dataset_name == 'MIND':
-                            impression_ID, user_ID, time, history, impressions = line.split('\t')
-                            labels = [int(impression[-1]) for impression in impressions.strip().split(' ')]
-                            truth_f.write(('' if dev_ID == 0 else '\n') + str(dev_ID + 1) + ' ' + str(labels).replace(' ', ''))
-        if self.dataset != 'large':
-            if not os.path.exists(data_path + 'test/ref/truth-%s.txt' % self.dataset):
-                with open(os.path.join(self.test_root, 'behaviors.tsv'), 'r', encoding='utf-8') as test_f:
-                    with open(data_path + 'test/ref/truth-%s.txt' % self.dataset, 'w', encoding='utf-8') as truth_f:
-                        for test_ID, line in enumerate(test_f):
-                            if dataset_name == 'ebnerd':
-                                impression_ID, user_ID, time, history, labels, impressions = line.split('\t')
-                                truth_f.write(
-                                    ('' if test_ID == 0 else '\n') + str(test_ID + 1) + ' ' + str(labels).replace(' ',
-                                                                                                                  ''))
-                            elif dataset_name == 'MIND':
-                                impression_ID, user_ID, time, history, impressions = line.split('\t')
-                                labels = [int(impression[-1]) for impression in impressions.strip().split(' ')]
-                                truth_f.write(
-                                    ('' if test_ID == 0 else '\n') + str(test_ID + 1) + ' ' + str(labels).replace(' ',
-                                                                                                                  ''))
-                                # impression_ID, user_ID, time, history, impressions, is_fake = line.split('\t')
 
-        else:
-            self.prediction_dir = data_path + 'prediction/large/' + model_name
+        dev_truth_path = os.path.join(data_path, f'dev/ref/truth-{self.dataset_name}.txt')
+        test_truth_path = os.path.join(data_path, f'test/ref/truth-{self.dataset_name}.txt')
+
+        # Load parquet for dev
+        if not os.path.exists(dev_truth_path):
+            dev_df = pd.read_parquet(os.path.join(self.dev_root, 'behaviors.parquet'))
+            with open(dev_truth_path, 'w', encoding='utf-8') as truth_f:
+                for dev_ID, row in dev_df.iterrows():
+                    if dataset_name == 'ebnerd':
+                        labels = row['labels']
+                        # remove space if string like '0 1 1 0'
+                        label_str = str(labels).replace(' ', ',')
+                    elif dataset_name == 'MIND':
+                        impressions = row['impressions']
+                        # e.g., impressions: "N11243-1 N56784-0 ..."
+                        label_list = [int(impr.split('-')[1]) for impr in impressions.strip().split()]
+                        label_str = str(label_list).replace(' ', ',')
+                    truth_f.write(('' if dev_ID == 0 else '\n') + str(dev_ID + 1) + ' ' + label_str)
+
+        # Load parquet for test
+        if self.dataset != 'large' and not os.path.exists(test_truth_path):
+            test_df = pd.read_parquet(os.path.join(self.test_root, 'behaviors.parquet'))
+            with open(test_truth_path, 'w', encoding='utf-8') as truth_f:
+                for test_ID, row in test_df.iterrows():
+                    if dataset_name == 'ebnerd':
+                        labels = row['labels']
+                        label_str = str(labels).replace(' ', ',')
+                    elif dataset_name == 'MIND':
+                        impressions = row['impressions']
+                        label_list = [int(impr.split('-')[1]) for impr in impressions.strip().split()]
+                        label_str = str(label_list).replace(' ', ',')
+                    truth_f.write(('' if test_ID == 0 else '\n') + str(test_ID + 1) + ' ' + label_str)
+
+        # If dataset is 'large', set prediction directory
+        if self.dataset == 'large':
+            self.prediction_dir = os.path.join(data_path, f'prediction/large/{model_name}')
             mkdirs(self.prediction_dir)
 
 

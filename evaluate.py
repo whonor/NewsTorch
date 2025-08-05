@@ -31,8 +31,23 @@ def mrr_score(y_true, y_score):
 
 
 def parse_line(l):
-    impid, ranks = l.strip('\n').split()
-    ranks = json.loads(ranks)
+    # impid, ranks = l.strip('\n').split()
+    impid, ranks = l.strip().split()
+    print("[DEBUG] parse_line got ranks:", ranks)
+    try:
+        ranks = json.loads(ranks)
+    except json.JSONDecodeError:
+        # try to fix the error format：如 [1,,4,,5,,3,,2] → extract [1, 4, 5, 3, 2]
+        content = ranks.strip('[] ')
+        # transform '1, 4, 5, 3, 2' to ['1', '4', '5', '3', '2']
+        # remove empty parts and convert to integers
+        parts = [p for p in content.split(',') if p.strip().isdigit()]
+        ranks_fixed = [int(p.strip()) for p in parts]
+        ranks = ranks_fixed
+        # try to fix this issue
+        ranks_fixed = '[' + ','.join(ranks.strip('[] ').split()) + ']'
+        ranks = json.loads(ranks_fixed)
+
     return impid, ranks
 
 

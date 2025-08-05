@@ -52,10 +52,6 @@ def to_tsv(df: pd.DataFrame, fpath: str) -> None:
 
 
 def _load_news(source_file_path, dst_dir):
-    """加载新闻数据"""
-    parsed_news_file = os.path.join(dst_dir, "news.tsv")
-    article_file = os.path.join(source_file_path, "articles.parquet")
-    print("News not parsed. Loading and parsing raw data.")
     '''
     Articles:
     ['article_id', 'title', 'subtitle', 'last_modified_time', 'premium', 'body', 
@@ -64,6 +60,11 @@ def _load_news(source_file_path, dst_dir):
     'total_read_time', 'sentiment_score', 'sentiment_label']
 
     '''
+    """加载新闻数据"""
+    parsed_news_file = os.path.join(dst_dir, "news.parquet")
+    article_file = os.path.join(source_file_path, "articles.parquet")
+    print("News not parsed. Loading and parsing raw data.")
+
     df_articles = pl.read_parquet(article_file,
                                   columns=[
                                       "article_id",
@@ -74,23 +75,16 @@ def _load_news(source_file_path, dst_dir):
                                       "topics",
                                   ])
 
-    news = df_articles.to_pandas()
-
-    news = news.rename(columns={
+    news = df_articles.rename({
         "article_id": "nid",
         "subtitle": "abstract"
     })
 
-    news.dropna(subset=["nid"], inplace=True)
-    news.drop_duplicates(subset=["nid"], inplace=True)
+    news = news.filter(pl.col("nid").is_not_null())
+    news = news.unique(subset=["nid"])
 
-    # remove empty strings in important columns
-    for col in ["nid", "title", "abstract", "category", "subcategory"]:
-        if col in news.columns:
-            news[col] = news[col].astype(str).str.strip()
-
-    news = news.set_index("nid", drop=False)
-    to_tsv(news, parsed_news_file)
+    news.write_parquet(parsed_news_file)
+    # to_tsv(news, parsed_news_file)
 
     return news
 
@@ -98,10 +92,10 @@ def _load_news(source_file_path, dst_dir):
 def _load_behaviors(source_file_path, dst_dir, split="train"):
     """加载用户行为数据"""
     source_file_path = os.path.join(
-        source_file_path + '/'+ split
+        source_file_path, split
     )
     parsed_bhv_file = os.path.join(
-        dst_dir + '/' + split + '/' + "behaviors.tsv"
+        dst_dir, split, "behaviors_.parquet"
     )
     print("User behaviors not parsed. Loading and parsing raw data.")
     '''
@@ -132,6 +126,13 @@ def _load_behaviors(source_file_path, dst_dir, split="train"):
             "impression_id",
             "user_id"
         ])
+        .pipe(
+            sampling_strategy_wu2019,
+            npratio=4,
+            shuffle=True,
+            with_replacement=True,
+            seed=42,
+        )
         .pipe(create_binary_labels_column)
     )
     '''
@@ -146,8 +147,7 @@ def _load_behaviors(source_file_path, dst_dir, split="train"):
     column_names = ["impression_id", "user_id", "impression_time", "article_id_fixed", "article_ids_inview",
                     "article_ids_clicked", "labels"]
     new_names = ["impid", "uid", "time", "history", "impressions", "labels"]
-    behaviors = df_behaviors.to_pandas()
-    behaviors = behaviors.rename(columns={"impression_id": "impid",
+    behaviors = df_behaviors.rename({"impression_id": "impid",
                                           "user_id": "uid",
                                           "impression_time": "time",
                                           "article_id_fixed": "history",
@@ -165,27 +165,19 @@ def _load_behaviors(source_file_path, dst_dir, split="train"):
     # behaviors["time"] = pd.to_datetime(behaviors["time"], format="%m/%d/%Y %I:%M:%S %p")
 
     # Apply the conversion to the 'history' column
-    behaviors["candidates"] = behaviors["impressions"]
-    behaviors = behaviors.drop(columns=["impressions"])
-
-    behaviors["history"] = behaviors["history"].apply(lambda x: [y for y in x.tolist()])
-    behaviors["candidates"] = behaviors["candidates"].apply(lambda x: [y for y in x.tolist()])
+    behaviors = behaviors.with_columns([
+        pl.col("impressions").alias("candidates")
+    ]).drop("impressions")
 
     cnt_bhv = len(behaviors)
-    behaviors = behaviors[behaviors["history"].apply(len) > 0]
+    behaviors = behaviors.filter(pl.col("history").list.len() > 0)
     dropped_bhv = cnt_bhv - len(behaviors)
     print(
         f"Removed {dropped_bhv} ({dropped_bhv / cnt_bhv}%) behaviors without user history"
     )
 
-    behaviors = behaviors.reset_index(drop=True)
-    # clean up behaviors
-    for col in ["impid", "uid", "time", "history", "labels", "candidates"]:
-        behaviors[col] = behaviors[col].astype(str).str.strip('[] ')
-
-    behaviors = behaviors.dropna(subset=["impid", "uid", "time", "history", "labels", "candidates"])
-
-    to_tsv(behaviors, parsed_bhv_file)
+    # to_tsv(behaviors, parsed_bhv_file)
+    behaviors.write_parquet(parsed_bhv_file)
 
     return behaviors
 
@@ -208,13 +200,10 @@ def main():
 
     print("\n===Preparing EB-NeRD news data. ===")
     _load_news(source_file_path=str(root / "ebnerd_demo/download/ebnerd_demo/"), dst_dir=str(root / "ebnerd_demo/download/ebnerd_demo/"))
-    # clean_data(input_path=str(root / "ebnerd_demo/download/ebnerd_demo/news.tsv"), output_path=str(root / "ebnerd_demo/download/ebnerd_demo/news_.tsv"))
     print("\n=== Preparing EB-NeRD users behaviour data. ===")
     _load_behaviors(source_file_path=str(root / "ebnerd_demo/download/ebnerd_demo/"), dst_dir=str(root / "ebnerd_demo/download/ebnerd_demo/"), split="train")
-    # clean_data(input_path=str(root / "ebnerd_demo/download/ebnerd_demo/train/behaviors.tsv"), output_path=str(root / "ebnerd_demo/download/ebnerd_demo/train/behaviors_.tsv"))
     _load_behaviors(source_file_path=str(root / "ebnerd_demo/download/ebnerd_demo/"), dst_dir=str(root / "ebnerd_demo/download/ebnerd_demo/"), split="validation")
-    # clean_data(input_path=str(root / "ebnerd_demo/download/ebnerd_demo/validation/behaviors.tsv"),
-               # output_path=str(root / "ebnerd_demo/download/ebnerd_demo/validation/behaviors_.tsv"))
+
 
 
 

@@ -5,6 +5,7 @@ import collections
 import re
 
 import fasttext
+import pandas as pd
 from gensim.models import KeyedVectors
 from nltk.tokenize import word_tokenize
 from torchtext.vocab import GloVe
@@ -112,47 +113,60 @@ class EBNeRD_Corpus:
             news_category_dict = {}
 
             # 1. user ID dictionay
-            with open(os.path.join(config.train_root, 'behaviors.tsv'), 'r', encoding='utf-8') as train_behaviors_f:
-                for line in train_behaviors_f:
-                    impression_ID, user_ID, time, history, labels, impressions = line.split('\t')
-                    if user_ID not in user_ID_dict:
-                        user_ID_dict[user_ID] = len(user_ID_dict)
-                with open(user_ID_file, 'w', encoding='utf-8') as user_ID_f:
-                    json.dump(user_ID_dict, user_ID_f)
+            behaviors_df = pd.read_parquet(os.path.join(config.train_root, 'behaviors.parquet'))
+
+            for user_id in behaviors_df['uid'].unique():
+                user_id = str(user_id)
+                if user_id not in user_ID_dict:
+                    user_ID_dict[user_id] = len(user_ID_dict)
+            with open(user_ID_file, 'w', encoding='utf-8') as user_ID_f:
+                json.dump(user_ID_dict, user_ID_f)
 
             # 2. news ID dictionay & news category dictionay & news subCategory dictionay
             for i, prefix in enumerate([config.train_root, config.dev_root, config.test_root]):
-                with open(os.path.join(prefix, 'news.tsv'), 'r', encoding='utf-8') as news_f:
-                    for line in news_f:
-                        news_ID, category, subCategory, title, abstract, topics = line.split('\t')
-                        news_ID = news_ID.strip()
-                        if news_ID not in news_ID_dict:
-                            news_ID_dict[news_ID] = len(news_ID_dict)
-                            if category not in category_dict:
-                                category_dict[category] = len(category_dict)
-                            if subCategory not in subCategory_dict:
-                                subCategory_dict[subCategory] = len(subCategory_dict)
-                            words = pat.findall(title.lower()) if config.tokenizer == 'MIND' else word_tokenize(title.lower())
+                news_parquet_file = os.path.join(prefix, 'news.parquet')
+                df_news = pd.read_parquet(news_parquet_file)
+
+                for _, row in df_news.iterrows():
+                    news_ID = str(row['nid']).strip()  # adapt column name if different
+                    category = str(row['category']).strip()
+                    subCategory = str(row['subcategory']).strip()
+                    title = str(row['title']).lower()
+                    abstract = str(row['abstract']).lower() if 'abstract' in row else ''
+
+                    if news_ID not in news_ID_dict:
+                        news_ID_dict[news_ID] = len(news_ID_dict)
+                        if category not in category_dict:
+                            category_dict[category] = len(category_dict)
+                        if subCategory not in subCategory_dict:
+                            subCategory_dict[subCategory] = len(subCategory_dict)
+
+                        words = pat.findall(title) if config.tokenizer == 'MIND' else word_tokenize(title)
+                        for word in words:
+                            if is_number(word):
+                                word_counter['<NUM>'] += 1
+                            else:
+                                if i == 0:  # training set
+                                    word_counter[word] += 1
+                                else:
+                                    if word in word_counter:
+                                        word_counter[word] += 1
+
+                        if abstract:
+                            words = pat.findall(abstract) if config.tokenizer == 'MIND' else word_tokenize(abstract)
                             for word in words:
                                 if is_number(word):
                                     word_counter['<NUM>'] += 1
                                 else:
-                                    if i == 0: # training set
+                                    if i == 0:  # training set
                                         word_counter[word] += 1
                                     else:
-                                        if word in word_counter: # already appeared in training set
+                                        if word in word_counter:
                                             word_counter[word] += 1
-                            words = pat.findall(abstract.lower()) if config.tokenizer == 'MIND' else word_tokenize(abstract.lower())
-                            for word in words:
-                                if is_number(word):
-                                    word_counter['<NUM>'] += 1
-                                else:
-                                    if i == 0: # training set
-                                        word_counter[word] += 1
-                                    else:
-                                        if word in word_counter: # already appeared in training set
-                                            word_counter[word] += 1
-                        news_category_dict[news_ID] = category_dict[category]
+
+                    news_category_dict[news_ID] = category_dict[category]
+
+            # Save dictionaries
             with open(news_ID_file, 'w', encoding='utf-8') as news_ID_f:
                 json.dump(news_ID_dict, news_ID_f)
             with open(category_file, 'w', encoding='utf-8') as category_f:
@@ -177,67 +191,91 @@ class EBNeRD_Corpus:
                 output_pkl_path=word_embedding_file
             )
 
+            # build graph
+            # build graph
+            category_num = len(category_dict)
+            graph_size = config.max_history_num + category_num  # |V_n| + |V_p|
+            prefix_mode = ['train', 'dev', 'test']
+            user_history_graph_data = {}
 
-            # 6. user history graph for CNE-SUE
-            # category_num = len(category_dict)
-            # graph_size = config.max_history_num + category_num # graph size of |V_{n}|+|V_{p}|
-            # prefix_mode = ['train', 'dev', 'test']
-            # user_history_graph_data = {}
-            # for prefix_index, prefix in enumerate([config.train_root, config.dev_root, config.test_root]):
-            #     mode = prefix_mode[prefix_index]
-            #     user_history_num = 0
-            #     with open(os.path.join(prefix, 'behaviors.tsv'), 'r', encoding='utf-8') as behaviors_f:
-            #         for line in behaviors_f:
-            #             user_history_num += 1
-            #     user_history_graph = np.zeros([user_history_num, graph_size, graph_size], dtype=np.float32)
-            #     user_history_category_mask = np.zeros([user_history_num, category_num + 1], dtype=np.float32)
-            #     user_history_category_indices = np.zeros([user_history_num, config.max_history_num], dtype=np.int64)
-            #     with open(os.path.join(prefix, 'behaviors.tsv'), 'r', encoding='utf-8') as behaviors_f:
-            #         for line_index, line in enumerate(behaviors_f):
-            #             impression_ID, user_ID, time, history, labels, impressions = line.split('\t')
-            #             if config.no_self_connection:
-            #                 history_graph = np.zeros([graph_size, graph_size], dtype=np.float32)
-            #             else:
-            #                 history_graph = np.identity(graph_size, dtype=np.float32)
-            #             history_category_mask = np.zeros(category_num + 1, dtype=np.float32) # extra one category index for padding news
-            #             history_category_indices = np.full([config.max_history_num], category_num, dtype=np.int64)
-            #             if len(history.strip('[] ')) > 0:
-            #                 history_news_ID = history.strip('[] ').strip().split(',')
-            #                 offset = max(0, len(history_news_ID) - config.max_history_num)
-            #                 history_news_num = min(len(history_news_ID), config.max_history_num)
-            #                 for i in range(history_news_num):
-            #                     category_index = news_category_dict[history_news_ID[i + offset]]
-            #                     history_category_mask[category_index] = 1.0
-            #                     history_category_indices[i] = category_index
-            #                     history_graph[i, config.max_history_num + category_index] = 1 # edge of E_{p}^{1} in inter-cluster graph G2
-            #                     history_graph[config.max_history_num + category_index, i] = 1 # edge of E_{p}^{1} in inter-cluster graph G2
-            #                     for j in range(i + 1, history_news_num):
-            #                         _category_index = news_category_dict[history_news_ID[j + offset]]
-            #                         if category_index == _category_index:
-            #                             history_graph[i, j] = 1 # edge of E_{n} in intra-cluster graph G1
-            #                             history_graph[j, i] = 1 # edge of E_{n} in intra-cluster graph G1
-            #                         else:
-            #                             history_graph[config.max_history_num + category_index, config.max_history_num + _category_index] = 1 # edge of E_{p}^{2} in inter-cluster graph G2
-            #                             history_graph[config.max_history_num + _category_index, config.max_history_num + category_index] = 1 # edge of E_{p}^{2} in inter-cluster graph G2
-            #                 if not config.no_adjacent_normalization:
-            #                     if config.gcn_normalization_type == 'asymmetric':
-            #                         # Asymmetric adjacent matrix normalization: D^{-\frac{1}{2}}A
-            #                         D_inv = np.zeros([graph_size, graph_size], dtype=np.float32)
-            #                         np.fill_diagonal(D_inv, 1 / history_graph.sum(axis=1, keepdims=False))
-            #                         history_graph = np.matmul(D_inv, history_graph)
-            #                     else:
-            #                         # Symmetric adjacent matrix normalization: D^{-\frac{1}{2}}AD^{-\frac{1}{2}}
-            #                         D_inv_sqrt = np.zeros([graph_size, graph_size], dtype=np.float32)
-            #                         np.fill_diagonal(D_inv_sqrt, np.sqrt(1 / history_graph.sum(axis=1, keepdims=False)))
-            #                         history_graph = np.matmul(np.matmul(D_inv_sqrt, history_graph), D_inv_sqrt)
-            #             user_history_graph[line_index] = history_graph
-            #             user_history_category_mask[line_index] = history_category_mask
-            #             user_history_category_indices[line_index] = history_category_indices
-            #         user_history_graph_data[mode + '_user_history_graph'] = user_history_graph
-            #         user_history_graph_data[mode + '_user_history_category_mask'] = user_history_category_mask
-            #         user_history_graph_data[mode + '_user_history_category_indices'] = user_history_category_indices
-            # with open(user_history_graph_file, 'wb') as user_history_graph_f:
-            #     pickle.dump(user_history_graph_data, user_history_graph_f)
+            for prefix_index, prefix in enumerate([config.train_root, config.dev_root, config.test_root]):
+                mode = prefix_mode[prefix_index]
+                behaviors_parquet = os.path.join(prefix, 'behaviors.parquet')
+
+                df_behaviors = pd.read_parquet(behaviors_parquet)
+                user_history_num = len(df_behaviors)
+
+                user_history_graph = np.zeros([user_history_num, graph_size, graph_size], dtype=np.float32)
+                user_history_category_mask = np.zeros([user_history_num, category_num + 1], dtype=np.float32)
+                user_history_category_indices = np.full([user_history_num, config.max_history_num], category_num,
+                                                        dtype=np.int64)
+
+                for line_index, row in df_behaviors.iterrows():
+                    history = str(row['history']).strip()
+
+                    if config.no_self_connection:
+                        history_graph = np.zeros([graph_size, graph_size], dtype=np.float32)
+                    else:
+                        history_graph = np.identity(graph_size, dtype=np.float32)
+
+                    history_category_mask = np.zeros(category_num + 1, dtype=np.float32)
+                    history_category_indices = np.full(config.max_history_num, category_num, dtype=np.int64)
+
+                    if len(history.strip('[] ')) > 0:
+                        history_news_ID = history.strip('[] ').split(',')
+                        history_news_ID = [nid.strip() for nid in history_news_ID if nid.strip() != '']
+
+                        offset = max(0, len(history_news_ID) - config.max_history_num)
+                        history_news_num = min(len(history_news_ID), config.max_history_num)
+
+                        for i in range(history_news_num):
+                            news_id = history_news_ID[i + offset]
+                            category_index = news_category_dict.get(news_id, category_num)
+
+                            if category_index >= category_num:
+                                continue  # skip invalid category
+
+                            history_category_mask[category_index] = 1.0
+                            history_category_indices[i] = category_index
+
+                            history_graph[i, config.max_history_num + category_index] = 1
+                            history_graph[config.max_history_num + category_index, i] = 1
+
+                            for j in range(i + 1, history_news_num):
+                                other_news_id = history_news_ID[j + offset]
+                                other_category_index = news_category_dict.get(other_news_id, category_num)
+
+                                if other_category_index >= category_num:
+                                    continue  # skip invalid category
+
+                                if category_index == other_category_index:
+                                    history_graph[i, j] = 1
+                                    history_graph[j, i] = 1
+                                else:
+                                    history_graph[
+                                        config.max_history_num + category_index, config.max_history_num + other_category_index] = 1
+                                    history_graph[
+                                        config.max_history_num + other_category_index, config.max_history_num + category_index] = 1
+
+                        if not config.no_adjacent_normalization:
+                            degrees = history_graph.sum(axis=1)
+                            if config.gcn_normalization_type == 'asymmetric':
+                                D_inv = np.diag(1 / np.clip(degrees, a_min=1e-12, a_max=None))
+                                history_graph = D_inv @ history_graph
+                            else:
+                                D_inv_sqrt = np.diag(np.sqrt(1 / np.clip(degrees, a_min=1e-12, a_max=None)))
+                                history_graph = D_inv_sqrt @ history_graph @ D_inv_sqrt
+
+                    user_history_graph[line_index] = history_graph
+                    user_history_category_mask[line_index] = history_category_mask
+                    user_history_category_indices[line_index] = history_category_indices
+
+                user_history_graph_data[f'{mode}_user_history_graph'] = user_history_graph
+                user_history_graph_data[f'{mode}_user_history_category_mask'] = user_history_category_mask
+                user_history_graph_data[f'{mode}_user_history_category_indices'] = user_history_category_indices
+
+            with open(user_history_graph_file, 'wb') as f:
+                pickle.dump(user_history_graph_data, f)
 
     def __init__(self, config: Config):
         # preprocess cache
@@ -257,23 +295,23 @@ class EBNeRD_Corpus:
         with open('cache/ebnerd/vocabulary-' + str(config.word_threshold) + '-' + config.tokenizer + '-' + str(config.max_title_length) + '-' + str(config.max_abstract_length) + '-' + config.dataset + '.json', 'r', encoding='utf-8') as vocabulary_f:
             self.word_dict = json.load(vocabulary_f)
             config.vocabulary_size = len(self.word_dict)
-        # with open('cache/entity-%s.json' % config.dataset, 'r', encoding='utf-8') as entity_f:
+        # with open('cache/ebnerd/entity-%s.json' % config.dataset, 'r', encoding='utf-8') as entity_f:
         #     self.entity_dict = json.load(entity_f)
         #     config.entity_size = len(self.entity_dict)
-        # with open('cache/ebnerd/user_history_graph-' + str(config.max_history_num) + ('' if config.no_self_connection else '-self') + ('' if config.no_adjacent_normalization else '-normalize-' + config.gcn_normalization_type) + '-' + config.dataset + '.pkl', 'rb') as user_history_graph_f:
-        #     user_history_data = pickle.load(user_history_graph_f)
-        #     self.train_user_history_graph = user_history_data['train_user_history_graph']
-        #     self.train_user_history_category_mask = user_history_data['train_user_history_category_mask']
-        #     self.train_user_history_category_indices = user_history_data['train_user_history_category_indices']
-        #     self.dev_user_history_graph = user_history_data['dev_user_history_graph']
-        #     self.dev_user_history_category_mask = user_history_data['dev_user_history_category_mask']
-        #     self.dev_user_history_category_indices = user_history_data['dev_user_history_category_indices']
-        #     self.test_user_history_graph = user_history_data['test_user_history_graph']
-        #     self.test_user_history_category_mask = user_history_data['test_user_history_category_mask']
-        #     self.test_user_history_category_indices = user_history_data['test_user_history_category_indices']
+        with open('cache/ebnerd/user_history_graph-' + str(config.max_history_num) + ('' if config.no_self_connection else '-self') + ('' if config.no_adjacent_normalization else '-normalize-' + config.gcn_normalization_type) + '-' + config.dataset + '.pkl', 'rb') as user_history_graph_f:
+            user_history_data = pickle.load(user_history_graph_f)
+            self.train_user_history_graph = user_history_data['train_user_history_graph']
+            self.train_user_history_category_mask = user_history_data['train_user_history_category_mask']
+            self.train_user_history_category_indices = user_history_data['train_user_history_category_indices']
+            self.dev_user_history_graph = user_history_data['dev_user_history_graph']
+            self.dev_user_history_category_mask = user_history_data['dev_user_history_category_mask']
+            self.dev_user_history_category_indices = user_history_data['dev_user_history_category_indices']
+            self.test_user_history_graph = user_history_data['test_user_history_graph']
+            self.test_user_history_category_mask = user_history_data['test_user_history_category_mask']
+            self.test_user_history_category_indices = user_history_data['test_user_history_category_indices']
 
         # meta cache
-        self.negative_sample_num = config.negative_sample_num                                           # negative sample number for training
+        self.negative_sample_num = config.negative_sample_num                                          # negative sample number for training
         self.max_history_num = config.max_history_num                                                   # max history number for each training user
         self.max_title_length = config.max_title_length                                                 # max title length for each news text
         self.max_abstract_length = config.max_abstract_length                                           # max abstract length for each news text
@@ -293,269 +331,158 @@ class EBNeRD_Corpus:
         self.title_word_num = 0
         self.abstract_word_num = 0
 
-        # generate news meta cache
         news_ID_set = set(['<PAD>'])
-        news_lines = []
-        with open(os.path.join(config.train_root, 'news.tsv'), 'r', encoding='utf-8') as train_news_f:
-            for line in train_news_f:
-                news_ID, category, subCategory, title, abstract, topics = line.split('\t')
+        news_records = []
+
+        for prefix in [config.train_root, config.dev_root, config.test_root]:
+            news_parquet = os.path.join(prefix, 'news.parquet')
+            df_news = pd.read_parquet(news_parquet)
+
+            for _, row in df_news.iterrows():
+                news_ID = str(row['nid']).strip()
                 if news_ID not in news_ID_set:
-                    news_lines.append(line)
+                    news_records.append(row)
                     news_ID_set.add(news_ID)
-        with open(os.path.join(config.dev_root, 'news.tsv'), 'r', encoding='utf-8') as dev_news_f:
-            for line in dev_news_f:
-                news_ID, category, subCategory, title, abstract, topics = line.split('\t')
-                if news_ID not in news_ID_set:
-                    news_lines.append(line)
-                    news_ID_set.add(news_ID)
-        with open(os.path.join(config.test_root, 'news.tsv'), 'r', encoding='utf-8') as test_news_f:
-            for line in test_news_f:
-                news_ID, category, subCategory, title, abstract, topics = line.split('\t')
-                if news_ID not in news_ID_set:
-                    news_lines.append(line)
-                    news_ID_set.add(news_ID)
-        assert self.news_num == len(news_ID_set), 'news num mismatch %d v.s. %d' % (self.news_num, len(news_ID_set))
-        for line in news_lines:
-            news_ID, category, subCategory, title, abstract, topics = line.split('\t')
+
+        assert self.news_num == len(news_ID_set), f'news num mismatch {self.news_num} v.s. {len(news_ID_set)}'
+
+        for row in news_records:
+            news_ID = str(row['nid']).strip()
+            category = str(row['category']).strip()
+            subCategory = str(row['subcategory']).strip()
+            title = str(row['title'])
+            abstract = str(row['abstract'])
+
             index = self.news_ID_dict[news_ID]
-            self.news_category[index] = self.category_dict[category] if category in self.category_dict else 0
-            self.news_subCategory[index] = self.subCategory_dict[subCategory] if subCategory in self.subCategory_dict else 0
+            self.news_category[index] = self.category_dict.get(category, 0)
+            self.news_subCategory[index] = self.subCategory_dict.get(subCategory, 0)
+
             words = pat.findall(title.lower()) if config.tokenizer == 'MIND' else word_tokenize(title.lower())
-            offsets = [-1 for _ in range(len(title))]
+            offsets = [-1] * len(title)
             offset_index = 0
             for i, word in enumerate(words):
                 if i == self.max_title_length:
                     break
                 if is_number(word):
                     self.news_title_text[index][i] = self.word_dict['<NUM>']
-                elif word in self.word_dict:
-                    self.news_title_text[index][i] = self.word_dict[word]
                 else:
-                    self.news_title_text[index][i] = 1
+                    self.news_title_text[index][i] = self.word_dict.get(word, 1)
                 self.news_title_mask[index][i] = 1
-                while title[offset_index] in [' ', '\t']:
+                while offset_index < len(title) and title[offset_index] in [' ', '\t']:
                     offset_index += 1
-                for j in range(len(word)):
-                    offsets[offset_index] = i
-                    offset_index += 1
-            # for entity in json.loads(title_entities):
-            #     WikidataId = entity['WikidataId']
-            #     for offset in entity['OccurrenceOffsets']:
-            #         if offsets[offset] != -1 and WikidataId in self.entity_dict:
-            #             self.news_title_entity[index][offsets[offset]] = self.entity_dict[WikidataId]
+                for _ in range(len(word)):
+                    if offset_index < len(offsets):
+                        offsets[offset_index] = i
+                        offset_index += 1
+
             self.title_word_num += len(words)
+
             words = pat.findall(abstract.lower()) if config.tokenizer == 'MIND' else word_tokenize(abstract.lower())
-            offsets = [-1 for _ in range(len(abstract))]
+            offsets = [-1] * len(abstract)
             offset_index = 0
             for i, word in enumerate(words):
                 if i == self.max_abstract_length:
                     break
                 if is_number(word):
                     self.news_abstract_text[index][i] = self.word_dict['<NUM>']
-                elif word in self.word_dict:
-                    self.news_abstract_text[index][i] = self.word_dict[word]
                 else:
-                    self.news_abstract_text[index][i] = 1
+                    self.news_abstract_text[index][i] = self.word_dict.get(word, 1)
                 self.news_abstract_mask[index][i] = 1
-                while abstract[offset_index] in [' ', '\t']:
+                while offset_index < len(abstract) and abstract[offset_index] in [' ', '\t']:
                     offset_index += 1
-                for j in range(len(word)):
-                    offsets[offset_index] = i
-                    offset_index += 1
-            # for entity in json.loads(abstract_entities):
-            #     WikidataId = entity['WikidataId']
-            #     for offset in entity['OccurrenceOffsets']:
-            #         if offsets[offset] != -1 and WikidataId in self.entity_dict:
-            #             self.news_abstract_entity[index][offsets[offset]] = self.entity_dict[WikidataId]
+                for _ in range(len(word)):
+                    if offset_index < len(offsets):
+                        offsets[offset_index] = i
+                        offset_index += 1
+
             self.abstract_word_num += len(words)
-        self.news_title_mask[0][0] = 1    # for <PAD> news
-        self.news_abstract_mask[0][0] = 1 # for <PAD> news
+
+        self.news_title_mask[0][0] = 1  # for <PAD> news
+        self.news_abstract_mask[0][0] = 1  # for <PAD> news
 
         # generate behavior meta cache
-        with open(os.path.join(config.train_root, 'behaviors.tsv'), 'r', encoding='utf-8') as train_behaviors_f:
-            for behavior_index, line in enumerate(train_behaviors_f):
-                impression_ID, user_ID, time, history, labels, impressions = line.split('\t')
+        def process_behavior_df(df, mode='train'):
+            for behavior_index, row in df.iterrows():
+                user_ID = str(row['uid'])  # or your actual user ID col name
+                history = row['history']  # assumed list or string like '[id1,id2,...]'
+                labels = row.get('labels', None)  # might be None for dev/test
+                impressions = row['candidates']  # string/list of impression IDs
+
+                # print(type(row['candidates']), row['candidates'])
+                # print(type(row['history']), row['history'])
+                # Parse impressions & labels for train (labels required to split clicks/non-clicks)
                 click_impressions = []
                 non_click_impressions = []
-                for impression, label in zip(impressions.strip('[]').split(','), labels.strip('[]').split(' ')):
-                    if label == '0':
-                        non_click_impressions.append(self.news_ID_dict[impression.strip()])
-                    else:
-                        click_impressions.append(self.news_ID_dict[impression.strip()])
-
-                if len(history) != 0:
-                    history = list(map(lambda x: self.news_ID_dict[x], history.strip('[]').split(',')))
-                    padding_num = max(0, self.max_history_num - len(history))
-                    user_history = history[-self.max_history_num:] + [0] * padding_num
-                    user_history_mask = np.zeros([self.max_history_num], dtype=np.float32)
-                    user_history_mask[:min(len(history), self.max_history_num)] = 1.0
-                    for click_impression in click_impressions:
-                        self.train_behaviors.append([self.user_ID_dict[user_ID], user_history, user_history_mask, click_impression, non_click_impressions, behavior_index])
-                else:
-                    for click_impression in click_impressions:
-                        self.train_behaviors.append([self.user_ID_dict[user_ID], [0 for _ in range(self.max_history_num)], np.zeros([self.max_history_num], dtype=np.float32), click_impression, non_click_impressions, behavior_index])
-        with open(os.path.join(config.dev_root, 'behaviors.tsv'), 'r', encoding='utf-8') as dev_behaviors_f:
-            for dev_ID, line in enumerate(dev_behaviors_f):
-                impression_ID, user_ID, time, history, labels, impressions = line.split('\t')
-                if len(history) != 0:
-                    history = list(map(lambda x: self.news_ID_dict[x], history.strip('[]').split(',')))
-                    padding_num = max(0, self.max_history_num - len(history))
-                    user_history = history[-self.max_history_num:] + [0] * padding_num
-                    user_history_mask = np.zeros([self.max_history_num], dtype=np.float32)
-                    user_history_mask[:min(len(history), self.max_history_num)] = 1.0
-                    for impression in impressions.strip('[]').split(','):
-                        self.dev_indices.append(dev_ID)
-                        self.dev_behaviors.append([self.user_ID_dict[user_ID] if user_ID in self.user_ID_dict else 0, user_history, user_history_mask, self.news_ID_dict[impression[:-2]], dev_ID])
-                else:
-                    for impression in impressions.strip('[]').split(','):
-                        self.dev_indices.append(dev_ID)
-                        self.dev_behaviors.append([self.user_ID_dict[user_ID] if user_ID in self.user_ID_dict else 0, [0 for _ in range(self.max_history_num)], np.zeros([self.max_history_num], dtype=np.float32), self.news_ID_dict[impression[:-2]], dev_ID])
-        with open(os.path.join(config.test_root, 'behaviors.tsv'), 'r', encoding='utf-8') as test_behaviors_f:
-            for test_ID, line in enumerate(test_behaviors_f):
-                impression_ID, user_ID, time, history, impressions = line.split('\t')
-                if len(history) != 0:
-                    history = list(map(lambda x: self.news_ID_dict[x], history.strip('[]').split(',')))
-                    padding_num = max(0, self.max_history_num - len(history))
-                    user_history = history[-self.max_history_num:] + [0] * padding_num
-                    user_history_mask = np.zeros([self.max_history_num], dtype=np.float32)
-                    user_history_mask[:min(len(history), self.max_history_num)] = 1.0
-                    for impression in impressions.strip().split(' '):
-                        self.test_indices.append(test_ID)
-                        if config.dataset != 'large':
-                            self.test_behaviors.append([self.user_ID_dict[user_ID] if user_ID in self.user_ID_dict else 0, user_history, user_history_mask, self.news_ID_dict[impression[:-2]], test_ID])
+                if mode == 'train' and labels is not None:
+                    labels_list = [int(l) for l in labels]
+                    impressions_list = [str(x).strip() for x in impressions]
+                    for impression, label in zip(impressions_list, labels_list):
+                        imp_id = self.news_ID_dict[impression.strip()]
+                        if label == '0':
+                            non_click_impressions.append(imp_id)
                         else:
-                            self.test_behaviors.append([self.user_ID_dict[user_ID] if user_ID in self.user_ID_dict else 0, user_history, user_history_mask, self.news_ID_dict[impression], test_ID])
+                            click_impressions.append(imp_id)
                 else:
-                    for impression in impressions.strip().split(' '):
-                        self.test_indices.append(test_ID)
-                        if config.dataset != 'large':
-                            self.test_behaviors.append([self.user_ID_dict[user_ID] if user_ID in self.user_ID_dict else 0, [0 for _ in range(self.max_history_num)], np.zeros([self.max_history_num], dtype=np.float32), self.news_ID_dict[impression[:-2]], test_ID])
-                        else:
-                            self.test_behaviors.append([self.user_ID_dict[user_ID] if user_ID in self.user_ID_dict else 0, [0 for _ in range(self.max_history_num)], np.zeros([self.max_history_num], dtype=np.float32), self.news_ID_dict[impression], test_ID])
+                    # For dev/test, impressions are processed differently
+                    impressions_list = [str(x).strip() for x in impressions]
 
+                # Process user history
+                if isinstance(history, str):
+                    history_list = list(
+                        map(lambda x: self.news_ID_dict[x], history.strip('[]').split(','))) if history.strip(
+                        '[]') else []
+                elif isinstance(history, list):
+                    history_list = list(map(lambda x: self.news_ID_dict[x], history)) if history else []
+                else:
+                    history_list = []
 
+                padding_num = max(0, self.max_history_num - len(history_list))
+                user_history = history_list[-self.max_history_num:] + [0] * padding_num
+                user_history_mask = np.zeros(self.max_history_num, dtype=np.float32)
+                user_history_mask[:min(len(history_list), self.max_history_num)] = 1.0
 
-import time
-from numpy.random import randint
-import torch.utils.data as data
+                if mode == 'train':
+                    for click_imp in click_impressions:
+                        self.train_behaviors.append([
+                            self.user_ID_dict[user_ID],
+                            user_history,
+                            user_history_mask,
+                            click_imp,
+                            non_click_impressions,
+                            behavior_index
+                        ])
+                elif mode == 'dev':
+                    for impression in impressions_list:
+                        imp_id = self.news_ID_dict[impression.strip()]
+                        self.dev_indices.append(behavior_index)
+                        self.dev_behaviors.append([
+                            self.user_ID_dict.get(user_ID, 0),
+                            user_history,
+                            user_history_mask,
+                            imp_id,
+                            behavior_index
+                        ])
+                elif mode == 'test':
+                    for impression in impressions_list:
+                        imp_id = self.news_ID_dict.get(impression.strip(), 0)
+                        self.test_indices.append(behavior_index)
+                        self.test_behaviors.append([
+                            self.user_ID_dict.get(user_ID, 0),
+                            user_history,
+                            user_history_mask,
+                            imp_id,
+                            behavior_index
+                        ])
 
-class Ebnerd_Train_Dataset(data.Dataset):
-    def __init__(self, corpus: EBNeRD_Corpus):
-        self.negative_sample_num = corpus.negative_sample_num
-        self.news_category = corpus.news_category
-        self.news_subCategory = corpus.news_subCategory
-        self.news_title_text =  corpus.news_title_text
-        self.news_title_mask = corpus.news_title_mask
-        self.news_title_entity = corpus.news_title_entity
-        self.news_abstract_text =  corpus.news_abstract_text
-        self.news_abstract_mask = corpus.news_abstract_mask
-        self.news_abstract_entity = corpus.news_abstract_entity
-        # self.user_history_graph = corpus.train_user_history_graph
-        self.user_history_category_mask = corpus.train_user_history_category_mask
-        self.user_history_category_indices = corpus.train_user_history_category_indices
-        self.train_behaviors = corpus.train_behaviors
-        self.train_samples = [[0 for _ in range(1 + self.negative_sample_num)] for __ in range(len(self.train_behaviors))]
-        self.num = len(self.train_behaviors)
+        # Load parquet files and process
+        train_path = os.path.join(config.train_root, 'behaviors.parquet')
+        dev_path = os.path.join(config.dev_root, 'behaviors.parquet')
+        test_path = os.path.join(config.test_root, 'behaviors.parquet')
 
-    def negative_sampling(self, rank=None):
-        print('\n%sBegin negative sampling, training sample num : %d' % ('' if rank is None else ('rank ' + str(rank) + ' : '), self.num))
-        start_time = time.time()
-        for i, train_behavior in enumerate(self.train_behaviors):
-            self.train_samples[i][0] = train_behavior[3]
-            negative_samples = train_behavior[4]
-            news_num = len(negative_samples)
-            if news_num <= self.negative_sample_num:
-                for j in range(self.negative_sample_num):
-                    self.train_samples[i][j + 1] = negative_samples[j % news_num]
-            else:
-                used_negative_samples = set()
-                for j in range(self.negative_sample_num):
-                    while True:
-                        k = randint(0, news_num)
-                        if k not in used_negative_samples:
-                            self.train_samples[i][j + 1] = negative_samples[k]
-                            used_negative_samples.add(k)
-                            break
-        end_time = time.time()
-        print('%sEnd negative sampling, used time : %.3fs' % ('' if rank is None else ('rank ' + str(rank) + ' : '), end_time - start_time))
+        train_df = pd.read_parquet(train_path)
+        dev_df = pd.read_parquet(dev_path)
+        test_df = pd.read_parquet(test_path)
 
-    # user_ID                       : [1]
-    # user_category                 : [max_history_num]
-    # usre_subCategory              : [max_history_num]
-    # user_title_text               : [max_history_num, max_title_length]
-    # user_title_mask               : [max_history_num, max_title_length]
-    # user_title_entity             : [max_history_num, max_title_length]
-    # user_abstract_text            : [max_history_num, max_abstract_length]
-    # user_abstract_mask            : [max_history_num, max_abstract_length]
-    # user_abstract_entity          : [max_history_num, max_abstract_length]
-    # user_history_mask             : [max_history_num]
-    # user_history_graph            : [max_history_num, max_history_num]
-    # user_history_category_mask    : [category_num + 1]
-    # user_history_category_indices : [max_history_num]
-    # news_category                 : [1 + negative_sample_num]
-    # news_subCategory              : [1 + negative_sample_num]
-    # news_title_text               : [1 + negative_sample_num, max_title_length]
-    # news_title_mask               : [1 + negative_sample_num, max_title_length]
-    # news_title_entity             : [1 + negative_sample_num, max_title_length]
-    # news_abstract_text            : [1 + negative_sample_num, max_abstract_length]
-    # news_abstract_mask            : [1 + negative_sample_num, max_abstract_length]
-    # news_abstract_entity          : [1 + negative_sample_num, max_abstract_length]
-    def __getitem__(self, index):
-        train_behavior = self.train_behaviors[index]
-        history_index = train_behavior[1]
-        sample_index = self.train_samples[index]
-        behavior_index = train_behavior[5]
-        return train_behavior[0], self.news_category[history_index], self.news_subCategory[history_index], self.news_title_text[history_index], self.news_title_mask[history_index], self.news_title_entity[history_index], self.news_abstract_text[history_index], self.news_abstract_mask[history_index], self.news_abstract_entity[history_index], train_behavior[2], self.user_history_category_mask[behavior_index], self.user_history_category_indices[behavior_index], \
-               self.news_category[sample_index], self.news_subCategory[sample_index], self.news_title_text[sample_index], self.news_title_mask[sample_index], self.news_title_entity[sample_index], self.news_abstract_text[sample_index], self.news_abstract_mask[sample_index], self.news_abstract_entity[sample_index]
-    def __len__(self):
-        return self.num
-
-
-class Ebnerd_DevTest_Dataset(data.Dataset):
-    def __init__(self, corpus: EBNeRD_Corpus, mode: str):
-        assert mode in ['dev', 'test'], 'mode must be chosen from \'dev\' or \'test\''
-        self.news_category = corpus.news_category
-        self.news_subCategory = corpus.news_subCategory
-        self.news_title_text =  corpus.news_title_text
-        self.news_title_mask = corpus.news_title_mask
-        self.news_title_entity = corpus.news_title_entity
-        self.news_abstract_text =  corpus.news_abstract_text
-        self.news_abstract_mask = corpus.news_abstract_mask
-        self.news_abstract_entity = corpus.news_abstract_entity
-        self.user_history_graph = corpus.dev_user_history_graph if mode == 'dev' else corpus.test_user_history_graph
-        self.user_history_category_mask = corpus.dev_user_history_category_mask if mode == 'dev' else corpus.test_user_history_category_mask
-        self.user_history_category_indices = corpus.dev_user_history_category_indices if mode == 'dev' else corpus.test_user_history_category_indices
-        self.behaviors = corpus.dev_behaviors if mode == 'dev' else corpus.test_behaviors
-        self.num = len(self.behaviors)
-
-    # user_ID                        : [1]
-    # user_category                  : [max_history_num]
-    # user_subCategory               : [max_history_num]
-    # user_title_text                : [max_history_num, max_title_length]
-    # user_title_mask                : [max_history_num, max_title_length]
-    # user_title_entity              : [max_history_num, max_title_length]
-    # user_abstract_text             : [max_history_num, max_abstract_length]
-    # user_abstract_mask             : [max_history_num, max_abstract_length]
-    # user_abstract_entity           : [max_history_num, max_abstract_length]
-    # user_history_mask              : [max_history_num]
-    # user_history_graph             : [max_history_num, max_history_num]
-    # user_history_category_mask     : [category_num + 1]
-    # user_history_category_indices  : [max_history_num]
-    # candidate_news_category        : [1]
-    # candidate_news_subCategory     : [1]
-    # candidate_news_title_text      : [max_title_length]
-    # candidate_news_title_mask      : [max_title_length]
-    # candidate_news_title_entity    : [max_title_lenght]
-    # candidate_news_abstract_text   : [max_abstract_length]
-    # candidate_news_abstract_mask   : [max_abstract_length]
-    # candidate_news_abstract_entity : [max_abstract_length]
-    def __getitem__(self, index):
-        behavior = self.behaviors[index]
-        history_index = behavior[1]
-        candidate_news_index = behavior[3]
-        behavior_index = behavior[4]
-        return behavior[0], self.news_category[history_index], self.news_subCategory[history_index], self.news_title_text[history_index], self.news_title_mask[history_index], self.news_title_entity[history_index], self.news_abstract_text[history_index], self.news_abstract_mask[history_index], self.news_abstract_entity[history_index], behavior[2], self.user_history_category_mask[behavior_index], self.user_history_category_indices[behavior_index], \
-               self.news_category[candidate_news_index], self.news_subCategory[candidate_news_index], self.news_title_text[candidate_news_index], self.news_title_mask[candidate_news_index], self.news_title_entity[candidate_news_index], self.news_abstract_text[candidate_news_index], self.news_abstract_mask[candidate_news_index], self.news_abstract_entity[candidate_news_index]
-
-    def __len__(self):
-        return self.num
+        process_behavior_df(train_df, 'train')
+        process_behavior_df(dev_df, 'dev')
+        process_behavior_df(test_df, 'test')
