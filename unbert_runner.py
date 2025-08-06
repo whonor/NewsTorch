@@ -38,7 +38,7 @@ class DataLoader(DataLoader):
             collate_fn = dataset.collate
         )
 
-def main(config: Config):
+def run_unbert(config: Config):
     dataset_path = config.dataset_path
     model = UNBERT(config)
     if config.restore is not None and os.path.isfile(config.restore):
