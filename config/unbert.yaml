@@ -1,5 +1,6 @@
 
 mode: train # mode: train, dev, test
+word_embedding_dim: 300
 dataset_path: './MIND-small' # Path to the dataset
 split: small # split: small, large
 pretrain: './bert-base-uncased'
@@ -11,6 +12,6 @@ seq_max_len: 300
 output: './logs/unbert'
 restore: None
 epoch: 5 # 5 in small dataset, 2 in large
-batch_size: 64
+batch_size: 8
 lr: 0.00002
 eval_every: 10000

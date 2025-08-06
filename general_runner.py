@@ -83,7 +83,7 @@ def run_unbert(config: Config):
             hist_max_len=config.hist_max_len,
             seq_max_len=config.seq_max_len
         )
-        train_loader = DataLoader(
+        train_loader = DataLoader_unbert(
             dataset=train_set,
             batch_size=config.batch_size,
             shuffle=True,
@@ -99,7 +99,7 @@ def run_unbert(config: Config):
             hist_max_len=config.hist_max_len,
             seq_max_len=config.seq_max_len
         )
-        dev_loader = DataLoader(
+        dev_loader = DataLoader_unbert(
             dataset=dev_set,
             batch_size=config.batch_size,
             shuffle=False,
@@ -171,7 +171,7 @@ def run_unbert(config: Config):
             hist_max_len=config.hist_max_len,
             seq_max_len=config.seq_max_len
         )
-        test_loader = DataLoader(
+        test_loader = DataLoader_unbert(
             dataset=test_set,
             batch_size=config.batch_size,
             shuffle=False,
@@ -485,13 +485,9 @@ def dev(config: Config, corpus):
                                                      'dev',
                                                      dev_res_dir + '/' + config.model + '.txt', config.dataset)
     elif config.dataset_name == 'ebnerd':
-        if config.model == 'IPNR':
-            auc, mrr, ndcg5, ndcg10 = compute_scores_IPNR(config, model, corpus, config.batch_size, 'dev',
-                                                          dev_res_dir + '/' + config.model + '.txt', config.dataset)
-        else:
-            auc, mrr, ndcg5, ndcg10 = compute_scores(config, model, corpus, config.batch_size,
-                                                     'dev',
-                                                     dev_res_dir + '/' + config.model + '.txt', config.dataset)
+        auc, mrr, ndcg5, ndcg10 = compute_scores(config, model, corpus, config.batch_size,
+                                                 'dev',
+                                                 dev_res_dir + '/' + config.model + '.txt', config.dataset)
 
 
 

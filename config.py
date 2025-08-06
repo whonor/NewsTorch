@@ -60,7 +60,7 @@ class Config:
 
     def __init__(self):
         parser = argparse.ArgumentParser()
-        parser.add_argument('--model', type=str, default='NRMS', help='Model name')
+        parser.add_argument('--model', type=str, default='UNBERT', help='Model name')
         parser.add_argument('--batch_size', type=int, default='64', help='Batfhch size for training')
         args, _ = parser.parse_known_args()
         self.model = args.model
@@ -77,8 +77,9 @@ class Config:
 
         self.root = "."
         self.data_path = "cache/"
-        self.dataset_name = 'ebnerd'  # Name of the dataset to be used
-        self.dataset = 'demo'
+        self.DATA_NAME = 'MIND-small'  # Default dataset name, can be 'MIND-small', 'MIND-200k', or 'MIND-large'
+        self.dataset_name = 'MIND'  # Name of the dataset to be used
+        self.dataset = 'small'  # Dataset variant, can be 'small', '200k', or 'large'
         self.tokenizer = 'MIND'
         self.word_threshold = 3
         self.max_title_length = 32
@@ -86,7 +87,7 @@ class Config:
         self.negative_sample_num = 4
         self.max_history_num = 50
         self.candidate_news_num = 5
-        self.epoch = 20
+        self.epoch = 1
 
         self.batch_size = args.batch_size
         self.lr = 1e-4
@@ -109,24 +110,13 @@ class Config:
         else:
             self.click_predictor = 'dot_product'
 
-        self.train_root = self.root + '/%s_%s/train' % (self.dataset_name, self.dataset)
-        self.dev_root = self.root + '/%s_%s/dev' % (self.dataset_name, self.dataset)
-        self.test_root = self.root + '/%s_%s/test' % (self.dataset_name, self.dataset)
-        # self.train_root = self.root + '/MIND-%s/train' % self.dataset
-        # self.dev_root = self.root + '/MIND-%s/dev' % self.dataset
-        # self.test_root = self.root + '/MIND-%s/test' % self.dataset
+        # self.train_root = self.root + '/%s_%s/train' % (self.dataset_name, self.dataset)
+        # self.dev_root = self.root + '/%s_%s/dev' % (self.dataset_name, self.dataset)
+        # self.test_root = self.root + '/%s_%s/test' % (self.dataset_name, self.dataset)
+        self.train_root = self.root + '/%s/train' % self.DATA_NAME
+        self.dev_root = self.root + '/%s/dev' % self.DATA_NAME
+        self.test_root = self.root + '/%s/test' % self.DATA_NAME
 
-        # if self.dataset == 'small': # suggested configuration for MIND-small
-        #     self.dropout_rate = 0.25
-        #     self.gcn_layer_num = 3
-        # elif self.dataset == '200k': # suggested configuration for MIND-200k
-        #     self.dropout_rate = 0.2
-        #     self.gcn_layer_num = 4
-        #     self.epoch = 8
-        # else: # suggested configuration for MIND-large
-        #     self.dropout_rate = 0.1
-        #     self.gcn_layer_num = 4
-        #     self.epoch = 6
         self.seed = self.seed if self.seed >= 0 else (int)(time.time())
 
         import yaml
@@ -218,43 +208,52 @@ class Config:
             mkdirs("cache/IPNR/")
         mkdirs("cache/%s/" % self.dataset_name)
 
-        dev_truth_path = os.path.join(data_path, f'dev/ref/truth-{self.dataset_name}.txt')
-        test_truth_path = os.path.join(data_path, f'test/ref/truth-{self.dataset_name}.txt')
+        dev_truth_path = os.path.join(data_path, f'dev/ref/truth-{self.DATA_NAME}.txt')
+        test_truth_path = os.path.join(data_path, f'test/ref/truth-{self.DATA_NAME}.txt')
 
-        # Load parquet for dev
-        if not os.path.exists(dev_truth_path):
-            dev_df = pd.read_parquet(os.path.join(self.dev_root, 'behaviors.parquet'))
-            with open(dev_truth_path, 'w', encoding='utf-8') as truth_f:
-                for dev_ID, row in dev_df.iterrows():
-                    if dataset_name == 'ebnerd':
+        if dataset_name == 'MIND':
+            if not os.path.exists(dev_truth_path):
+                with open(os.path.join(self.dev_root, 'behaviors.tsv'), 'r', encoding='utf-8') as dev_f:
+                    with open(dev_truth_path, 'w', encoding='utf-8') as truth_f:
+                        for dev_ID, line in enumerate(dev_f):
+                            impression_ID, user_ID, time, history, impressions = line.split('\t')
+                            labels = [int(impression[-1]) for impression in impressions.strip().split(' ')]
+                            truth_f.write(
+                                ('' if dev_ID == 0 else '\n') + str(dev_ID + 1) + ' ' + str(labels).replace(' ', ''))
+            if self.dataset != 'large':
+                if not os.path.exists(test_truth_path):
+                    with open(os.path.join(self.test_root, 'behaviors.tsv'), 'r', encoding='utf-8') as test_f:
+                        with open(test_truth_path, 'w', encoding='utf-8') as truth_f:
+                            for test_ID, line in enumerate(test_f):
+                                impression_ID, user_ID, time, history, impressions = line.split('\t')
+                                labels = [int(impression[-1]) for impression in impressions.strip().split(' ')]
+                                truth_f.write(
+                                    ('' if test_ID == 0 else '\n') + str(test_ID + 1) + ' ' + str(labels).replace(' ',
+                                                                                                                  ''))
+            else:
+                self.prediction_dir = 'prediction/large/' + model_name
+                mkdirs(self.prediction_dir)
+
+        elif dataset_name == 'ebnerd':
+            # Load parquet for dev
+            if not os.path.exists(dev_truth_path):
+                dev_df = pd.read_parquet(os.path.join(self.dev_root, 'behaviors.parquet'))
+                with open(dev_truth_path, 'w', encoding='utf-8') as truth_f:
+                    for dev_ID, row in dev_df.iterrows():
                         labels = row['labels']
                         # remove space if string like '0 1 1 0'
                         label_str = str(labels).replace(' ', ',')
-                    elif dataset_name == 'MIND':
-                        impressions = row['impressions']
-                        # e.g., impressions: "N11243-1 N56784-0 ..."
-                        label_list = [int(impr.split('-')[1]) for impr in impressions.strip().split()]
-                        label_str = str(label_list).replace(' ', ',')
-                    truth_f.write(('' if dev_ID == 0 else '\n') + str(dev_ID + 1) + ' ' + label_str)
+                        truth_f.write(('' if dev_ID == 0 else '\n') + str(dev_ID + 1) + ' ' + label_str)
 
-        # Load parquet for test
-        if self.dataset != 'large' and not os.path.exists(test_truth_path):
-            test_df = pd.read_parquet(os.path.join(self.test_root, 'behaviors.parquet'))
-            with open(test_truth_path, 'w', encoding='utf-8') as truth_f:
-                for test_ID, row in test_df.iterrows():
-                    if dataset_name == 'ebnerd':
+            # Load parquet for test
+            if not os.path.exists(test_truth_path):
+                test_df = pd.read_parquet(os.path.join(self.test_root, 'behaviors.parquet'))
+                with open(test_truth_path, 'w', encoding='utf-8') as truth_f:
+                    for test_ID, row in test_df.iterrows():
                         labels = row['labels']
                         label_str = str(labels).replace(' ', ',')
-                    elif dataset_name == 'MIND':
-                        impressions = row['impressions']
-                        label_list = [int(impr.split('-')[1]) for impr in impressions.strip().split()]
-                        label_str = str(label_list).replace(' ', ',')
-                    truth_f.write(('' if test_ID == 0 else '\n') + str(test_ID + 1) + ' ' + label_str)
+                        truth_f.write(('' if test_ID == 0 else '\n') + str(test_ID + 1) + ' ' + label_str)
 
-        # If dataset is 'large', set prediction directory
-        if self.dataset == 'large':
-            self.prediction_dir = os.path.join(data_path, f'prediction/large/{model_name}')
-            mkdirs(self.prediction_dir)
 
 
 
