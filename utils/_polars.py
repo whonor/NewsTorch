@@ -1,6 +1,5 @@
 import numpy as np
 import random
-import json
 
 try:
     import polars as pl
@@ -8,7 +7,7 @@ except ImportError:
     print("polars not available")
 
 
-from ebrec.utils._python import generate_unique_name
+from utils._python import generate_unique_name
 
 
 def _check_columns_in_df(df: pl.DataFrame, columns: list[str]) -> None:

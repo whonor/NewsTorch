@@ -222,5 +222,5 @@ if __name__ == "__main__":
         config=config.attribute_dict,
         mode='offline'
     )
-    main(config)
+    run_unbert(config)
 

@@ -12,24 +12,21 @@ This library includes implementations of the following models:
 
 | Model | Paper | Year |
 |-------|-------|------|
-| LibFM | [LibFM](https://www.csie.ntu.edu.tw/~cjlin/libfm/) | 2011 |
-| DSSM | [DSSM](https://www.microsoft.com/en-us/research/publication/dssm-deep-structured-semantic-models-for-web-search-using-clickthrough-data/) | 2013 |
-| Wide&Deep | [Wide&Deep](https://arxiv.org/abs/1606.07792) | 2016 |
-| NPA | [NPA](https://arxiv.org/abs/1704.00270) | 2017 |
-| DKN | [DKN](https://arxiv.org/abs/1709.02320) | 2017 |
-| LSTUR | [LSTUR](https://arxiv.org/abs/1802.03684) | 2018 |
-| NAML | [NAML](https://arxiv.org/abs/1802.03401) | 2018 |
-| NRMS | [NRMS](https://arxiv.org/abs/1808.09781) | 2018 |
-| FIM | [FIM](https://arxiv.org/abs/1904.06690) | 2019 |
+| NPA | [NPA](https://arxiv.org/abs/1704.00270) | 2019 |
+| DKN | [DKN](https://arxiv.org/abs/1709.02320) | 2018 |
+| LSTUR | [LSTUR](https://arxiv.org/abs/1802.03684) | 2019 |
+| NAML | [NAML](https://arxiv.org/abs/1802.03401) | 2019 |
+| NRMS | [NRMS](https://arxiv.org/abs/1808.09781) | 2019 |
+| FIM | [FIM](https://arxiv.org/abs/1904.06690) | 2020 |
 | TANR | [TANR](https://arxiv.org/abs/1909.05883) | 2019 |
 | CenNewsRec | [CenNewsRec](https://arxiv.org/abs/2004.01463) | 2020 |
-| MINS | [MINS](https://arxiv.org/abs/2005.00796) | 2020 |
-| UNBERT | [UNBERT](https://arxiv.org/abs/2010.06467) | 2020 |
+| MINS | [MINS](https://arxiv.org/abs/2005.00796) | 2022 |
+| UNBERT | [UNBERT](https://arxiv.org/abs/2010.06467) | 2021 |
 | CNE-SUE | [CNE-SUE](https://arxiv.org/abs/2101.08604) | 2021 |
-| IPNR | [IPNR](https://arxiv.org/abs/2105.01524) | 2021 |
+| IPNR | [IPNR](https://arxiv.org/abs/2105.01524) | 2023 |
 | MANNeR | [MANNeR](https://arxiv.org/abs/2203.12664) | 2022 |
-| LKPNR | [LKPNR](https://arxiv.org/abs/2204.08666) | 2022 |
-| ONCE | [ONCE](https://arxiv.org/abs/2205.15263) | 2022 |
+| LKPNR | [LKPNR](https://arxiv.org/abs/2204.08666) | 2024 |
+| ONCE | [ONCE](https://arxiv.org/abs/2205.15263) | 2024 |
 | Prompt4NR | [Prompt4NR](https://arxiv.org/abs/2303.11364) | 2023 |
 
 

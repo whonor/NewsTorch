@@ -17,7 +17,7 @@
 from typing import List, Tuple, Dict, Any
 import torch
 import torch.nn as nn
-from transformers import AutoTokenizer, get_linear_schedule_with_warmup, AutoModel
+from transformers import AutoTokenizer, get_linear_schedule_with_warmup, AutoModel, BertModel
 
 from config import Config
 from models.modules.unbert.configuration_bert import BertConfig
@@ -52,6 +52,21 @@ class UNBERT(nn.Module):
                        )
         else:
             self.att = None
+
+    def initialize(self):
+        self._model.initialize()
+        if self._level_state == 'both':
+            nn.init.xavier_uniform_(self._dense.weight, gain=nn.init.calculate_gain('relu'))
+            nn.init.zeros_(self._dense.bias)
+        else:
+            nn.init.xavier_uniform_(self._dense.weight)
+            nn.init.zeros_(self._dense.bias)
+
+        if self.att is not None:
+            nn.init.xavier_uniform_(self.att[0].weight)
+            nn.init.zeros_(self.att[0].bias)
+            nn.init.xavier_uniform_(self.att[2].weight)
+            nn.init.zeros_(self.att[2].bias)
 
     def forward(self,
                 input_ids: torch.Tensor,

@@ -1,10 +1,7 @@
 import os
-import gc
 import shutil
 
 from dataset_corpus_preprocessing.EBNeRD_corpus_main import EBNeRD_Corpus
-from dataset_corpus_preprocessing.EBNeRD_dataset import Ebnerd_Train_Dataset
-from dataset_corpus_preprocessing.MIND_corpus_IPNR import MIND_Corpus_IPNR
 from models.CNE_SUE import Model
 from models.DKN import DKN
 from models.FIM import FIM
@@ -16,26 +13,19 @@ from models.NPA import NPA
 from models.NRMS import NRMS
 from models.TANR import TANR
 from models.CenNewsRec import CenNewsRec
-from models.UNBERT import UNBERT
 from models.modules.ipnr.trainer import TrainerIPNR
-from unbert_runner import run_unbert
-from util import get_run_index, compute_scores_IPNR
+from utils.util import get_run_index, compute_scores_IPNR
 from datetime import datetime
 import wandb
 from config import Config
 from dataset_corpus_preprocessing.MIND_corpus_main import MIND_Corpus
-from dataset_corpus_preprocessing.MIND_dataset import MIND_Train_Dataset
-from util import AvgMetric
-from util import compute_scores
+from utils.util import AvgMetric
+from utils.util import compute_scores
 from tqdm import tqdm
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
-from torch.utils.data import Dataset
-from transformers import AutoTokenizer, get_linear_schedule_with_warmup
-from dataset_corpus_preprocessing.data_loader_unbert import MindDataset
-from models.modules.unbert.eval import dev, test
 
 
 class Trainer:
@@ -103,7 +93,8 @@ class Trainer:
             model = nn.DataParallel(model, device_ids=self.config.device_id)
             self.loss = nn.DataParallel(self.loss)
         for e in tqdm(range(1, self.epoch + 1)):
-            # self.train_dataset.negative_sampling()
+            if self.config.dataset_name == 'MIND':
+                self.train_dataset.negative_sampling()
             train_dataloader = DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.batch_size // 16, pin_memory=True)
             model.train()
             epoch_loss = 0
@@ -383,24 +374,21 @@ if __name__ == '__main__':
     elif config.dataset_name == 'ebnerd':
         corpus = EBNeRD_Corpus(config)
 
-    if config.model == 'UNBERT':
-        run_unbert(config)
-    else:
-        if config.mode == 'train':
-            print("Start training at: ", datetime.now())
-            train(config, corpus, wandb)
-            print("Finish training at: ", datetime.now())
-            config.test_model_path = config.best_model_dir + '/#' + str(config.run_index) + '/' + config.model
-            print("Start testing at: ", datetime.now())
-            test(config, corpus)
-            print("Finish testing at: ", datetime.now())
-        elif config.mode == 'dev':
-            print("Start dev at: ", datetime.now())
-            dev(config, corpus)
-            print("Finish dev at: ", datetime.now())
-        elif config.mode == 'test':
-            print("Start testing at: ", datetime.now())
-            test(config)
-            print("Finish testing at: ", datetime.now())
+    if config.mode == 'train':
+        print("Start training at: ", datetime.now())
+        train(config, corpus, wandb)
+        print("Finish training at: ", datetime.now())
+        config.test_model_path = config.best_model_dir + '/#' + str(config.run_index) + '/' + config.model
+        print("Start testing at: ", datetime.now())
+        test(config, corpus)
+        print("Finish testing at: ", datetime.now())
+    elif config.mode == 'dev':
+        print("Start dev at: ", datetime.now())
+        dev(config, corpus)
+        print("Finish dev at: ", datetime.now())
+    elif config.mode == 'test':
+        print("Start testing at: ", datetime.now())
+        test(config)
+        print("Finish testing at: ", datetime.now())
 
 

@@ -33,7 +33,6 @@ import numpy as np
 import os
 
 from config import Config
-from evaluate import scoring
 
 def func_auc(grouped_df):
     if sum(grouped_df["label"]) == 0 or sum(grouped_df["label"]) == len(grouped_df["label"]):

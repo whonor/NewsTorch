@@ -1,6 +1,6 @@
-from ebrec.utils._python import create_lookup_dict
+from utils._python import create_lookup_dict
 import polars as pl
-from ebrec.utils._constants import DEFAULT_ARTICLE_ID_COL
+from utils._constants import DEFAULT_ARTICLE_ID_COL
 
 try:
     from transformers import AutoTokenizer

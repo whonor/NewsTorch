@@ -1,6 +1,6 @@
 import polars as pl
 
-from ebrec.utils._constants import (
+from utils._constants import (
     DEFAULT_HISTORY_IMPRESSION_TIMESTAMP_COL,
     DEFAULT_IMPRESSION_TIMESTAMP_COL,
 )

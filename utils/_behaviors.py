@@ -1,12 +1,11 @@
 from typing import Any, Iterable
 from pathlib import Path
-from tqdm import tqdm
 import warnings
 import datetime
 import inspect
 
 
-from ebrec.utils._polars import (
+from utils._polars import (
     slice_join_dataframes,
     _check_columns_in_df,
     drop_nulls_from_list,
@@ -15,8 +14,8 @@ from ebrec.utils._polars import (
 )
 import polars as pl
 
-from ebrec.utils._constants import *
-from ebrec.utils._python import create_lookup_dict
+from utils._constants import *
+from utils._python import create_lookup_dict
 
 
 def create_binary_labels_column(

@@ -1,8 +1,7 @@
 from tqdm import tqdm
-import numpy as np
 import torch
 
-from ebrec.utils._python import get_torch_device
+from utils._python import get_torch_device
 
 try:
     from torch.utils.data import DataLoader, TensorDataset

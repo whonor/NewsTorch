@@ -206,6 +206,8 @@ class Config:
         mkdirs(self.test_res_dir)
         if model_name == 'IPNR':
             mkdirs("cache/IPNR/")
+        if model_name == 'UNBERT':
+            mkdirs("cache/UNBERT/")
         mkdirs("cache/%s/" % self.dataset_name)
 
         dev_truth_path = os.path.join(data_path, f'dev/ref/truth-{self.DATA_NAME}.txt')
