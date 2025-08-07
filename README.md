@@ -50,29 +50,17 @@ The dataset preparation is divided into two steps: downloading the dataset and p
 
 Neural news recommendation baselines:
 
-- ML-based models: LibFM, DSSM, Wide&Deep
-
 - DL-based models: NPA, DKN, LSTUR, NAML, NRMS, FIM, TANR, CenNewsRec, MINS, UNBERT
 
 - Graph-based models: CNE-SUE, IPNR
 
-You can run the ML-based models in the following order:
-<pre><code>cd general_recommendation_methods
-python generate_tf_idf_feature_file.py
-python generate_libfm_data.py
-chmod -R 777 libfm
-python libfm_main.py
-python DSSM_main.py 
-python wide_deep_main.py</code></pre>
 
 You can run the DL-based models like NRMS in the following order:
 <pre><code>python general_runner.py --model=NRMS</code></pre>
-or run UNBERT model like this:
-<pre><code>python unbert_runner.py --model=UNBERT</code></pre>
 
 
 ## To Do
-1. Add more datasets: Adressa, EB-NeRD
+1. Add more datasets: Adressa
 2. Add more models: MANNeR, LKPNR, ONCE, Prompt4NR
-3. Add more evaluation metrics using TorchMetrics.
+
 

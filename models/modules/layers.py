@@ -6,6 +6,41 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 
+class QAttention(nn.Module):
+    def __init__(self, feature_dim: int, attention_dim: int):
+        super(QAttention, self).__init__()
+
+        self.affine1 = nn.Linear(feature_dim, attention_dim, bias=True)
+        self.affine2 = nn.Linear(attention_dim, 1, bias=False)
+
+    def initialize(self):
+        nn.init.xavier_uniform_(self.affine1.weight, gain=nn.init.calculate_gain('tanh'))
+        nn.init.zeros_(self.affine1.bias)
+        nn.init.xavier_uniform_(self.affine2.weight)
+
+    # Input
+    # feature : [batch_size, length, feature_dim]
+    # mask    : [batch_size, length]
+    # Output
+    # out     : [batch_size, feature_dim]
+    def forward(self, feature, Q, mask=None ):
+        for i in range(len(Q)):
+            feature_Q = torch.cat((feature, Q[i]), dim=2)
+            feature_Q = torch.cat((feature_Q, feature*Q[i]), dim=2)
+
+            attention = torch.tanh(self.affine1(feature_Q))                                 # [batch_size, length, attention_dim]
+            a = self.affine2(attention).squeeze(dim=2)                                    # [batch_size, length]
+
+            if mask is not None:
+                alpha = F.softmax(a.masked_fill(mask == 0, -1e9), dim=1).unsqueeze(dim=1) # [batch_size, 1, length]
+            else:
+                alpha = F.softmax(a, dim=1).unsqueeze(dim=1)                              # [batch_size, 1, length]
+            out = torch.bmm(alpha, feature).squeeze(dim=1)                                # [batch_size, feature_dim]
+
+            res = out if i==0 else torch.cat((res, out), dim=1)
+        return res
+
+
 class Conv1D(nn.Module):
     def __init__(self, cnn_method: str, in_channels: int, cnn_kernel_num: int, cnn_window_size: int):
         super(Conv1D, self).__init__()
