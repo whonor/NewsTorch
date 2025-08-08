@@ -14,6 +14,7 @@ class DKN(nn.Module):
         self.model_name = config.model
         self.batch_size = config.batch_size
         self.config = config
+        self.dropout = nn.Dropout(p=config.dropout_rate)
 
     def initialize(self):
         self.news_encoder.initialize()

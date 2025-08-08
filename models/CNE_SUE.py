@@ -5,9 +5,9 @@ import torch.nn.functional as F
 from models.modules import userEncoders, newsEncoders
 
 
-class Model(nn.Module):
+class CNE_SUE(nn.Module):
     def __init__(self, config: Config):
-        super(Model, self).__init__()
+        super(CNE_SUE, self).__init__()
         self.config = config
         if config.model == 'CNE-SUE':
             self.news_encoder = newsEncoders.CNE(config)

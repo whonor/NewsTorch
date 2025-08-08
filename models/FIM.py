@@ -8,7 +8,7 @@ class FIM(nn.Module):
         super(FIM, self).__init__()
         self.news_encoder = newsEncoders.HDC(config)
         self.user_encoder = userEncoders.FIM(self.news_encoder, config)
-
+        self.dropout = nn.Dropout(p=config.dropout_rate)
         self.use_user_embedding = False
         self.model_name = config.model
         self.batch_size = config.batch_size

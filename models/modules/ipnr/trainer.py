@@ -6,8 +6,7 @@ import json
 import wandb
 
 from config import Config
-from dataset_corpus_preprocessing.MIND_corpus_IPNR import MIND_Corpus_IPNR
-from dataset_corpus_preprocessing.MIND_dataset_IPNR import MIND_Train_Dataset_IPNR
+from dataset_corpus_preprocessing.MIND_corpus_IPNR import MIND_Corpus_IPNR, MIND_Train_Dataset_IPNR
 
 from utils.util import AvgMetric, compute_scores_IPNR
 from utils.util import compute_scores

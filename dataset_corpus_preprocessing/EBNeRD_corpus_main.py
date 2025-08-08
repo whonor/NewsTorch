@@ -182,14 +182,17 @@ class EBNeRD_Corpus:
                 json.dump(word_dict, vocabulary_f)
 
             # 4. Danish word embedding using fastText
-            build_danish_word_embedding(
-                word_dict,
-                vec_file='cc.da.300.vec',
-                embedding_dim=300,
-                output_pkl_path=word_embedding_file
-            )
+            if not os.path.exists(word_embedding_file):
+                build_danish_word_embedding(
+                    word_dict,
+                    vec_file='cc.da.300.vec',
+                    embedding_dim=300,
+                    output_pkl_path=word_embedding_file
+                )
+            else:
+                pass
 
-            # build graph
+
             # build graph
             category_num = len(category_dict)
             graph_size = config.max_history_num + category_num  # |V_n| + |V_p|

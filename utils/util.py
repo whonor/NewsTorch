@@ -3,12 +3,11 @@ import torch
 import torch.nn as nn
 
 from dataset_corpus_preprocessing.EBNeRD_corpus_main import EBNeRD_Corpus
-from dataset_corpus_preprocessing.MIND_corpus_main import MIND_Corpus
-from dataset_corpus_preprocessing.MIND_dataset import MIND_DevTest_Dataset
+from dataset_corpus_preprocessing.MIND_corpus_IPNR import MIND_DevTest_Dataset_IPNR
+from dataset_corpus_preprocessing.MIND_corpus_main import MIND_Corpus, MIND_DevTest_Dataset
 from torch.utils.data import DataLoader
 
 from config import Config
-from dataset_corpus_preprocessing.MIND_dataset_IPNR import MIND_DevTest_Dataset_IPNR
 import sys, os, os.path
 import numpy as np
 import json
@@ -39,7 +38,7 @@ def mrr_score(y_true, y_score):
 def parse_line(l):
     # impid, ranks = l.strip('\n').split()
     impid, ranks = l.strip().split()
-    print("[DEBUG] parse_line got ranks:", ranks)
+    # print("[DEBUG] parse_line got ranks:", ranks)
     try:
         ranks = json.loads(ranks)
     except json.JSONDecodeError:

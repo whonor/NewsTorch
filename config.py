@@ -60,26 +60,26 @@ class Config:
 
     def __init__(self):
         parser = argparse.ArgumentParser()
-        parser.add_argument('--model', type=str, default='UNBERT', help='Model name')
-        parser.add_argument('--batch_size', type=int, default='64', help='Batfhch size for training')
+        parser.add_argument('--model', type=str, default='MINS', help='Model name')
+        parser.add_argument('--batch_size', type=int, default='64', help='Batch size for training')
         args, _ = parser.parse_known_args()
         self.model = args.model
-        self.multi_gpu = False  # Whether to use multiple GPUs
+        self.multi_gpu = True  # Whether to use multiple GPUs
         self.wandb = 'offline'  # Whether to use Weights & Biases for experiment tracking
         self.wandb_key = '510e44ae3bcf9efc088d88e2c85dcf2a5f0960b1'  # Key for Weights & Biases, if needed
         self.mode = 'train'
         self.dev_model_path = ''
         self.test_model_path = ''
         self.test_output_file = ''
-        self.device_id = 0 # [0, 1]  # Default to GPU 0, can be set to a list for multi-GPU training
+        self.device_id = [0, 1] # [0, 1]  # Default to GPU 0, can be set to a list for multi-GPU training
         self.seed = 0
         self.config_file = ''
 
         self.root = "."
         self.data_path = "cache/"
-        self.DATA_NAME = 'MIND-small'  # Default dataset name, can be 'MIND-small', 'MIND-200k', or 'MIND-large'
-        self.dataset_name = 'MIND'  # Name of the dataset to be used
-        self.dataset = 'small'  # Dataset variant, can be 'small', '200k', or 'large'
+        self.DATA_NAME = 'ebnerd_demo'  # Default dataset name, can be 'ebnerd_demo', 'ebnerd_small' 'MIND-small', 'MIND-200k', or 'MIND-large'
+        self.dataset_name = 'ebnerd'  # Name of the dataset to be used, MIND, ebnerd
+        self.dataset = 'demo'  # Dataset variant, can be 'small', 'large', or 'demo'
         self.tokenizer = 'MIND'
         self.word_threshold = 3
         self.max_title_length = 32
@@ -87,7 +87,7 @@ class Config:
         self.negative_sample_num = 4
         self.max_history_num = 50
         self.candidate_news_num = 5
-        self.epoch = 1
+        self.epoch = 20
 
         self.batch_size = args.batch_size
         self.lr = 1e-4

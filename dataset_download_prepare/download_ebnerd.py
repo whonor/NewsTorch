@@ -7,6 +7,8 @@ import datetime as dt
 import pandas as pd
 from zipfile import ZipFile
 
+from utils._behaviors import ebnerd_from_path, sampling_strategy_wu2019, create_binary_labels_column
+
 
 def download_file(url: str, dest: Path, chunk_size: int = 1024):
     dest.parent.mkdir(parents=True, exist_ok=True)
@@ -42,8 +44,6 @@ def process_dataset(base_dir: Path, splits: dict):
         download_file(url, zip_path)
         extract_zip(zip_path, download_dir / split)
 
-
-from utils import ebnerd_from_path, sampling_strategy_wu2019, create_binary_labels_column
 
 def to_tsv(df: pd.DataFrame, fpath: str) -> None:
     """Stores a dataframe in `.tsv` format."""

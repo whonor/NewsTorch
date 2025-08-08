@@ -1,8 +1,8 @@
 import os
 import shutil
 
-from dataset_corpus_preprocessing.EBNeRD_corpus_main import EBNeRD_Corpus
-from models.CNE_SUE import Model
+from dataset_corpus_preprocessing.EBNeRD_corpus_main import EBNeRD_Corpus, Ebnerd_Train_Dataset
+from models.CNE_SUE import CNE_SUE
 from models.DKN import DKN
 from models.FIM import FIM
 from models.IPNR import IPNR
@@ -18,7 +18,7 @@ from utils.util import get_run_index, compute_scores_IPNR
 from datetime import datetime
 import wandb
 from config import Config
-from dataset_corpus_preprocessing.MIND_corpus_main import MIND_Corpus
+from dataset_corpus_preprocessing.MIND_corpus_main import MIND_Corpus, MIND_Train_Dataset
 from utils.util import AvgMetric
 from utils.util import compute_scores
 from tqdm import tqdm
@@ -42,9 +42,11 @@ class Trainer:
         self._dataset = config.dataset_name
         self._corpus = _corpus
         if config.dataset_name == 'MIND':
-            _corpus = MIND_Corpus
+            _corpus = MIND_Corpus(config)
+            self.train_dataset = MIND_Train_Dataset(_corpus)
         elif config.dataset_name == 'ebnerd':
-            _corpus = EBNeRD_Corpus
+            _corpus = EBNeRD_Corpus(config)
+            self.train_dataset = Ebnerd_Train_Dataset(_corpus)
 
         self.run_index = run_index
         self.model_dir = config.model_dir + '/#' + str(self.run_index)
@@ -91,7 +93,6 @@ class Trainer:
         model = self.model
         if self.config.multi_gpu:
             model = nn.DataParallel(model, device_ids=self.config.device_id)
-            self.loss = nn.DataParallel(self.loss)
         for e in tqdm(range(1, self.epoch + 1)):
             if self.config.dataset_name == 'MIND':
                 self.train_dataset.negative_sampling()
@@ -141,12 +142,7 @@ class Trainer:
                                    news_content_text, news_content_mask,
                                    news_content_entity)  # [batch_size, 1 + negative_sample_num]
                     loss = self.loss(logits)
-                if model.news_encoder.auxiliary_loss is not None:
-                    news_auxiliary_loss = model.news_encoder.auxiliary_loss.mean()
-                    loss += news_auxiliary_loss
-                if model.user_encoder.auxiliary_loss is not None:
-                    user_encoder_auxiliary_loss = model.user_encoder.auxiliary_loss.mean()
-                    loss += user_encoder_auxiliary_loss
+
                 epoch_loss += float(loss) * user_ID.size(0)
                 self.optimizer.zero_grad()
                 loss.backward()
@@ -226,8 +222,8 @@ def train(config: Config, corpus, wandb):
         model = CenNewsRec(config)
     elif config.model == 'IPNR':
         model = IPNR(config)
-    else:
-        model = Model(config)
+    elif config.model == 'CNE_SUE':
+        model = CNE_SUE(config)
     model.initialize()
     run_index = get_run_index(config.result_dir)
     if config.dataset_name == 'MIND':
@@ -267,8 +263,8 @@ def dev(config: Config, corpus):
         model = CenNewsRec(config)
     elif config.model == 'IPNR':
         model = IPNR(config)
-    else:
-        model = Model(config)
+    elif config.model == 'CNE_SUE':
+        model = CNE_SUE(config)
     assert os.path.exists(config.dev_model_path), 'Dev model does not exist : ' + config.dev_model_path
     model.load_state_dict(torch.load(config.dev_model_path, map_location=torch.device('cpu'))[model.model_name])
     model.cuda()
@@ -317,8 +313,9 @@ def test(config: Config, corpus):
         model = CenNewsRec(config)
     elif config.model == 'IPNR':
         model = IPNR(config)
-    else:
-        model = Model(config)
+    elif config.model == 'CNE_SUE':
+        model = CNE_SUE(config)
+
     assert os.path.exists(config.test_model_path), 'Test model does not exist : ' + config.test_model_path
     model.load_state_dict(torch.load(config.test_model_path, map_location=torch.device('cpu'))[config.model])
     model.cuda()
