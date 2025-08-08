@@ -100,7 +100,7 @@ class Trainer:
             model.train()
             epoch_loss = 0
             for (user_ID, user_category, user_subCategory, user_title_text, user_title_mask, user_title_entity, user_content_text, user_content_mask, user_content_entity, user_history_mask, user_history_graph, user_history_category_mask, user_history_category_indices, \
-                news_category, news_subCategory, news_title_text, news_title_mask, news_title_entity, news_content_text, news_content_mask, news_content_entity) in train_dataloader:
+                news_category, news_subCategory, news_title_text, news_title_mask, news_title_entity, news_content_text, news_content_mask, news_content_entity, history_index, sample_index) in train_dataloader:
                 user_ID = user_ID.cuda(non_blocking=True)                                                                                                                       # [batch_size]
                 user_category = user_category.cuda(non_blocking=True)                                                                                                           # [batch_size, max_history_num]
                 user_subCategory = user_subCategory.cuda(non_blocking=True)                                                                                                     # [batch_size, max_history_num]
@@ -133,6 +133,15 @@ class Trainer:
                                    news_content_entity)  # [batch_size, 1 + negative_sample_num]
                     # topic classification loss
                     loss = self.loss(logits) + self.config.topic_pred_loss_coef * topic_pred_loss
+                elif config.model == "LKPNR":
+                    logits = model(user_ID, user_category, user_subCategory, user_title_text, user_title_mask,
+                                   user_title_entity, user_content_text, user_content_mask, user_content_entity,
+                                   user_history_mask, user_history_graph, user_history_category_mask,
+                                   user_history_category_indices, \
+                                   news_category, news_subCategory, news_title_text, news_title_mask, news_title_entity,
+                                   news_content_text, news_content_mask, news_content_entity, history_index,
+                                   sample_index)
+                    loss = self.loss(logits)
                 else:
                     logits = model(user_ID, user_category, user_subCategory, user_title_text, user_title_mask,
                                    user_title_entity, user_content_text, user_content_mask, user_content_entity,
