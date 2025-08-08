@@ -1,3 +1,5 @@
+import argparse
+
 import pandas as pd
 import pickle
 def get_entity_in_news(path):
@@ -28,9 +30,10 @@ def get_entity_in_news(path):
 
     return new_df
 
-def get_entity_in_emb_file():
+def get_entity_in_emb_file(train_entity_path="../../MIND-200k/train/entity_embedding.vec",
+                            dev_entity_path="../../MIND-200k/dev/entity_embedding.vec"):
     # 读取entity_embedding.vec文件
-    with open("../MIND-200k/train/entity_embedding.vec", "r", encoding="utf-8") as file:
+    with open(train_entity_path, "r", encoding="utf-8") as file:
         lines = file.readlines()
 
     # 解析每一行，提取KEY和Value
@@ -44,7 +47,7 @@ def get_entity_in_emb_file():
     node_emb_train = pd.DataFrame(data, columns=["Node", "Embedding"])
 
     # 读取entity_embedding.vec文件
-    with open("../MIND-200k/dev/entity_embedding.vec", "r", encoding="utf-8") as file:
+    with open(dev_entity_path, "r", encoding="utf-8") as file:
         lines = file.readlines()
 
     # 解析每一行，提取KEY和Value
@@ -64,10 +67,19 @@ def get_entity_in_emb_file():
     return node_emb
 
 if __name__ == "__main__":
-    # 获得数据集中出现过的entity
-    node_in_train = get_entity_in_news('../MIND-200k/train/news.tsv')
-    node_in_dev = get_entity_in_news('../MIND-200k/dev/news.tsv')
-    node_in_test = get_entity_in_news('../MIND-200k/test/news.tsv')
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--train_news_path', type=str, default='../../MIND-200k/train/news.tsv', help='dataset path')
+    parser.add_argument('--dev_news_path', type=str, default='../../MIND-200k/dev/news.tsv', help='dataset path')
+    parser.add_argument('--test_news_path', type=str, default='../../MIND-200k/test/news.tsv', help='dataset path')
+
+    parser.add_argument('--train_entity_path', type=str, default='../../MIND-200k/train/entity_embedding.vec', help='dataset path')
+    parser.add_argument('--dev_entity_path', type=str, default='../../MIND-200k/dev/entity_embedding.vec', help='dataset path')
+
+    args, _ = parser.parse_known_args()
+
+    node_in_train = get_entity_in_news(args.train_news_path)
+    node_in_dev = get_entity_in_news(args.dev_news_path)
+    node_in_test = get_entity_in_news(args.test_news_path)
 
     node_all = pd.concat([node_in_train, node_in_dev], ignore_index=True)
     node_all = pd.concat([node_all, node_in_test], ignore_index=True)
@@ -76,7 +88,8 @@ if __name__ == "__main__":
     print(node_all)
 
     # 获取entity库
-    entity_in_emb_file = get_entity_in_emb_file()
+    entity_in_emb_file = get_entity_in_emb_file(train_entity_path=args.train_entity_path,
+                                                dev_entity_path=args.dev_entity_path)
     print(entity_in_emb_file)
 
 

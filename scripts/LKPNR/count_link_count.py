@@ -1,6 +1,12 @@
+import argparse
 
 import pandas as pd
 import pickle
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--dataset_path', type=str, default='../../MIND-small', help='dataset path')
+args, _ = parser.parse_known_args()
+dataset_path = args.dataset_path
 
 linked_node_dic_df = pd.read_csv('linked_node_dic_df.csv', sep='\t')
 # dic指明实体有多少相邻节点
@@ -12,7 +18,7 @@ with open('./entity_in_emb_file.pickle', 'rb') as file:
     entity_in_emb_file = pickle.load(file)
 
 # 计算 训练集各新闻包含 entity数
-with open('../MIND-200k/train/news.tsv', "r", encoding="utf-8") as file:
+with open(dataset_path + '/train/news.tsv', "r", encoding="utf-8") as file:
     lines = file.readlines()
 data = []
 for line in lines:
@@ -41,7 +47,7 @@ for line in lines:
 linked_relation_in_train_news = pd.DataFrame(data, columns=["news_id", "news_entity_id", "news_entity_id_count", 'link_entity_id', 'link_entity_count'])
 
 # 计算 dev集各新闻包含 entity数
-with open('../MIND-200k/dev/news.tsv', "r", encoding="utf-8") as file:
+with open(dataset_path + '/dev/news.tsv', "r", encoding="utf-8") as file:
     lines = file.readlines()
 data = []
 for line in lines:
@@ -69,7 +75,7 @@ for line in lines:
 linked_relation_in_dev_news = pd.DataFrame(data, columns=["news_id", "news_entity_id", "news_entity_id_count", 'link_entity_id', 'link_entity_count'])
 
 # 计算 dev集各新闻包含 entity数
-with open('../MIND-200k/test/news.tsv', "r", encoding="utf-8") as file:
+with open(dataset_path + '/test/news.tsv', "r", encoding="utf-8") as file:
     lines = file.readlines()
 data = []
 for line in lines:
