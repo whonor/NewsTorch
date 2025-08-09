@@ -15,6 +15,7 @@ class LKPNR(nn.Module):
         self.batch_size = config.batch_size
         self.config = config
         self.dropout = nn.Dropout(p=config.dropout_rate)
+        self.use_user_embedding = False
 
     def initialize(self):
         self.news_encoder.initialize()

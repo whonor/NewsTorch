@@ -106,13 +106,13 @@ result_df = pd.concat([linked_relation_in_train_news, linked_relation_in_dev_new
 
 result_df = result_df.drop_duplicates(subset='news_id', keep='first')
 
-link_entuty_dic = result_df.set_index('news_id')['link_entity_id'].to_dict()
+link_entity_dic = result_df.set_index('news_id')['link_entity_id'].to_dict()
 
 
-with open('link_entuty_dic.pkl', 'wb') as file:
-    pickle.dump(link_entuty_dic, file)
+with open('link_entity_dic.pkl', 'wb') as file:
+    pickle.dump(link_entity_dic, file)
 
-with open('link_entuty_dic.pkl', 'rb') as file:
+with open('link_entity_dic.pkl', 'rb') as file:
     my_dict = pickle.load(file)
 
 with open('./link_entity_dic.pkl', 'rb') as file:

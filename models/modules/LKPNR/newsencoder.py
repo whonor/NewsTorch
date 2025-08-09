@@ -17,7 +17,7 @@ class NewsEncoder(nn.Module):
         self.config = config
         self.word_embedding_dim = config.word_embedding_dim
         self.word_embedding = nn.Embedding(num_embeddings=config.vocabulary_size, embedding_dim=self.word_embedding_dim)
-        with open('word_embedding-' + str(config.word_threshold) + '-' + str(config.word_embedding_dim) + '-' + config.tokenizer + '-' + str(config.max_title_length) + '-' + str(config.max_abstract_length) + '-' + config.dataset + '.pkl', 'rb') as word_embedding_f:
+        with open('cache/word_embedding-' + str(config.word_threshold) + '-' + str(config.word_embedding_dim) + '-' + config.tokenizer + '-' + str(config.max_title_length) + '-' + str(config.max_abstract_length) + '-' + config.dataset + '.pkl', 'rb') as word_embedding_f:
             self.word_embedding.weight.data.copy_(pickle.load(word_embedding_f))
         self.category_embedding = nn.Embedding(num_embeddings=config.category_num, embedding_dim=config.category_embedding_dim)
         self.subCategory_embedding = nn.Embedding(num_embeddings=config.subCategory_num, embedding_dim=config.subCategory_embedding_dim)
@@ -25,15 +25,15 @@ class NewsEncoder(nn.Module):
         self.dropout_ = nn.Dropout(p=config.dropout_rate, inplace=False)
         self.auxiliary_loss = None
         # 预训练emb
-        self.item_emb_dic = np.load('./pretrain_emb/item_emb.npy', allow_pickle=True).item()
+        self.item_emb_dic = np.load('graph LKPNR/item_emb.npy', allow_pickle=True).item()
         # 加载ID到NEWS的映射字典
-        with open('ID_news-200k.pkl', 'rb') as file:
+        with open('graph LKPNR/ID_news-200k.pkl', 'rb') as file:
             self.ID_news_200k = pickle.load(file)        
         # news to linked entity list
-        with open('../graph/link_entity_dic.pkl', 'rb') as file:
+        with open('graph LKPNR/link_entity_dic.pkl', 'rb') as file:
             self.link_entity_dic = pickle.load(file)
         # entity to embedding
-        with open('../graph/all_entity_emb_dic.pkl', 'rb') as file:
+        with open('graph LKPNR/all_entity_emb_dic.pkl', 'rb') as file:
             self.all_entity_emb_dic = pickle.load(file)
         
 

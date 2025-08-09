@@ -6,6 +6,7 @@ from models.CNE_SUE import CNE_SUE
 from models.DKN import DKN
 from models.FIM import FIM
 from models.IPNR import IPNR
+from models.LKPNR import LKPNR
 from models.LSTUR import LSTUR
 from models.MINS import MINS
 from models.NAML import NAML
@@ -213,41 +214,59 @@ def negative_log_sigmoid(logits):
 def train(config: Config, corpus, wandb):
     if config.model == 'TANR':
         model = TANR(config)
+        model.initialize()
     elif config.model == 'NAML':
         model = NAML(config)
+        model.initialize()
     elif config.model == 'DKN':
         model = DKN(config)
+        model.initialize()
     elif config.model == 'NRMS':
         model = NRMS(config)
+        model.initialize()
     elif config.model == 'LSTUR':
         model = LSTUR(config)
+        model.initialize()
     elif config.model == 'NPA':
         model = NPA(config)
+        model.initialize()
     elif config.model == 'FIM':
         model = FIM(config)
+        model.initialize()
     elif config.model == 'MINS':
         model = MINS(config)
+        model.initialize()
     elif config.model == 'CENNEWSREC':
         model = CenNewsRec(config)
+        model.initialize()
     elif config.model == 'IPNR':
         model = IPNR(config)
+        model.initialize()
     elif config.model == 'CNE_SUE':
         model = CNE_SUE(config)
-    model.initialize()
+        model.initialize()
+    elif config.model == 'LKPNR':
+        model = LKPNR(config)
+        model.initialize()
+
     run_index = get_run_index(config.result_dir)
     if config.dataset_name == 'MIND':
         if config.model == 'IPNR':
             trainer = TrainerIPNR(model, config, corpus, wandb, run_index)
+            trainer.train()
         else:
             trainer = Trainer(model, config, corpus, wandb, run_index)
+            trainer.train()
     elif config.dataset_name == 'ebnerd':
         if config.model == 'IPNR':
             trainer = TrainerIPNR(model, config, corpus, wandb, run_index)
+            trainer.train()
         else:
             trainer = Trainer(model, config, corpus, wandb, run_index)
+            trainer.train()
 
 
-    trainer.train()
+
     config.run_index = run_index
 
 
@@ -274,6 +293,8 @@ def dev(config: Config, corpus):
         model = IPNR(config)
     elif config.model == 'CNE_SUE':
         model = CNE_SUE(config)
+    elif config.model == 'LKPNR':
+        model = LKPNR(config)
     assert os.path.exists(config.dev_model_path), 'Dev model does not exist : ' + config.dev_model_path
     model.load_state_dict(torch.load(config.dev_model_path, map_location=torch.device('cpu'))[model.model_name])
     model.cuda()
@@ -324,6 +345,8 @@ def test(config: Config, corpus):
         model = IPNR(config)
     elif config.model == 'CNE_SUE':
         model = CNE_SUE(config)
+    elif config.model == 'LKPNR':
+        model = LKPNR(config)
 
     assert os.path.exists(config.test_model_path), 'Test model does not exist : ' + config.test_model_path
     model.load_state_dict(torch.load(config.test_model_path, map_location=torch.device('cpu'))[config.model])
