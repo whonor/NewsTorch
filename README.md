@@ -61,6 +61,6 @@ You can run the DL-based models like NRMS in the following order:
 
 ## To Do
 1. Add more datasets: Adressa
-2. Add more models: MANNeR, LKPNR, ONCE, Prompt4NR
+2. Add more models: MANNeR, LKPNR, ONCE
 
 

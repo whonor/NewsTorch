@@ -9,6 +9,7 @@ pretrain_rep_d: 500
 pretrain_hidden_dim: 1024
 entity_hidden_dim: 256
 entity_att_head_num: 3
+max_linked_entity_length: 20
 head_num: 20
 head_dim: 20
 attention_dim: 200

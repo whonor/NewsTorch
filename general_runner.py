@@ -15,6 +15,7 @@ from models.NRMS import NRMS
 from models.TANR import TANR
 from models.CenNewsRec import CenNewsRec
 from models.modules.ipnr.trainer import TrainerIPNR
+from scripts.LKPNR.TransformJSON2pkl import transform_json_to_pickle
 from utils.util import get_run_index, compute_scores_IPNR
 from datetime import datetime
 import wandb
@@ -246,6 +247,10 @@ def train(config: Config, corpus, wandb):
         model = CNE_SUE(config)
         model.initialize()
     elif config.model == 'LKPNR':
+        # if not os.path.exists("cache/ID_news-%s.pkl" % config.dataset):
+        #     transform_json_to_pickle(json_file_path="cache/news_ID-%s.json" % config.dataset,
+        #                              pickle_file_path="cache/ID_news-%s.pkl" % config.dataset)
+
         model = LKPNR(config)
         model.initialize()
 
@@ -264,9 +269,6 @@ def train(config: Config, corpus, wandb):
         else:
             trainer = Trainer(model, config, corpus, wandb, run_index)
             trainer.train()
-
-
-
     config.run_index = run_index
 
 
