@@ -1,14 +1,14 @@
 from config import Config
 import torch.nn as nn
 from models.modules.LKPNR import userEncoders
-from models.modules.LKPNR import newsencoder
+from models.modules.LKPNR import newsEncoders
 from models.modules.click_predictor import DotProduct
-
+import torch
 
 class LKPNR(nn.Module):
     def __init__(self, config: Config):
         super(LKPNR, self).__init__()
-        self.news_encoder = newsencoder.MHSA(config)
+        self.news_encoder = newsEncoders.MHSA(config)
         self.user_encoder = userEncoders.MHSA(self.news_encoder, config)
         self.click_predictor = DotProduct()
         self.model_name = config.model
@@ -20,6 +20,9 @@ class LKPNR(nn.Module):
     def initialize(self):
         self.news_encoder.initialize()
         self.user_encoder.initialize()
+        if self.use_user_embedding:
+            nn.init.uniform_(self.user_embedding.weight, -0.1, 0.1)
+            nn.init.zeros_(self.user_embedding.weight[0])
 
     def forward(self, user_ID, user_category, user_subCategory, user_title_text, user_title_mask, user_title_entity, user_content_text, user_content_mask, user_content_entity, user_history_mask, user_history_graph, user_history_category_mask, user_history_category_indices, \
                       news_category, news_subCategory, news_title_text, news_title_mask, news_title_entity, news_content_text, news_content_mask, news_content_entity, history_index, sample_index):
@@ -28,7 +31,8 @@ class LKPNR(nn.Module):
         news_representation = self.news_encoder(news_title_text, news_title_mask, news_title_entity, news_content_text, news_content_mask, news_content_entity, news_category, news_subCategory, user_embedding, sample_index)
         # [batch, 400]
         user_representation = self.user_encoder(user_title_text, user_title_mask, user_title_entity, user_content_text, user_content_mask, user_content_entity, user_category, user_subCategory, \
-                                                user_history_mask, user_history_graph, user_history_category_mask, user_history_category_indices, user_embedding, news_representation, history_index)
+                                                    user_history_mask, user_history_graph, user_history_category_mask, user_history_category_indices, user_embedding, news_representation, history_index)
+
         # [batch, 5]
         logits = (user_representation * news_representation).sum(dim=2) # dot-product  torch.Size([64, 5])
 

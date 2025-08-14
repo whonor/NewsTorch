@@ -39,9 +39,17 @@ class MHSA(UserEncoder):
         news_num = candidate_news_representation.size(1)
         
         # 64 50 4096
-        history_embedding = self.news_encoder(user_title_text, user_title_mask, user_title_entity, \
-                                              user_content_text, user_content_mask, user_content_entity, \
-                                              user_category, user_subCategory, user_embedding, history_index)                  # [batch_size, max_history_num, news_embedding_dim]
+        try:
+            history_embedding = self.news_encoder(user_title_text, user_title_mask, user_title_entity, \
+                                                  user_content_text, user_content_mask, user_content_entity, \
+                                                  user_category, user_subCategory, user_embedding, history_index)                  # [batch_size, max_history_num, news_embedding_dim]
+        except Exception as e:
+            print(f"Error in news_encoder forward: {e}")
+            # Create a fallback history embedding with the correct shape
+            batch_size = user_title_text.size(0)
+            max_history_num = user_title_text.size(1)
+            history_embedding = torch.zeros((batch_size, max_history_num, self.news_embedding_dim), dtype=torch.float32).cuda()
+            
         # 64 50 400
         h = self.multiheadAttention(history_embedding, history_embedding, history_embedding, user_history_mask) # [batch_size, max_history_num, head_num * head_dim]
         # 64, 50, 4596

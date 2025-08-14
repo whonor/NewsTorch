@@ -1,6 +1,7 @@
 import os
 import torch
 import torch.nn as nn
+from tqdm import tqdm
 
 from dataset_corpus_preprocessing.EBNeRD_corpus_main import EBNeRD_Corpus
 from dataset_corpus_preprocessing.MIND_corpus_IPNR import MIND_DevTest_Dataset_IPNR
@@ -116,6 +117,92 @@ def scoring(truth_f, sub_f):
     return np.mean(aucs), np.mean(mrrs), np.mean(ndcg5s), np.mean(ndcg10s)
 
 
+def compute_scores_LKPNR(model: nn.Module, mind_corpus: MIND_Corpus, batch_size: int, mode: str, result_file: str,
+                   dataset: str):
+    assert mode in ['dev', 'test'], 'mode must be chosen from \'dev\' or \'test\''
+    dataloader = DataLoader(MIND_DevTest_Dataset(mind_corpus, mode), batch_size=batch_size, shuffle=False,
+                            num_workers=batch_size // 16, pin_memory=True)
+    indices = (mind_corpus.dev_indices if mode == 'dev' else mind_corpus.test_indices)  # 曝光次数
+    scores = torch.zeros([len(indices)]).cuda()
+    index = 0
+    torch.cuda.empty_cache()
+    model.eval()
+
+    with torch.no_grad():
+        for (user_ID, user_category, user_subCategory, user_title_text, user_title_mask, user_title_entity,
+             user_content_text, user_content_mask, user_content_entity, user_history_mask, user_history_graph,
+             user_history_category_mask, user_history_category_indices, \
+             news_category, news_subCategory, news_title_text, news_title_mask, news_title_entity, news_content_text,
+             news_content_mask, news_content_entity, history_index, candidate_news_index) in tqdm(dataloader):
+            user_ID = user_ID.cuda(non_blocking=True)
+            user_category = user_category.cuda(non_blocking=True)
+            user_subCategory = user_subCategory.cuda(non_blocking=True)
+            user_title_text = user_title_text.cuda(non_blocking=True)
+            user_title_mask = user_title_mask.cuda(non_blocking=True)
+            user_title_entity = user_title_entity.cuda(non_blocking=True)
+            user_content_text = user_content_text.cuda(non_blocking=True)
+            user_content_mask = user_content_mask.cuda(non_blocking=True)
+            user_content_entity = user_content_entity.cuda(non_blocking=True)
+            user_history_mask = user_history_mask.cuda(non_blocking=True)
+            user_history_graph = user_history_graph.cuda(non_blocking=True)
+            user_history_category_mask = user_history_category_mask.cuda(non_blocking=True)
+            user_history_category_indices = user_history_category_indices.cuda(non_blocking=True)
+            news_category = news_category.cuda(non_blocking=True)
+            news_subCategory = news_subCategory.cuda(non_blocking=True)
+            news_title_text = news_title_text.cuda(non_blocking=True)
+            news_title_mask = news_title_mask.cuda(non_blocking=True)
+            news_title_entity = news_title_entity.cuda(non_blocking=True)
+            news_content_text = news_content_text.cuda(non_blocking=True)
+            news_content_mask = news_content_mask.cuda(non_blocking=True)
+            news_content_entity = news_content_entity.cuda(non_blocking=True)
+            history_index = history_index.cuda(non_blocking=True)
+            candidate_news_index = candidate_news_index.cuda(non_blocking=True)
+
+            batch_size = user_ID.size(0)
+            news_category = news_category.unsqueeze(dim=1)
+            news_subCategory = news_subCategory.unsqueeze(dim=1)
+            news_title_text = news_title_text.unsqueeze(dim=1)
+            news_title_mask = news_title_mask.unsqueeze(dim=1)
+            news_content_text = news_content_text.unsqueeze(dim=1)
+            news_content_mask = news_content_mask.unsqueeze(dim=1)
+            candidate_news_index = candidate_news_index.unsqueeze(dim=1)
+
+            scores[index: index + batch_size] = model(user_ID, user_category, user_subCategory, user_title_text,
+                                                      user_title_mask, user_title_entity, user_content_text,
+                                                      user_content_mask, user_content_entity, user_history_mask,
+                                                      user_history_graph, user_history_category_mask,
+                                                      user_history_category_indices, \
+                                                      news_category, news_subCategory, news_title_text, news_title_mask,
+                                                      news_title_entity, news_content_text, news_content_mask,
+                                                      news_content_entity, history_index, candidate_news_index).squeeze(
+                dim=1)  # [batch_size]
+            index += batch_size
+    scores = scores.tolist()
+
+    sub_scores = [[] for _ in range(indices[-1] + 1)]
+
+    for i, index in enumerate(indices):
+        sub_scores[index].append([scores[i], len(sub_scores[index])])
+
+    with open(result_file, 'w', encoding='utf-8') as result_f:
+        for i, sub_score in enumerate(sub_scores):
+            sub_score.sort(key=lambda x: x[0], reverse=True)
+            result = [0 for _ in range(len(sub_score))]
+            for j in range(len(sub_score)):
+                result[sub_score[j][1]] = j + 1
+            result_f.write(('' if i == 0 else '\n') + str(i + 1) + ' ' + str(result).replace(' ', ''))
+    print('result_file', result_file)
+    print('save done')
+    if dataset != 'large' or mode != 'test':
+        with open(mode + '/ref/truth-%s.txt' % dataset, 'r', encoding='utf-8') as truth_f, open(result_file, 'r',
+                                                                                                encoding='utf-8') as result_f:
+            auc, mrr, ndcg5, ndcg10 = scoring(
+                truth_f, result_f)
+        return auc, mrr, ndcg5, ndcg10
+    else:
+        return None, None, None, None
+
+
 def compute_scores_IPNR(config, model: nn.Module, mind_corpus: MIND_Corpus, batch_size: int, mode: str, result_file: str, dataset: str):
     assert mode in ['dev', 'test'], 'mode must be chosen from \'dev\' or \'test\''
     dataloader = DataLoader(MIND_DevTest_Dataset_IPNR(mind_corpus, mode), batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=True)
@@ -195,10 +282,10 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
     dataloader = DataLoader(MIND_DevTest_Dataset(corpus, mode), batch_size=batch_size, shuffle=False,
                             num_workers=batch_size // 16, pin_memory=True)
     indices = (corpus.dev_indices if mode == 'dev' else corpus.test_indices)
-
     scores = torch.zeros([len(indices)]).cuda()
     index = 0
     model.eval()
+
     with torch.no_grad():
         for (user_ID, user_category, user_subCategory, user_title_text, user_title_mask, user_title_entity, user_content_text, user_content_mask, user_content_entity, user_history_mask, user_history_graph, user_history_category_mask, user_history_category_indices, \
              news_category, news_subCategory, news_title_text, news_title_mask, news_title_entity, news_content_text, news_content_mask, news_content_entity, history_index, candidate_news_index) in dataloader:
@@ -223,6 +310,9 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
             news_content_text = news_content_text.cuda(non_blocking=True)
             news_content_mask = news_content_mask.cuda(non_blocking=True)
             news_content_entity = news_content_entity.cuda(non_blocking=True)
+            history_index = history_index.cuda(non_blocking=True)
+            candidate_news_index = candidate_news_index.cuda(non_blocking=True)
+
             batch_size = user_ID.size(0)
             news_category = news_category.unsqueeze(dim=1)
             news_subCategory = news_subCategory.unsqueeze(dim=1)
@@ -230,6 +320,8 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
             news_title_mask = news_title_mask.unsqueeze(dim=1)
             news_content_text = news_content_text.unsqueeze(dim=1)
             news_content_mask = news_content_mask.unsqueeze(dim=1)
+            candidate_news_index = candidate_news_index.unsqueeze(dim=1)
+
             if config.model == "TANR":
                 scores[index: index + batch_size], _ = model(user_ID, user_category, user_subCategory, user_title_text,
                                                           user_title_mask, user_title_entity, user_content_text,
