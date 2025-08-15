@@ -68,12 +68,12 @@ def get_entity_in_emb_file(train_entity_path="../../MIND-200k/train/entity_embed
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--train_news_path', type=str, default='../../MIND-200k/train/news.tsv', help='dataset path')
-    parser.add_argument('--dev_news_path', type=str, default='../../MIND-200k/dev/news.tsv', help='dataset path')
-    parser.add_argument('--test_news_path', type=str, default='../../MIND-200k/test/news.tsv', help='dataset path')
+    parser.add_argument('--train_news_path', type=str, default='../../MIND-large/train/news.tsv', help='dataset path')
+    parser.add_argument('--dev_news_path', type=str, default='../../MIND-large/dev/news.tsv', help='dataset path')
+    parser.add_argument('--test_news_path', type=str, default='../../MIND-large/test/news.tsv', help='dataset path')
 
-    parser.add_argument('--train_entity_path', type=str, default='../../MIND-200k/train/entity_embedding.vec', help='dataset path')
-    parser.add_argument('--dev_entity_path', type=str, default='../../MIND-200k/dev/entity_embedding.vec', help='dataset path')
+    parser.add_argument('--train_entity_path', type=str, default='../../MIND-large/train/entity_embedding.vec', help='dataset path')
+    parser.add_argument('--dev_entity_path', type=str, default='../../MIND-large/dev/entity_embedding.vec', help='dataset path')
 
     args, _ = parser.parse_known_args()
 
@@ -101,9 +101,9 @@ if __name__ == "__main__":
     print(len(nodes_not_in_df2))
 
     # 保存set到本地文件
-    #with open('entity_in_news.pickle', 'wb') as file:
-        #pickle.dump(set_df1_nodes, file)
+    with open('../../KGraph_LKPNR/entity_in_news.pickle', 'wb') as file:
+        pickle.dump(set_df1_nodes, file)
     
-    #with open('entity_in_emb_file.pickle', 'wb') as file:
-        #pickle.dump(set_df2_nodes, file)
+    with open('../../KGraph_LKPNR/entity_in_emb_file.pickle', 'wb') as file:
+        pickle.dump(set_df2_nodes, file)
         

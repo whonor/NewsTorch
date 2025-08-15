@@ -5,16 +5,18 @@ import pickle
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset_path', type=str, default='../../MIND-small', help='dataset path')
+parser.add_argument('--save_path', type=str, default='KGraph_LKPNR', help='dataset path')
 args, _ = parser.parse_known_args()
 dataset_path = args.dataset_path
+save_path = args.save_path
 
-linked_node_dic_df = pd.read_csv('linked_node_dic_df.csv', sep='\t')
+linked_node_dic_df = pd.read_csv('../../KGraph_LKPNR/linked_node_dic_df.csv', sep='\t')
 # dic指明实体有多少相邻节点
 entity_link_count = linked_node_dic_df['original_entity'].value_counts().to_dict()
 # 相邻节点字典
 linke_dic = linked_node_dic_df.groupby('original_entity')['linked_entities'].agg(list).to_dict()
 
-with open('./entity_in_emb_file.pickle', 'rb') as file:
+with open('../../KGraph_LKPNR/entity_in_emb_file.pickle', 'rb') as file:
     entity_in_emb_file = pickle.load(file)
 
 # 计算 训练集各新闻包含 entity数
@@ -109,11 +111,9 @@ result_df = result_df.drop_duplicates(subset='news_id', keep='first')
 link_entity_dic = result_df.set_index('news_id')['link_entity_id'].to_dict()
 
 
-with open('link_entity_dic.pkl', 'wb') as file:
+with open('../../' + save_path + '/link_entity_dic.pkl', 'wb') as file:
     pickle.dump(link_entity_dic, file)
 
-with open('link_entity_dic.pkl', 'rb') as file:
-    my_dict = pickle.load(file)
+# with open('link_entity_dic.pkl', 'rb') as file:
+#     my_dict = pickle.load(file)
 
-with open('./link_entity_dic.pkl', 'rb') as file:
-    link_entity_dic = pickle.load(file)

@@ -3,9 +3,9 @@ import argparse
 import pandas as pd
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--train_entity_path', type=str, default='../../MIND-200k/train/entity_embedding.vec', help='dataset path')
-parser.add_argument('--dev_entity_path', type=str, default='../../MIND-200k/dev/entity_embedding.vec', help='dataset path')
-parser.add_argument('--output_path', type=str, default='all_entity_emb_dic.pkl', help='dataset path')
+parser.add_argument('--train_entity_path', type=str, default='../../MIND-large/train/entity_embedding.vec', help='dataset path')
+parser.add_argument('--dev_entity_path', type=str, default='../../MIND-large/dev/entity_embedding.vec', help='dataset path')
+parser.add_argument('--output_path', type=str, default='../../KGraph_LKPNR/all_entity_emb_dic.pkl', help='dataset path')
 
 args, _ = parser.parse_known_args()
 

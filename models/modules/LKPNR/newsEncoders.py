@@ -25,15 +25,15 @@ class NewsEncoder(nn.Module):
         self.dropout_ = nn.Dropout(p=config.dropout_rate, inplace=False)
         self.auxiliary_loss = None
         # 预训练emb
-        self.item_emb_dic = np.load('Graph LKPNR/item_emb.npy', allow_pickle=True).item()
+        self.item_emb_dic = np.load('KGraph_LKPNR/item_emb.npy', allow_pickle=True).item()
         # 加载ID到NEWS的映射字典
-        with open('Graph LKPNR/ID_news-200k.pkl', 'rb') as file:
+        with open('KGraph_LKPNR/ID_news-200k.pkl', 'rb') as file:
             self.ID_news_200k = pickle.load(file)        
         # news to linked entity list
-        with open('Graph LKPNR/link_entity_dic.pkl', 'rb') as file:
+        with open('KGraph_LKPNR/link_entity_dic.pkl', 'rb') as file:
             self.link_entity_dic = pickle.load(file)
         # entity to embedding
-        with open('Graph LKPNR/all_entity_emb_dic.pkl', 'rb') as file:
+        with open('KGraph_LKPNR/all_entity_emb_dic.pkl', 'rb') as file:
             self.all_entity_emb_dic = pickle.load(file)
         
 

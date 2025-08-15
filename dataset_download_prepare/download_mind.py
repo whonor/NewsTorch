@@ -60,11 +60,11 @@ def main():
             'train': 'https://recodatasets.z20.web.core.windows.net/newsrec/MINDsmall_train.zip',
             'dev':   'https://recodatasets.z20.web.core.windows.net/newsrec/MINDsmall_dev.zip',
         },
-        # 'MIND-large': {
-        #     'train': 'https://recodatasets.z20.web.core.windows.net/newsrec/MINDlarge_train.zip',
-        #     'dev':   'https://recodatasets.z20.web.core.windows.net/newsrec/MINDlarge_dev.zip',
+        'MIND-large': {
+            'train': 'https://recodatasets.z20.web.core.windows.net/newsrec/MINDlarge_train.zip',
+            'dev':   'https://recodatasets.z20.web.core.windows.net/newsrec/MINDlarge_dev.zip',
         #     'test':  'https://recodatasets.z20.web.core.windows.net/newsrec/MINDlarge_test.zip',
-        # },
+        },
     }
 
     root = Path(__file__).resolve().parent.parent

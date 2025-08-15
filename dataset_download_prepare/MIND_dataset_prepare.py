@@ -96,6 +96,52 @@ def preprocess_MIND_small():
             shutil.copyfile(src, dst)
 
 
+def preprocess_MIND_large():
+    train_behavior_lines, dev_behavior_lines = split_training_behaviors()
+
+    # train/dev sets
+    for mode, lines, src_news_split in [
+        ('train', train_behavior_lines, 'train'),
+        ('dev', dev_behavior_lines, 'train')
+    ]:
+        out_dir = os.path.join(MIND_large_dataset_root, mode)
+        if os.path.exists(out_dir):
+            if not confirm_overwrite(out_dir):
+                print(f"jump {mode} dataset prepare")
+                continue
+            shutil.rmtree(out_dir)
+        os.makedirs(out_dir)
+
+        # 写 behaviors
+        with open(os.path.join(out_dir, 'behaviors.tsv'), 'w', encoding='utf-8') as f:
+            f.writelines(lines)
+
+        # 拷贝 news
+        src_news = os.path.join(MIND_large_dataset_root, 'download', src_news_split, 'news.tsv')
+        dst_news = os.path.join(out_dir, 'news.tsv')
+        if confirm_overwrite(dst_news):
+            if not os.path.exists(src_news):
+                raise FileNotFoundError(f"news file no exist: {src_news}")
+            shutil.copyfile(src_news, dst_news)
+
+    # test set
+    test_dir = os.path.join(MIND_large_dataset_root, 'test')
+    if os.path.exists(test_dir):
+        if not confirm_overwrite(test_dir):
+            print("jump test dataset prepare")
+            return
+        shutil.rmtree(test_dir)
+    os.makedirs(test_dir)
+
+    for fname in ('behaviors.tsv', 'news.tsv'):
+        src = os.path.join(MIND_large_dataset_root, 'download', 'dev', fname)
+        dst = os.path.join(test_dir, fname)
+        if confirm_overwrite(dst):
+            if not os.path.exists(src):
+                raise FileNotFoundError(f"no exist: {src}")
+            shutil.copyfile(src, dst)
+
+
 def sampling_MIND_dataset(sample_num=200000):
     # 采样用户并生成行为
     user_set = set()
@@ -157,11 +203,11 @@ def generate_knowledge_entity_embedding(data_mode):
                     root + '/MIND-%s/train/entity_embedding.vec' % data_mode)
     shutil.copyfile(root + '/MIND-%s/download/dev/entity_embedding.vec' % data_mode,
                     root + '/MIND-%s/dev/entity_embedding.vec' % data_mode)
-    if data_mode in ['200k', 'small']:
+    if data_mode in ['200k', 'small', 'large']:
         shutil.copyfile(root + '/MIND-%s/download/dev/entity_embedding.vec' % data_mode,
                         root + '/MIND-%s/test/entity_embedding.vec' % data_mode)
-    else:
-        shutil.copyfile(root + '/MIND-large/download/test/entity_embedding.vec', root + '/MIND-large/test/entity_embedding.vec')
+    # else:
+    #     shutil.copyfile(root + '/MIND-large/download/test/entity_embedding.vec', root + '/MIND-large/test/entity_embedding.vec')
 
 
     entity_embeddings = {}
@@ -175,7 +221,7 @@ def generate_knowledge_entity_embedding(data_mode):
                     assert len(terms) == 101
                     entity_embeddings[terms[0]] = list(map(float, terms[1:]))
     entity_embedding_relation = collections.defaultdict(set)
-    with open(root + '/MIND-%s/download/wikidata-graph/wikidata-graph/wikidata-graph.tsv' % data_mode, 'r',
+    with open(root + 'MIND-%s/download/wikidata-graph/wikidata-graph/wikidata-graph.tsv' % data_mode, 'r',
               encoding='utf-8') as wikidata_graph_f:
         for line in wikidata_graph_f:
             if len(line.strip()) > 0:
@@ -214,6 +260,7 @@ def prepare_MIND_small():
 
 
 def prepare_MIND_large():
+    preprocess_MIND_large()
     generate_knowledge_entity_embedding('large')
 
 
@@ -222,12 +269,12 @@ def prepare_MIND_200k():
     generate_knowledge_entity_embedding('200k')
 
 def main():
-    print("Prepare MIND-small...")
-    prepare_MIND_small()
+    # print("Prepare MIND-small...")
+    # prepare_MIND_small()
     # print("准备 MIND-200k...")
     # prepare_MIND_200k()
-    # print("准备 MIND-large...")
-    # prepare_MIND_large()
+    print("准备 MIND-large...")
+    prepare_MIND_large()
     print("All datasets are finished。")
 
 
