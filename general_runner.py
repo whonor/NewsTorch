@@ -370,7 +370,7 @@ def test(config: Config, corpus):
                                                      'test',
                                                      test_res_dir + '/' + config.model + '.txt', config.dataset)
 
-    if config.dataset != 'large':
+    if config.dataset != 'submission':
         print('AUC : %.4f\nMRR : %.4f\nnDCG@5 : %.4f\nnDCG@10 : %.4f' % (auc, mrr, ndcg5, ndcg10))
         if config.mode == 'train':
             with open(config.result_dir + '/#' + str(config.run_index) + '-test', 'w') as result_f:
@@ -390,7 +390,7 @@ if __name__ == '__main__':
     config = Config()
     wandb.login(anonymous="allow", key=config.wandb_key)  # Login to Weights & Biases
     run = wandb.init(
-        project="NewsRecTorch-project",  # Specify your project
+        project="NewsTorch-project",  # Specify your project
         config=config.attribute_dict,
         mode=config.wandb  # Set mode based on config
     )

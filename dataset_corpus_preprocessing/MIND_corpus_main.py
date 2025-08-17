@@ -435,14 +435,14 @@ class MIND_Corpus:
                     user_history_mask[:min(len(history), self.max_history_num)] = 1.0
                     for impression in impressions.strip().split(' '):
                         self.test_indices.append(test_ID)
-                        if config.dataset != 'large':
+                        if config.dataset != 'submission':
                             self.test_behaviors.append([self.user_ID_dict[user_ID] if user_ID in self.user_ID_dict else 0, user_history, user_history_mask, self.news_ID_dict[impression[:-2]], test_ID])
                         else:
                             self.test_behaviors.append([self.user_ID_dict[user_ID] if user_ID in self.user_ID_dict else 0, user_history, user_history_mask, self.news_ID_dict[impression], test_ID])
                 else:
                     for impression in impressions.strip().split(' '):
                         self.test_indices.append(test_ID)
-                        if config.dataset != 'large':
+                        if config.dataset != 'submission':
                             self.test_behaviors.append([self.user_ID_dict[user_ID] if user_ID in self.user_ID_dict else 0, [0 for _ in range(self.max_history_num)], np.zeros([self.max_history_num], dtype=np.float32), self.news_ID_dict[impression[:-2]], test_ID])
                         else:
                             self.test_behaviors.append([self.user_ID_dict[user_ID] if user_ID in self.user_ID_dict else 0, [0 for _ in range(self.max_history_num)], np.zeros([self.max_history_num], dtype=np.float32), self.news_ID_dict[impression], test_ID])

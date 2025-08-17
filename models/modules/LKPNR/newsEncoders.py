@@ -17,7 +17,7 @@ class NewsEncoder(nn.Module):
         self.config = config
         self.word_embedding_dim = config.word_embedding_dim
         self.word_embedding = nn.Embedding(num_embeddings=config.vocabulary_size, embedding_dim=self.word_embedding_dim)
-        with open('word_embedding-' + str(config.word_threshold) + '-' + str(config.word_embedding_dim) + '-' + config.tokenizer + '-' + str(config.max_title_length) + '-' + str(config.max_abstract_length) + '-' + config.dataset + '.pkl', 'rb') as word_embedding_f:
+        with open('cache/word_embedding-' + str(config.word_threshold) + '-' + str(config.word_embedding_dim) + '-' + config.tokenizer + '-' + str(config.max_title_length) + '-' + str(config.max_abstract_length) + '-' + config.dataset + '.pkl', 'rb') as word_embedding_f:
             self.word_embedding.weight.data.copy_(pickle.load(word_embedding_f))
         self.category_embedding = nn.Embedding(num_embeddings=config.category_num, embedding_dim=config.category_embedding_dim)
         self.subCategory_embedding = nn.Embedding(num_embeddings=config.subCategory_num, embedding_dim=config.subCategory_embedding_dim)
@@ -28,7 +28,7 @@ class NewsEncoder(nn.Module):
         self.item_emb_dic = np.load('KGraph_LKPNR/item_emb.npy', allow_pickle=True).item()
         # 加载ID到NEWS的映射字典
         with open('KGraph_LKPNR/ID_news-200k.pkl', 'rb') as file:
-            self.ID_news_200k = pickle.load(file)        
+            self.ID_news = pickle.load(file)
         # news to linked entity list
         with open('KGraph_LKPNR/link_entity_dic.pkl', 'rb') as file:
             self.link_entity_dic = pickle.load(file)
@@ -81,7 +81,7 @@ class NewsEncoder(nn.Module):
         for i in range(batch_his.shape[0]):
             for j in range(batch_his.shape[1]):
                 id_read = batch_his[i, j].item()  # 获取id
-                news_read = self.ID_news_200k[id_read] # 转为new
+                news_read = self.ID_news[id_read] # 转为news
                 # 忽略padding
                 if news_read != "<PAD>":
                     vector = self.item_emb_dic[news_read]  # 查找对应的向量
@@ -94,7 +94,7 @@ class NewsEncoder(nn.Module):
         for i in range(batch_his.shape[0]):
             for j in range(batch_his.shape[1]):
                 id_read = batch_his[i, j].item()
-                news_read = self.ID_news_200k[id_read]
+                news_read = self.ID_news[id_read]
                 if news_read != "<PAD>":
                     # read linked entity
                     linked_entity = self.link_entity_dic[news_read]

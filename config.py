@@ -77,9 +77,9 @@ class Config:
 
         self.root = "."
         self.data_path = "cache/"
-        self.DATA_NAME = 'MIND-small'  # Default dataset name, can be 'ebnerd_demo', 'ebnerd_small' 'MIND-small', 'MIND-200k', or 'MIND-large'
+        self.DATA_NAME = 'MIND-large'  # Default dataset name, can be 'ebnerd_demo', 'ebnerd_small' 'MIND-small', 'MIND-200k', or 'MIND-large'
         self.dataset_name = 'MIND'  # Name of the dataset to be used, MIND, EBNeRD
-        self.dataset = 'small'  # Dataset variant, can be 'small', 'large', or 'demo'
+        self.dataset = 'large'  # Dataset variant, can be 'small', 'large', or 'demo', if submit the predictions 'submission'
         self.tokenizer = 'MIND'
         self.word_threshold = 3
         self.max_title_length = 32
@@ -222,7 +222,7 @@ class Config:
                             labels = [int(impression[-1]) for impression in impressions.strip().split(' ')]
                             truth_f.write(
                                 ('' if dev_ID == 0 else '\n') + str(dev_ID + 1) + ' ' + str(labels).replace(' ', ''))
-            if self.dataset != 'large':
+            if self.dataset != 'submission':
                 if not os.path.exists(test_truth_path):
                     with open(os.path.join(self.test_root, 'behaviors.tsv'), 'r', encoding='utf-8') as test_f:
                         with open(test_truth_path, 'w', encoding='utf-8') as truth_f:

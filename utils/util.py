@@ -193,7 +193,7 @@ def compute_scores_LKPNR(model: nn.Module, mind_corpus: MIND_Corpus, batch_size:
             result_f.write(('' if i == 0 else '\n') + str(i + 1) + ' ' + str(result).replace(' ', ''))
     print('result_file', result_file)
     print('save done')
-    if dataset != 'large' or mode != 'test':
+    if dataset != 'submission' or mode != 'test':
         with open(mode + '/ref/truth-%s.txt' % dataset, 'r', encoding='utf-8') as truth_f, open(result_file, 'r',
                                                                                                 encoding='utf-8') as result_f:
             auc, mrr, ndcg5, ndcg10 = scoring(
@@ -265,7 +265,7 @@ def compute_scores_IPNR(config, model: nn.Module, mind_corpus: MIND_Corpus, batc
             for j in range(len(sub_score)):
                 result[sub_score[j][1]] = j + 1
             result_f.write(('' if i == 0 else '\n') + str(i + 1) + ' ' + str(result).replace(' ', ''))
-    if dataset != 'large' or mode != 'test':
+    if dataset != 'submission' or mode != 'test':
         with open("./cache/" + mode + '/ref/truth-%s.txt' % dataset, 'r', encoding='utf-8') as truth_f, open(result_file, 'r', encoding='utf-8') as result_f:
             auc, mrr, ndcg5, ndcg10 = scoring(truth_f, result_f)
         return auc, mrr, ndcg5, ndcg10
@@ -372,7 +372,7 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
             for j in range(len(sub_score)):
                 result[sub_score[j][1]] = j + 1
             result_f.write(('' if i == 0 else '\n') + str(i + 1) + ' ' + str(result).replace(' ', ''))
-    if dataset != 'large' or mode != 'test':
+    if dataset != 'submission' or mode != 'test':
         with open(config.data_path + '/' + mode + '/ref/truth-%s.txt' % config.DATA_NAME, 'r', encoding='utf-8') as truth_f, open(result_file, 'r', encoding='utf-8') as result_f:
             auc, mrr, ndcg5, ndcg10 = scoring(truth_f, result_f)
         return auc, mrr, ndcg5, ndcg10

@@ -23,9 +23,9 @@ def confirm_overwrite(path: str) -> bool:
     return True
 
 
-def split_training_behaviors():
+def split_training_behaviors(dataset_root):
     MIND_small_train_ratio = 0.9
-    behavior_file = os.path.join(MIND_small_dataset_root, 'download', 'train', 'behaviors.tsv')
+    behavior_file = os.path.join(dataset_root, 'download', 'train', 'behaviors.tsv')
     if not os.path.exists(behavior_file):
         raise FileNotFoundError(f"behavior file no exist: {behavior_file}")
 
@@ -51,7 +51,7 @@ def split_training_behaviors():
 
 
 def preprocess_MIND_small():
-    train_behavior_lines, dev_behavior_lines = split_training_behaviors()
+    train_behavior_lines, dev_behavior_lines = split_training_behaviors(dataset_root=MIND_small_dataset_root)
 
     # train/dev sets
     for mode, lines, src_news_split in [
@@ -97,7 +97,7 @@ def preprocess_MIND_small():
 
 
 def preprocess_MIND_large():
-    train_behavior_lines, dev_behavior_lines = split_training_behaviors()
+    train_behavior_lines, dev_behavior_lines = split_training_behaviors(dataset_root=MIND_large_dataset_root)
 
     # train/dev sets
     for mode, lines, src_news_split in [

@@ -31,14 +31,14 @@ itemtext_list = news["news_text"].tolist()
 
 # Setup device and multi-GPU
 if torch.cuda.is_available():
-    device = torch.device("cuda")
+    device = torch.device("cuda:1")
     n_gpu = torch.cuda.device_count()
     print(f"Using {n_gpu} GPUs")
 else:
     device = torch.device("cpu")
     print("Using CPU")
 
-# Dependence： CharGLM2-6B pip install protobuf transformers==4.30.2
+# Dependence： ChatGLM2-6B pip install protobuf transformers==4.30.2
 tokenizer = AutoTokenizer.from_pretrained("THUDM/chatglm2-6b", trust_remote_code=True)
 model = AutoModel.from_pretrained("THUDM/chatglm2-6b", trust_remote_code=True).float()
 
@@ -48,8 +48,8 @@ for param in model.parameters():
 model.config.output_hidden_states = True
 
 # Enable multi-GPU
-if torch.cuda.is_available() and torch.cuda.device_count() > 1:
-    model = torch.nn.DataParallel(model)
+# if torch.cuda.is_available() and torch.cuda.device_count() > 1:
+#     model = torch.nn.DataParallel(model)
 model = model.to(device)
 
 item_text_map = {}
