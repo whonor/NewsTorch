@@ -288,7 +288,7 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
 
     with torch.no_grad():
         for (user_ID, user_category, user_subCategory, user_title_text, user_title_mask, user_title_entity, user_content_text, user_content_mask, user_content_entity, user_history_mask, user_history_graph, user_history_category_mask, user_history_category_indices, \
-             news_category, news_subCategory, news_title_text, news_title_mask, news_title_entity, news_content_text, news_content_mask, news_content_entity, history_index, candidate_news_index) in dataloader:
+             news_category, news_subCategory, news_title_text, news_title_mask, news_title_entity, news_content_text, news_content_mask, news_content_entity, history_index, candidate_news_index) in tqdm(dataloader):
             user_ID = user_ID.cuda(non_blocking=True)
             user_category = user_category.cuda(non_blocking=True)
             user_subCategory = user_subCategory.cuda(non_blocking=True)

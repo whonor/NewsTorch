@@ -1,7 +1,7 @@
 #!/bin/bash
 # Prepare the data for LKPNR entities embeddings
 #conda init
-#conda activate NewsRecTorch
+#conda activate NewsTorch
 
 # python ./LKPNR/get_item.py
 

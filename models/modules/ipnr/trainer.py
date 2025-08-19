@@ -62,7 +62,7 @@ class TrainerIPNR:
         self.epoch_not_increase = 0
         self.gradient_clip_norm = config.gradient_clip_norm
         self.model.cuda()
-        print('Running : ' + self.model.model_name + '\t#' + str(self.run_index))
+        print('Running : ' + config.model + '\t#' + str(self.run_index))
 
     def negative_log_softmax(self, logits):
         loss = (-torch.log_softmax(logits, dim=1).select(dim=1, index=0)).mean()

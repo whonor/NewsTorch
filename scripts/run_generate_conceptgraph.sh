@@ -1,7 +1,7 @@
 #!/bin/bash
 # Prepare the graph data for IPNR after download_mind and MIND_dataset_prepare
 #conda init
-#conda activate NewsRecTorch
+#conda activate NewsTorch
 
 python ../Conceptgraph/conceptnet/_extract_english_cpnet.py --conceptnet_path="../Conceptgraph/conceptnet/conceptnet-assertions-5.7.0.csv/assertions.csv" --output_csv_path='../Conceptgraph/conceptnet/conceptnet.en.csv'
 

@@ -60,7 +60,7 @@ class Config:
 
     def __init__(self):
         parser = argparse.ArgumentParser()
-        parser.add_argument('--model', type=str, default='LKPNR', help='Model name')
+        parser.add_argument('--model', type=str, default='NRMS', help='Model name')
         parser.add_argument('--batch_size', type=int, default='64', help='Batch size for training')
         args, _ = parser.parse_known_args()
         self.model = args.model
@@ -77,9 +77,9 @@ class Config:
 
         self.root = "."
         self.data_path = "cache/"
-        self.DATA_NAME = 'MIND-large'  # Default dataset name, can be 'ebnerd_demo', 'ebnerd_small' 'MIND-small', 'MIND-200k', or 'MIND-large'
+        self.DATA_NAME = 'MIND-small'  # Default dataset name, can be 'ebnerd_demo', 'ebnerd_small' 'MIND-small', 'MIND-200k', or 'MIND-large'
         self.dataset_name = 'MIND'  # Name of the dataset to be used, MIND, EBNeRD
-        self.dataset = 'large'  # Dataset variant, can be 'small', 'large', or 'demo', if submit the predictions 'submission'
+        self.dataset = 'small'  # Dataset variant, can be 'small', 'large', or 'demo', if submit the predictions 'submission'
         self.tokenizer = 'MIND'
         self.word_threshold = 3
         self.max_title_length = 32

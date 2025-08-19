@@ -27,7 +27,7 @@ class NewsEncoder(nn.Module):
         # 预训练emb
         self.item_emb_dic = np.load('KGraph_LKPNR/item_emb.npy', allow_pickle=True).item()
         # 加载ID到NEWS的映射字典
-        with open('KGraph_LKPNR/ID_news-200k.pkl', 'rb') as file:
+        with open('KGraph_LKPNR/ID_news-large.pkl', 'rb') as file:
             self.ID_news = pickle.load(file)
         # news to linked entity list
         with open('KGraph_LKPNR/link_entity_dic.pkl', 'rb') as file:

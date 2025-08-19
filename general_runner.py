@@ -101,7 +101,7 @@ class Trainer:
             model.train()
             epoch_loss = 0
             for (user_ID, user_category, user_subCategory, user_title_text, user_title_mask, user_title_entity, user_content_text, user_content_mask, user_content_entity, user_history_mask, user_history_graph, user_history_category_mask, user_history_category_indices, \
-                news_category, news_subCategory, news_title_text, news_title_mask, news_title_entity, news_content_text, news_content_mask, news_content_entity, history_index, sample_index) in train_dataloader:
+                news_category, news_subCategory, news_title_text, news_title_mask, news_title_entity, news_content_text, news_content_mask, news_content_entity, history_index, sample_index) in tqdm(train_dataloader):
                 user_ID = user_ID.cuda(non_blocking=True)                                                                                                                       # [batch_size]
                 user_category = user_category.cuda(non_blocking=True)                                                                                                           # [batch_size, max_history_num]
                 user_subCategory = user_subCategory.cuda(non_blocking=True)                                                                                                     # [batch_size, max_history_num]
@@ -191,8 +191,8 @@ class Trainer:
                 torch.save({self.config.model: model.state_dict()}, self.model_dir + '/' + self.config.model + '-' + str(self.best_dev_epoch))
             if self.epoch_not_increase == self.early_stopping_epoch:
                 break
-        shutil.copy(self.model_dir + '/' + model.model_name + '-' + str(self.best_dev_epoch),
-                    self.best_model_dir + '/' + model.model_name)
+        shutil.copy(self.model_dir + '/' + self.config.model + '-' + str(self.best_dev_epoch),
+                    self.best_model_dir + '/' + self.config.model)
         print('Training : ' + self.config.model + ' #' + str(self.run_index) + ' completed\nDev criterions:')
         print('AUC : %.4f' % self.auc_results[self.best_dev_epoch - 1])
         print('MRR : %.4f' % self.mrr_results[self.best_dev_epoch - 1])
