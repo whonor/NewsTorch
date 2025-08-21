@@ -60,7 +60,7 @@ class Config:
 
     def __init__(self):
         parser = argparse.ArgumentParser()
-        parser.add_argument('--model', type=str, default='NRMS', help='Model name')
+        parser.add_argument('--model', type=str, default='LSTUR', help='Model name')
         parser.add_argument('--batch_size', type=int, default='64', help='Batch size for training')
         args, _ = parser.parse_known_args()
         self.model = args.model
@@ -87,7 +87,7 @@ class Config:
         self.negative_sample_num = 4
         self.max_history_num = 50
         self.candidate_news_num = 5
-        self.epoch = 2
+        self.epoch = 10
 
         self.batch_size = args.batch_size
         self.lr = 1e-4

@@ -346,7 +346,12 @@ def test(config: Config, corpus):
         model = LKPNR(config)
 
     assert os.path.exists(config.test_model_path), 'Test model does not exist : ' + config.test_model_path
-    model.load_state_dict(torch.load(config.test_model_path, map_location=torch.device('cpu'))[config.model])
+    checkpoint = torch.load(config.test_model_path, map_location=torch.device('cpu'))
+    model_state_dict = checkpoint[config.model]
+    if list(model_state_dict.keys())[0].startswith('module.'):
+        model_state_dict = {k[7:]: v for k, v in model_state_dict.items()}
+    model.load_state_dict(model_state_dict)
+    # model.load_state_dict(torch.load(config.test_model_path, map_location=torch.device('cpu'))[config.model])
     model.cuda()
     test_res_dir = os.path.join(config.test_res_dir, config.test_model_path.replace('\\', '_').replace('/', '_'))
     if not os.path.exists(test_res_dir):

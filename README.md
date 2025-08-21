@@ -41,8 +41,15 @@ conda activate NewsRecTorch
 
 ## Dataset Preparation
 
-The dataset preparation is divided into two steps: downloading the dataset and preparing the dataset.
+The dataset preparation is divided into two steps: 
+downloading the dataset and preparing the dataset by running the 
+python files in the dataset_download_prepare file.
 
+For example, dowload and prepare the MIND dataset in the following order:
+<pre><code>
+python download_mind.py
+python MIND_dataset_prepare.py
+</code></pre>
 
 ## How to Run
 
