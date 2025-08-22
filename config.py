@@ -60,19 +60,22 @@ class Config:
 
     def __init__(self):
         parser = argparse.ArgumentParser()
-        parser.add_argument('--model', type=str, default='LSTUR', help='Model name')
+        parser.add_argument('--model', type=str, default='NRMS', help='Model name')
         parser.add_argument('--batch_size', type=int, default='64', help='Batch size for training')
+        parser.add_argument('--seed', type=int, default='0', help='Seed')
         args, _ = parser.parse_known_args()
         self.model = args.model
+
         self.multi_gpu = True  # Whether to use multiple GPUs
+        self.device_id = 0  # [0, 1]  # Default to GPU 0, can be set to a list for multi-GPU training
+
         self.wandb = 'offline'  # Whether to use Weights & Biases for experiment tracking
         self.wandb_key = '510e44ae3bcf9efc088d88e2c85dcf2a5f0960b1'  # Key for Weights & Biases, if needed
         self.mode = 'train'
         self.dev_model_path = ''
         self.test_model_path = ''
         self.test_output_file = ''
-        self.device_id = [0, 1] # [0, 1]  # Default to GPU 0, can be set to a list for multi-GPU training
-        self.seed = 0
+        self.seed = args.seed
         self.config_file = ''
 
         self.root = "."
@@ -256,8 +259,3 @@ class Config:
                         label_str = str(labels).replace(' ', ',')
                         truth_f.write(('' if test_ID == 0 else '\n') + str(test_ID + 1) + ' ' + label_str)
 
-
-
-
-if __name__ == '__main__':
-    config = Config()
