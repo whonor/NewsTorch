@@ -102,27 +102,27 @@ class Trainer:
             epoch_loss = 0
             for (user_ID, user_category, user_subCategory, user_title_text, user_title_mask, user_title_entity, user_content_text, user_content_mask, user_content_entity, user_history_mask, user_history_graph, user_history_category_mask, user_history_category_indices, \
                 news_category, news_subCategory, news_title_text, news_title_mask, news_title_entity, news_content_text, news_content_mask, news_content_entity, history_index, sample_index) in tqdm(train_dataloader):
-                user_ID = user_ID.cuda(non_blocking=True)                                                                                                                       # [batch_size]
-                user_category = user_category.cuda(non_blocking=True)                                                                                                           # [batch_size, max_history_num]
-                user_subCategory = user_subCategory.cuda(non_blocking=True)                                                                                                     # [batch_size, max_history_num]
-                user_title_text = user_title_text.cuda(non_blocking=True)                                                                                                       # [batch_size, max_history_num, max_title_length]
-                user_title_mask = user_title_mask.cuda(non_blocking=True)                                                                                                       # [batch_size, max_history_num, max_title_length]
-                user_title_entity = user_title_entity.cuda(non_blocking=True)                                                                                                   # [batch_size, max_history_num, max_title_length]
-                user_content_text = user_content_text.cuda(non_blocking=True)                                                                                                   # [batch_size, max_history_num, max_content_length]
-                user_content_mask = user_content_mask.cuda(non_blocking=True)                                                                                                   # [batch_size, max_history_num, max_content_length]
-                user_content_entity = user_content_entity.cuda(non_blocking=True)                                                                                               # [batch_size, max_history_num, max_content_length]
-                user_history_mask = user_history_mask.cuda(non_blocking=True)                                                                                                   # [batch_size, max_history_num]
-                user_history_graph = user_history_graph.cuda(non_blocking=True)                                                                                                 # [batch_size, max_history_num, max_history_num]
-                user_history_category_mask = user_history_category_mask.cuda(non_blocking=True)                                                                                 # [batch_size, category_num + 1]
-                user_history_category_indices = user_history_category_indices.cuda(non_blocking=True)                                                                           # [batch_size, max_history_num]
-                news_category = news_category.cuda(non_blocking=True)                                                                                                           # [batch_size, 1 + negative_sample_num]
-                news_subCategory = news_subCategory.cuda(non_blocking=True)                                                                                                     # [batch_size, 1 + negative_sample_num]
-                news_title_text = news_title_text.cuda(non_blocking=True)                                                                                                       # [batch_size, 1 + negative_sample_num, max_title_length]
-                news_title_mask = news_title_mask.cuda(non_blocking=True)                                                                                                       # [batch_size, 1 + negative_sample_num, max_title_length]
-                news_title_entity = news_title_entity.cuda(non_blocking=True)                                                                                                   # [batch_size, 1 + negative_sample_num, max_title_length]
-                news_content_text = news_content_text.cuda(non_blocking=True)                                                                                                   # [batch_size, 1 + negative_sample_num, max_content_length]
-                news_content_mask = news_content_mask.cuda(non_blocking=True)                                                                                                   # [batch_size, 1 + negative_sample_num, max_content_length]
-                news_content_entity = news_content_entity.cuda(non_blocking=True)                                                                                               # [batch_size, 1 + negative_sample_num, max_content_length]
+                user_ID = user_ID.cuda(non_blocking=True)
+                user_category = user_category.cuda(non_blocking=True)
+                user_subCategory = user_subCategory.cuda(non_blocking=True)
+                user_title_text = user_title_text.cuda(non_blocking=True)
+                user_title_mask = user_title_mask.cuda(non_blocking=True)
+                user_title_entity = user_title_entity.cuda(non_blocking=True)
+                user_content_text = user_content_text.cuda(non_blocking=True)
+                user_content_mask = user_content_mask.cuda(non_blocking=True)
+                user_content_entity = user_content_entity.cuda(non_blocking=True)
+                user_history_mask = user_history_mask.cuda(non_blocking=True)
+                user_history_graph = user_history_graph.cuda(non_blocking=True)
+                user_history_category_mask = user_history_category_mask.cuda(non_blocking=True)
+                user_history_category_indices = user_history_category_indices.cuda(non_blocking=True)
+                news_category = news_category.cuda(non_blocking=True)
+                news_subCategory = news_subCategory.cuda(non_blocking=True)
+                news_title_text = news_title_text.cuda(non_blocking=True)
+                news_title_mask = news_title_mask.cuda(non_blocking=True)
+                news_title_entity = news_title_entity.cuda(non_blocking=True)
+                news_content_text = news_content_text.cuda(non_blocking=True)
+                news_content_mask = news_content_mask.cuda(non_blocking=True)
+                news_content_entity = news_content_entity.cuda(non_blocking=True)
 
                 if self.config.model == "TANR":
                     logits, topic_pred_loss = model(user_ID, user_category, user_subCategory, user_title_text, user_title_mask,
@@ -165,7 +165,7 @@ class Trainer:
             self.wandb.log({'train epoch': e, 'loss': epoch_loss / len(self.train_dataset)})
 
             # validation
-            auc, mrr, ndcg5, ndcg10 = compute_scores(self.config, model, self._corpus, self.batch_size,
+            auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = compute_scores(self.config, model, self._corpus, self.batch_size,
                                                      'dev', self.dev_res_dir + '/' + self.config.model + '-' + str(
                     e) + '.txt', self._dataset)
 
@@ -300,22 +300,21 @@ def dev(config: Config, corpus):
         os.mkdir(dev_res_dir)
     if config.dataset_name == 'MIND':
         if config.model == 'IPNR':
-            auc, mrr, ndcg5, ndcg10 = compute_scores_IPNR(config, model, corpus, config.batch_size, 'dev',
-                                                          dev_res_dir + '/' + config.model + '.txt', config.dataset)
+            auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = compute_scores_IPNR(config, model, corpus, config.batch_size, 'dev',
+                                                          dev_res_dir + '/' + config.model + '.txt', config.dataset_size)
         else:
-            auc, mrr, ndcg5, ndcg10 = compute_scores(config, model, corpus, config.batch_size,
+            auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = compute_scores(config, model, corpus, config.batch_size,
                                                      'dev',
-                                                     dev_res_dir + '/' + config.model + '.txt', config.dataset)
+                                                     dev_res_dir + '/' + config.model + '.txt', config.dataset_size)
     elif config.dataset_name == 'ebnerd':
-        auc, mrr, ndcg5, ndcg10 = compute_scores(config, model, corpus, config.batch_size,
+        auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = compute_scores(config, model, corpus, config.batch_size,
                                                  'dev',
-                                                 dev_res_dir + '/' + config.model + '.txt', config.dataset)
-
-
+                                                 dev_res_dir + '/' + config.model + '.txt', config.dataset_size)
 
     print('Dev : ' + config.dev_model_path)
-    print('AUC : %.4f\nMRR : %.4f\nnDCG@5 : %.4f\nnDCG@10 : %.4f' % (auc, mrr, ndcg5, ndcg10))
-    return auc, mrr, ndcg5, ndcg10
+    print('AUC : %.4f\nMRR : %.4f\nnDCG@5 : %.4f\nnDCG@10 : %.4f\nMAE : %.4f\nRMSE : %.4f\nrecall@5 : %.4f'
+          '\nrecall@10 : %.4f\nhit@5 : %.4f\nhit@10 : %.4f\nprecision@5 : %.4f\nprecision@10 : %.4f' % (auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10))
+    return auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10
 
 
 
@@ -360,35 +359,39 @@ def test(config: Config, corpus):
     print('test output file : ' + test_res_dir + '/' + config.model + '.txt')
     if config.dataset_name == 'MIND':
         if config.model == 'IPNR':
-            auc, mrr, ndcg5, ndcg10 = compute_scores_IPNR(config, model, corpus, config.batch_size, 'test',
-                                                          test_res_dir + '/' + config.model + '.txt', config.dataset)
+            auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = compute_scores_IPNR(config, model, corpus, config.batch_size, 'test',
+                                                          test_res_dir + '/' + config.model + '.txt', config.dataset_size)
         else:
-            auc, mrr, ndcg5, ndcg10 = compute_scores(config, model, corpus, config.batch_size,
+            auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = compute_scores(config, model, corpus, config.batch_size,
                                                      'test',
-                                                     test_res_dir + '/' + config.model + '.txt', config.dataset)
+                                                     test_res_dir + '/' + config.model + '.txt', config.dataset_size)
     elif config.dataset_name == 'ebnerd':
         if config.model == 'IPNR':
-            auc, mrr, ndcg5, ndcg10 = compute_scores_IPNR(config, model, corpus, config.batch_size, 'test',
-                                                          test_res_dir + '/' + config.model + '.txt', config.dataset)
+            auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = compute_scores_IPNR(config, model, corpus, config.batch_size, 'test',
+                                                          test_res_dir + '/' + config.model + '.txt', config.dataset_size)
         else:
-            auc, mrr, ndcg5, ndcg10 = compute_scores(config, model, corpus, config.batch_size,
+            auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = compute_scores(config, model, corpus, config.batch_size,
                                                      'test',
-                                                     test_res_dir + '/' + config.model + '.txt', config.dataset)
+                                                     test_res_dir + '/' + config.model + '.txt', config.dataset_size)
 
-    if config.dataset != 'submission':
-        print('AUC : %.4f\nMRR : %.4f\nnDCG@5 : %.4f\nnDCG@10 : %.4f' % (auc, mrr, ndcg5, ndcg10))
+    if config.dataset_size != 'submission':
+        print('AUC : %.4f\nMRR : %.4f\nnDCG@5 : %.4f\nnDCG@10 : %.4f\nMAE : %.4f\nRMSE : %.4f\nrecall@5 : %.4f'
+          '\nrecall@10 : %.4f\nhit@5 : %.4f\nhit@10 : %.4f\nprecision@5 : %.4f\nprecision@10 : %.4f' % (auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10))
         if config.mode == 'train':
             with open(config.result_dir + '/#' + str(config.run_index) + '-test', 'w') as result_f:
-                result_f.write('#' + str(config.run_index) + '\t' + str(auc) + '\t' + str(mrr) + '\t' + str(ndcg5) + '\t' + str(ndcg10) + '\n')
+                result_f.write('#' + str(config.run_index) + '\t' + str(auc) + '\t' + str(mrr) + '\t' + str(ndcg5) + '\t'
+                               + str(ndcg10) + '\t' + str(mae) + '\t' + str(rmse) + '\t' + str(recall5) + '\t'
+                               + str(recall10) + '\t' + str(hit5) + '\t' + str(hit10) + '\t' + str(precision5) + '\t' + str(precision10) + '\n')
         elif config.mode == 'test' and config.test_output_file != '':
             with open(config.test_output_file, 'w', encoding='utf-8') as f:
-                f.write('#' + str(config.seed + 1) + '\t' + str(auc) + '\t' + str(mrr) + '\t' + str(ndcg5) + '\t' + str(ndcg10) + '\n')
+                f.write('#' + str(config.seed + 1) + '\t' + str(auc) + '\t' + str(mrr) + '\t' + str(ndcg5) + '\t' + str(ndcg10)
+                        + '\t' + str(mae) + '\t' + str(rmse) + '\t' + str(recall5) + '\t' + str(recall10) + '\t' + str(hit5)
+                        + '\t' + str(hit10) + '\t' + str(precision5) + '\t' + str(precision10) + '\n')
     else:
-        if config.mode == 'train':
-            shutil.copy(test_res_dir + '/' + config.model + '.txt', 'cache/prediction/large/%s/#%d/prediction.txt' % (config.model, config.run_index))
-            os.chdir('cache/prediction/large/%s/#%d' % (config.model, config.run_index))
-            os.system('zip prediction.zip prediction.txt')
-            os.chdir('../../../..')
+        shutil.copy(test_res_dir + '/' + config.model + '.txt', 'cache/prediction/large/%s/#%d/prediction.txt' % (config.model, config.run_index))
+        os.chdir('cache/prediction/large/%s/#%d' % (config.model, config.run_index))
+        os.system('zip prediction.zip prediction.txt')
+        os.chdir('../../../..')
 
 
 if __name__ == '__main__':

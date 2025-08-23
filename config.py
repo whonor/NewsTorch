@@ -82,7 +82,7 @@ class Config:
         self.data_path = "cache/"
         self.DATA_NAME = 'MIND-small'  # Default dataset name, can be 'ebnerd_demo', 'ebnerd_small' 'MIND-small', 'MIND-200k', or 'MIND-large'
         self.dataset_name = 'MIND'  # Name of the dataset to be used, MIND, EBNeRD
-        self.dataset = 'small'  # Dataset variant, can be 'small', 'large', or 'demo', if submit the predictions 'submission'
+        self.dataset_size = 'small'  # Dataset variant, can be 'small', 'large', or 'demo', if submit the predictions 'submission'
         self.tokenizer = 'MIND'
         self.word_threshold = 3
         self.max_title_length = 32
@@ -90,7 +90,7 @@ class Config:
         self.negative_sample_num = 4
         self.max_history_num = 50
         self.candidate_news_num = 5
-        self.epoch = 10
+        self.epoch = 20
 
         self.batch_size = args.batch_size
         self.lr = 1e-4
@@ -195,11 +195,11 @@ class Config:
         model_name = self.model
         data_path = self.data_path
         mkdirs = lambda x: os.makedirs(x) if not os.path.exists(x) else None
-        self.model_dir = data_path + 'models/' + self.dataset + '/' + model_name
-        self.dev_res_dir = data_path + 'dev/res/' + self.dataset + '/' + model_name
-        self.result_dir = data_path + 'results/' + self.dataset + '/' + model_name
-        self.best_model_dir = data_path + 'best_models/' + self.dataset + '/' + model_name
-        self.test_res_dir = data_path + 'test/res/' + self.dataset + '/' + model_name
+        self.model_dir = data_path + 'models/' + self.dataset_size + '/' + model_name
+        self.dev_res_dir = data_path + 'dev/res/' + self.dataset_size + '/' + model_name
+        self.result_dir = data_path + 'results/' + self.dataset_size + '/' + model_name
+        self.best_model_dir = data_path + 'best_models/' + self.dataset_size + '/' + model_name
+        self.test_res_dir = data_path + 'test/res/' + self.dataset_size + '/' + model_name
         mkdirs(self.model_dir)
         mkdirs(data_path + 'dev/ref')
         mkdirs(self.dev_res_dir)
@@ -209,8 +209,6 @@ class Config:
         mkdirs(self.test_res_dir)
         if model_name == 'IPNR':
             mkdirs("cache/IPNR/")
-        if model_name == 'UNBERT':
-            mkdirs("cache/UNBERT/")
         mkdirs("cache/%s/" % self.dataset_name)
 
         dev_truth_path = os.path.join(data_path, f'dev/ref/truth-{self.DATA_NAME}.txt')
@@ -225,7 +223,7 @@ class Config:
                             labels = [int(impression[-1]) for impression in impressions.strip().split(' ')]
                             truth_f.write(
                                 ('' if dev_ID == 0 else '\n') + str(dev_ID + 1) + ' ' + str(labels).replace(' ', ''))
-            if self.dataset != 'submission':
+            if self.dataset_size != 'submission':
                 if not os.path.exists(test_truth_path):
                     with open(os.path.join(self.test_root, 'behaviors.tsv'), 'r', encoding='utf-8') as test_f:
                         with open(test_truth_path, 'w', encoding='utf-8') as truth_f:

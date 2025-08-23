@@ -1,6 +1,7 @@
 import os
 import torch
 import torch.nn as nn
+from torchmetrics import MeanSquaredError, MeanAbsoluteError
 from tqdm import tqdm
 
 from dataset_corpus_preprocessing.EBNeRD_corpus_main import EBNeRD_Corpus
@@ -14,6 +15,56 @@ import numpy as np
 import json
 from sklearn.metrics import roc_auc_score
 
+
+def MAE_score(y_true: np.ndarray, y_score: np.ndarray) -> float:
+    y_score = torch.tensor(y_score)
+    y_true = torch.tensor(y_true)
+    mae = MeanAbsoluteError()
+    score = mae(y_score, y_true)
+    return score
+
+def RMSE_score(y_true: np.ndarray, y_score: np.ndarray) -> float:
+    y_score = torch.tensor(y_score)
+    y_true = torch.tensor(y_true)
+    rmse = MeanSquaredError(squared=False)
+    score = rmse(y_score, y_true)
+    return score
+
+def recall_at_k(y_true, y_score, k=5):
+    """
+    Compute Recall@k using numpy for efficiency.
+    """
+    # Sort indices by scores in descending order
+    order = np.argsort(y_score)[::-1]
+    y_true = np.take(y_true, order)
+    # Top-k indices in y_true
+    y_true_k = y_true[:k]
+    # Calculate recall@k
+    return np.sum(y_true_k) / np.sum(y_true)
+
+def hit_at_k(y_true, y_score, k=5):
+    """
+    Compute Hit@k using numpy for efficiency.
+    """
+    # Sort indices by scores in descending order
+    order = np.argsort(y_score)[::-1]
+    y_true = np.take(y_true, order)
+    # Top-k indices in y_true
+    y_true_k = y_true[:k]
+    # Check if there's at least one hit in top-k
+    return 1.0 if np.any(y_true_k) else 0.0
+
+def precision_at_k(y_true, y_score, k=5):
+    """
+    Compute Precision@k using numpy for efficiency.
+    """
+    # Sort indices by scores in descending order
+    order = np.argsort(y_score)[::-1]
+    y_true = np.take(y_true, order)
+    # Top-k indices in y_true
+    y_true_k = y_true[:k]
+    # Calculate precision@k
+    return np.sum(y_true_k) / k
 
 def dcg_score(y_true, y_score, k=10):
     order = np.argsort(y_score)[::-1]
@@ -62,6 +113,15 @@ def scoring(truth_f, sub_f):
     mrrs = []
     ndcg5s = []
     ndcg10s = []
+
+    maes = []
+    rmses = []
+    recall5s = []
+    recall10s = []
+    hit5s = []
+    hit10s = []
+    precision5s = []
+    precision10s = []
 
     line_index = 1
     for lt in truth_f:
@@ -112,95 +172,29 @@ def scoring(truth_f, sub_f):
         ndcg5s.append(ndcg5)
         ndcg10s.append(ndcg10)
 
+        mae = MAE_score(y_true, y_score)
+        rmse = RMSE_score(y_true, y_score)
+        recall5 = recall_at_k(y_true, y_score, 5)
+        recall10 = recall_at_k(y_true, y_score, 10)
+        precision5 = precision_at_k(y_true, y_score, 5)
+        precision10 = precision_at_k(y_true, y_score, 10)
+        hit5 = hit_at_k(y_true, y_score, 5)
+        hit10 = hit_at_k(y_true, y_score, 10)
+
+        maes.append(mae)
+        rmses.append(rmse)
+        recall5s.append(recall5)
+        recall10s.append(recall10)
+        hit5s.append(hit5)
+        hit10s.append(hit10)
+        precision5s.append(precision5)
+        precision10s.append(precision10)
+
         line_index += 1
 
-    return np.mean(aucs), np.mean(mrrs), np.mean(ndcg5s), np.mean(ndcg10s)
-
-
-def compute_scores_LKPNR(model: nn.Module, mind_corpus: MIND_Corpus, batch_size: int, mode: str, result_file: str,
-                   dataset: str):
-    assert mode in ['dev', 'test'], 'mode must be chosen from \'dev\' or \'test\''
-    dataloader = DataLoader(MIND_DevTest_Dataset(mind_corpus, mode), batch_size=batch_size, shuffle=False,
-                            num_workers=batch_size // 16, pin_memory=True)
-    indices = (mind_corpus.dev_indices if mode == 'dev' else mind_corpus.test_indices)  # 曝光次数
-    scores = torch.zeros([len(indices)]).cuda()
-    index = 0
-    torch.cuda.empty_cache()
-    model.eval()
-
-    with torch.no_grad():
-        for (user_ID, user_category, user_subCategory, user_title_text, user_title_mask, user_title_entity,
-             user_content_text, user_content_mask, user_content_entity, user_history_mask, user_history_graph,
-             user_history_category_mask, user_history_category_indices, \
-             news_category, news_subCategory, news_title_text, news_title_mask, news_title_entity, news_content_text,
-             news_content_mask, news_content_entity, history_index, candidate_news_index) in tqdm(dataloader):
-            user_ID = user_ID.cuda(non_blocking=True)
-            user_category = user_category.cuda(non_blocking=True)
-            user_subCategory = user_subCategory.cuda(non_blocking=True)
-            user_title_text = user_title_text.cuda(non_blocking=True)
-            user_title_mask = user_title_mask.cuda(non_blocking=True)
-            user_title_entity = user_title_entity.cuda(non_blocking=True)
-            user_content_text = user_content_text.cuda(non_blocking=True)
-            user_content_mask = user_content_mask.cuda(non_blocking=True)
-            user_content_entity = user_content_entity.cuda(non_blocking=True)
-            user_history_mask = user_history_mask.cuda(non_blocking=True)
-            user_history_graph = user_history_graph.cuda(non_blocking=True)
-            user_history_category_mask = user_history_category_mask.cuda(non_blocking=True)
-            user_history_category_indices = user_history_category_indices.cuda(non_blocking=True)
-            news_category = news_category.cuda(non_blocking=True)
-            news_subCategory = news_subCategory.cuda(non_blocking=True)
-            news_title_text = news_title_text.cuda(non_blocking=True)
-            news_title_mask = news_title_mask.cuda(non_blocking=True)
-            news_title_entity = news_title_entity.cuda(non_blocking=True)
-            news_content_text = news_content_text.cuda(non_blocking=True)
-            news_content_mask = news_content_mask.cuda(non_blocking=True)
-            news_content_entity = news_content_entity.cuda(non_blocking=True)
-            history_index = history_index.cuda(non_blocking=True)
-            candidate_news_index = candidate_news_index.cuda(non_blocking=True)
-
-            batch_size = user_ID.size(0)
-            news_category = news_category.unsqueeze(dim=1)
-            news_subCategory = news_subCategory.unsqueeze(dim=1)
-            news_title_text = news_title_text.unsqueeze(dim=1)
-            news_title_mask = news_title_mask.unsqueeze(dim=1)
-            news_content_text = news_content_text.unsqueeze(dim=1)
-            news_content_mask = news_content_mask.unsqueeze(dim=1)
-            candidate_news_index = candidate_news_index.unsqueeze(dim=1)
-
-            scores[index: index + batch_size] = model(user_ID, user_category, user_subCategory, user_title_text,
-                                                      user_title_mask, user_title_entity, user_content_text,
-                                                      user_content_mask, user_content_entity, user_history_mask,
-                                                      user_history_graph, user_history_category_mask,
-                                                      user_history_category_indices, \
-                                                      news_category, news_subCategory, news_title_text, news_title_mask,
-                                                      news_title_entity, news_content_text, news_content_mask,
-                                                      news_content_entity, history_index, candidate_news_index).squeeze(
-                dim=1)  # [batch_size]
-            index += batch_size
-    scores = scores.tolist()
-
-    sub_scores = [[] for _ in range(indices[-1] + 1)]
-
-    for i, index in enumerate(indices):
-        sub_scores[index].append([scores[i], len(sub_scores[index])])
-
-    with open(result_file, 'w', encoding='utf-8') as result_f:
-        for i, sub_score in enumerate(sub_scores):
-            sub_score.sort(key=lambda x: x[0], reverse=True)
-            result = [0 for _ in range(len(sub_score))]
-            for j in range(len(sub_score)):
-                result[sub_score[j][1]] = j + 1
-            result_f.write(('' if i == 0 else '\n') + str(i + 1) + ' ' + str(result).replace(' ', ''))
-    print('result_file', result_file)
-    print('save done')
-    if dataset != 'submission' or mode != 'test':
-        with open(mode + '/ref/truth-%s.txt' % dataset, 'r', encoding='utf-8') as truth_f, open(result_file, 'r',
-                                                                                                encoding='utf-8') as result_f:
-            auc, mrr, ndcg5, ndcg10 = scoring(
-                truth_f, result_f)
-        return auc, mrr, ndcg5, ndcg10
-    else:
-        return None, None, None, None
+    return (np.mean(aucs), np.mean(mrrs), np.mean(ndcg5s), np.mean(ndcg10s),
+            np.mean(maes), np.mean(rmses), np.mean(recall5s), np.mean(recall10s),
+            np.mean(hit5s), np.mean(hit10s), np.mean(precision5s), np.mean(precision10s))
 
 
 def compute_scores_IPNR(config, model: nn.Module, mind_corpus: MIND_Corpus, batch_size: int, mode: str, result_file: str, dataset: str):
@@ -267,10 +261,10 @@ def compute_scores_IPNR(config, model: nn.Module, mind_corpus: MIND_Corpus, batc
             result_f.write(('' if i == 0 else '\n') + str(i + 1) + ' ' + str(result).replace(' ', ''))
     if dataset != 'submission' or mode != 'test':
         with open("./cache/" + mode + '/ref/truth-%s.txt' % dataset, 'r', encoding='utf-8') as truth_f, open(result_file, 'r', encoding='utf-8') as result_f:
-            auc, mrr, ndcg5, ndcg10 = scoring(truth_f, result_f)
-        return auc, mrr, ndcg5, ndcg10
+            auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = scoring(truth_f, result_f)
+        return auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10
     else:
-        return None, None, None, None
+        return None, None, None, None, None, None, None, None, None, None, None, None
 
 
 def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mode: str, result_file: str, dataset: str):
@@ -374,10 +368,10 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
             result_f.write(('' if i == 0 else '\n') + str(i + 1) + ' ' + str(result).replace(' ', ''))
     if dataset != 'submission' or mode != 'test':
         with open(config.data_path + '/' + mode + '/ref/truth-%s.txt' % config.DATA_NAME, 'r', encoding='utf-8') as truth_f, open(result_file, 'r', encoding='utf-8') as result_f:
-            auc, mrr, ndcg5, ndcg10 = scoring(truth_f, result_f)
-        return auc, mrr, ndcg5, ndcg10
+            auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = scoring(truth_f, result_f)
+        return auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10
     else:
-        return None, None, None, None
+        return None, None, None, None, None, None, None, None, None, None, None, None
 
 
 def get_run_index(result_dir: str):
