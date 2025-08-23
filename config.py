@@ -66,9 +66,6 @@ class Config:
         args, _ = parser.parse_known_args()
         self.model = args.model
 
-        self.multi_gpu = True  # Whether to use multiple GPUs
-        self.device_id = 0  # [0, 1]  # Default to GPU 0, can be set to a list for multi-GPU training
-
         self.wandb = 'offline'  # Whether to use Weights & Biases for experiment tracking
         self.wandb_key = '510e44ae3bcf9efc088d88e2c85dcf2a5f0960b1'  # Key for Weights & Biases, if needed
         self.mode = 'train'
