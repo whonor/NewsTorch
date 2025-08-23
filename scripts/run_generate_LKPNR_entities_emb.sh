@@ -3,7 +3,6 @@
 #conda init
 #conda activate NewsTorch
 
-# python ./LKPNR/get_item.py
 
 python ./LKPNR/count_link_count.py --dataset_path="../../MIND-large"\
 --save_path='KGraph_LKPNR'

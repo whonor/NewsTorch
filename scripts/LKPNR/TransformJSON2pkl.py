@@ -3,6 +3,7 @@ import pickle
 
 # This script transforms a JSON file into a Pickle file.
 # The JSON file is expected to be in the same directory as this script.
+# This code will generate a Pickle file with the reversed mapping: ID_news-%s.pkl for LKPNR model.
 def transform_json_to_pickle(json_file_path, pickle_file_path):
     # Define the paths for the JSON and Pickle files
     # json_file_path = 'news_ID-small.json'
