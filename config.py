@@ -160,16 +160,6 @@ class Config:
         gpu_available = torch.cuda.is_available()
         assert gpu_available, 'GPU is not available'
         #torch.cuda.set_device(self.device_id)
-        if isinstance(self.device_id, list):
-            self.device = torch.device("cuda")
-            if len(self.device_id) > 1:
-                # DataParallel
-                self.multi_gpu = True
-        else:
-            # single GPU
-            torch.cuda.set_device(self.device_id)
-            self.device = torch.device(f"cuda:{self.device_id}")
-            self.multi_gpu = False
         torch.manual_seed(self.seed)
         torch.cuda.manual_seed(self.seed)
         random.seed(self.seed)

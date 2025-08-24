@@ -15,13 +15,13 @@ from models.NRMS import NRMS
 from models.TANR import TANR
 from models.CenNewsRec import CenNewsRec
 from models.modules.ipnr.trainer import TrainerIPNR
-from utils.util import get_run_index, compute_scores_IPNR
+from utils._evaluation import get_run_index, compute_scores_IPNR
 from datetime import datetime
 import wandb
 from config import Config
 from dataset_corpus_preprocessing.MIND_corpus_main import MIND_Corpus, MIND_Train_Dataset
-from utils.util import AvgMetric
-from utils.util import compute_scores
+from utils._evaluation import AvgMetric
+from utils._evaluation import compute_scores
 from tqdm import tqdm
 import torch
 import torch.nn as nn
