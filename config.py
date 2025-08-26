@@ -63,6 +63,7 @@ class Config:
         parser.add_argument('--model', type=str, default='NRMS', help='Model name')
         parser.add_argument('--batch_size', type=int, default='64', help='Batch size for training')
         parser.add_argument('--seed', type=int, default=0, help='Seed')
+        parser.add_argument('--epoch', type=int, default=20, help='Epoch for training')
         args, _ = parser.parse_known_args()
         self.model = args.model
 
@@ -87,7 +88,7 @@ class Config:
         self.negative_sample_num = 4
         self.max_history_num = 50
         self.candidate_news_num = 5
-        self.epoch = 20
+        self.epoch = args.epoch
 
         self.batch_size = args.batch_size
         self.lr = 1e-4

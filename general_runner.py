@@ -1,7 +1,9 @@
+import csv
 import os
 import shutil
 
 from dataset_corpus_preprocessing.EBNeRD_corpus_main import EBNeRD_Corpus, Ebnerd_Train_Dataset
+from dataset_corpus_preprocessing.MIND_corpus_IPNR import MIND_Corpus_IPNR
 from models.CNE_SUE import CNE_SUE
 from models.DKN import DKN
 from models.FIM import FIM
@@ -213,42 +215,26 @@ def negative_log_sigmoid(logits):
 
 
 def train(config: Config, corpus, wandb):
-    if config.model == 'TANR':
-        model = TANR(config)
-        model.initialize()
-    elif config.model == 'NAML':
-        model = NAML(config)
-        model.initialize()
-    elif config.model == 'DKN':
-        model = DKN(config)
-        model.initialize()
-    elif config.model == 'NRMS':
-        model = NRMS(config)
-        model.initialize()
-    elif config.model == 'LSTUR':
-        model = LSTUR(config)
-        model.initialize()
-    elif config.model == 'NPA':
-        model = NPA(config)
-        model.initialize()
-    elif config.model == 'FIM':
-        model = FIM(config)
-        model.initialize()
-    elif config.model == 'MINS':
-        model = MINS(config)
-        model.initialize()
-    elif config.model == 'CENNEWSREC':
-        model = CenNewsRec(config)
-        model.initialize()
-    elif config.model == 'IPNR':
-        model = IPNR(config)
-        model.initialize()
-    elif config.model == 'CNE_SUE':
-        model = CNE_SUE(config)
-        model.initialize()
-    elif config.model == 'LKPNR':
-        model = LKPNR(config)
-        model.initialize()
+    model_classes = {
+        'TANR': TANR,
+        'NAML': NAML,
+        'DKN': DKN,
+        'NRMS': NRMS,
+        'LSTUR': LSTUR,
+        'NPA': NPA,
+        'FIM': FIM,
+        'MINS': MINS,
+        'CENNEWSREC': CenNewsRec,
+        'IPNR': IPNR,
+        'CNE-SUE': CNE_SUE,
+        'LKPNR': LKPNR
+    }
+
+    if config.model not in model_classes:
+        raise ValueError(f"Unknown model: {config.model}")
+
+    model = model_classes[config.model](config)
+    model.initialize()
 
     run_index = get_run_index(config.result_dir)
     if config.dataset_name == 'MIND':
@@ -269,30 +255,26 @@ def train(config: Config, corpus, wandb):
 
 
 def dev(config: Config, corpus):
-    if config.model == 'TANR':
-        model = TANR(config)
-    elif config.model == 'NAML':
-        model = NAML(config)
-    elif config.model == 'DKN':
-        model = DKN(config)
-    elif config.model == 'NRMS':
-        model = NRMS(config)
-    elif config.model == 'LSTUR':
-        model = LSTUR(config)
-    elif config.model == 'NPA':
-        model = NPA(config)
-    elif config.model == 'FIM':
-        model = FIM(config)
-    elif config.model == 'MINS':
-        model = MINS(config)
-    elif config.model == 'CENNEWSREC':
-        model = CenNewsRec(config)
-    elif config.model == 'IPNR':
-        model = IPNR(config)
-    elif config.model == 'CNE_SUE':
-        model = CNE_SUE(config)
-    elif config.model == 'LKPNR':
-        model = LKPNR(config)
+    model_classes = {
+        'TANR': TANR,
+        'NAML': NAML,
+        'DKN': DKN,
+        'NRMS': NRMS,
+        'LSTUR': LSTUR,
+        'NPA': NPA,
+        'FIM': FIM,
+        'MINS': MINS,
+        'CENNEWSREC': CenNewsRec,
+        'IPNR': IPNR,
+        'CNE-SUE': CNE_SUE,
+        'LKPNR': LKPNR
+    }
+
+    if config.model not in model_classes:
+        raise ValueError(f"Unknown model: {config.model}")
+
+    model = model_classes[config.model](config)
+
     assert os.path.exists(config.dev_model_path), 'Dev model does not exist : ' + config.dev_model_path
     model.load_state_dict(torch.load(config.dev_model_path, map_location=torch.device('cpu'))[model.model_name])
     model.cuda()
@@ -320,30 +302,25 @@ def dev(config: Config, corpus):
 
 
 def test(config: Config, corpus):
-    if config.model == 'TANR':
-        model = TANR(config)
-    elif config.model == 'NAML':
-        model = NAML(config)
-    elif config.model == 'DKN':
-        model = DKN(config)
-    elif config.model == 'NRMS':
-        model = NRMS(config)
-    elif config.model == 'LSTUR':
-        model = LSTUR(config)
-    elif config.model == 'NPA':
-        model = NPA(config)
-    elif config.model == 'FIM':
-        model = FIM(config)
-    elif config.model == 'MINS':
-        model = MINS(config)
-    elif config.model == 'CENNEWSREC':
-        model = CenNewsRec(config)
-    elif config.model == 'IPNR':
-        model = IPNR(config)
-    elif config.model == 'CNE_SUE':
-        model = CNE_SUE(config)
-    elif config.model == 'LKPNR':
-        model = LKPNR(config)
+    model_classes = {
+        'TANR': TANR,
+        'NAML': NAML,
+        'DKN': DKN,
+        'NRMS': NRMS,
+        'LSTUR': LSTUR,
+        'NPA': NPA,
+        'FIM': FIM,
+        'MINS': MINS,
+        'CENNEWSREC': CenNewsRec,
+        'IPNR': IPNR,
+        'CNE-SUE': CNE_SUE,
+        'LKPNR': LKPNR
+    }
+
+    if config.model not in model_classes:
+        raise ValueError(f"Unknown model: {config.model}")
+
+    model = model_classes[config.model](config)
 
     assert os.path.exists(config.test_model_path), 'Test model does not exist : ' + config.test_model_path
     checkpoint = torch.load(config.test_model_path, map_location=torch.device('cpu'))
@@ -379,10 +356,32 @@ def test(config: Config, corpus):
         print('AUC : %.4f\nMRR : %.4f\nnDCG@5 : %.4f\nnDCG@10 : %.4f\nMAE : %.4f\nRMSE : %.4f\nrecall@5 : %.4f'
           '\nrecall@10 : %.4f\nhit@5 : %.4f\nhit@10 : %.4f\nprecision@5 : %.4f\nprecision@10 : %.4f' % (auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10))
         if config.mode == 'train':
-            with open(config.result_dir + '/#' + str(config.run_index) + '-test', 'w') as result_f:
-                result_f.write('#' + str(config.run_index) + '\t' + str(auc) + '\t' + str(mrr) + '\t' + str(ndcg5) + '\t'
-                               + str(ndcg10) + '\t' + str(mae) + '\t' + str(rmse) + '\t' + str(recall5) + '\t'
-                               + str(recall10) + '\t' + str(hit5) + '\t' + str(hit10) + '\t' + str(precision5) + '\t' + str(precision10) + '\n')
+            metrics = {
+                'AUC': auc,
+                'MRR': mrr,
+                'nDCG@5': ndcg5,
+                'nDCG@10': ndcg10,
+                'MAE': mae,
+                'RMSE': rmse,
+                'Recall@5': recall5,
+                'Recall@10': recall10,
+                'Hit@5': hit5,
+                'Hit@10': hit10,
+                'Precision@5': precision5,
+                'Precision@10': precision10
+            }
+            csv_path = os.path.join(config.result_dir, 'metrics_results.csv')
+            file_exists = os.path.isfile(csv_path)
+            with open(csv_path, mode='a', newline='') as csv_file:
+                writer = csv.DictWriter(csv_file, fieldnames=['Model'] + ['RunIndex'] + list(metrics.keys()))
+
+                if not file_exists:
+                    writer.writeheader()
+
+                row = {'Model': config.model, 'RunIndex': config.run_index}
+                row.update(metrics)
+                writer.writerow(row)
+
         elif config.mode == 'test' and config.test_output_file != '':
             with open(config.test_output_file, 'w', encoding='utf-8') as f:
                 f.write('#' + str(config.seed + 1) + '\t' + str(auc) + '\t' + str(mrr) + '\t' + str(ndcg5) + '\t' + str(ndcg10)
@@ -405,7 +404,11 @@ if __name__ == '__main__':
     )
 
     if config.dataset_name == 'MIND':
-        corpus = MIND_Corpus(config)
+        if config.model == 'IPNR':
+            corpus = MIND_Corpus_IPNR(config)
+        else:
+            corpus = MIND_Corpus(config)
+
     elif config.dataset_name == 'ebnerd':
         corpus = EBNeRD_Corpus(config)
 

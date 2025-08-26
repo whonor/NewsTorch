@@ -57,7 +57,7 @@ class MIND_Corpus_IPNR:
         subCategory_file = 'cache/IPNR/subCategory-%s.json' % config.dataset_size
         vocabulary_file = 'cache/IPNR/vocabulary-' + str(config.word_threshold) + '-' + config.tokenizer + '-' + str(config.max_title_length) + '-' + str(config.max_abstract_length) + '-' + config.dataset_size + '.json'
         word_embedding_file = 'cache/IPNR/word_embedding-' + str(config.word_threshold) + '-' + str(config.word_embedding_dim) + '-' + config.tokenizer + '-' + str(config.max_title_length) + '-' + str(config.max_abstract_length) + '-' + config.dataset_size + '.pkl'
-        entity_file = 'cache/IPNR//entity-%s.json' % config.dataset_size
+        entity_file = 'cache/IPNR/entity-%s.json' % config.dataset_size
         entity_embedding_file = 'cache/IPNR/entity_embedding-%s.pkl' % config.dataset_size
         context_embedding_file = 'cache/IPNR/context_embedding-%s.pkl' % config.dataset_size
         user_history_graph_file = 'cache/IPNR/user_history_graph-' + str(config.max_history_num) + ('' if config.no_self_connection else '-self') + ('' if config.no_adjacent_normalization else '-normalize-' + config.gcn_normalization_type) + '-' + config.dataset_size + '.pkl'

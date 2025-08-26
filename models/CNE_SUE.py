@@ -9,11 +9,8 @@ class CNE_SUE(nn.Module):
     def __init__(self, config: Config):
         super(CNE_SUE, self).__init__()
         self.config = config
-        if config.model == 'CNE-SUE':
-            self.news_encoder = newsEncoders.CNE(config)
-            self.user_encoder = userEncoders.SUE(self.news_encoder, config)
-        else:
-            raise Exception(config.model + ' is not implemented')
+        self.news_encoder = newsEncoders.CNE(config)
+        self.user_encoder = userEncoders.SUE(self.news_encoder, config)
 
         self.model_name = config.model
         self.news_embedding_dim = self.news_encoder.news_embedding_dim

@@ -3,7 +3,7 @@
 #conda init
 #conda activate NewsTorch
 
-python ../Conceptgraph/conceptnet/_extract_english_cpnet.py --conceptnet_path="../Conceptgraph/conceptnet/conceptnet-assertions-5.7.0.csv/assertions.csv" --output_csv_path='../Conceptgraph/conceptnet/conceptnet.en.csv'
+# python ../Conceptgraph/conceptnet/_extract_english_cpnet.py --conceptnet_path="../Conceptgraph/conceptnet/conceptnet-assertions-5.7.0.csv/assertions.csv" --output_csv_path='../Conceptgraph/conceptnet/conceptnet.en.csv'
 
 python ../Conceptgraph/graph/_build_vocab_and_graph.py --root_path="../MIND-small/download/"
 
