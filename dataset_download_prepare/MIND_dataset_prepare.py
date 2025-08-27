@@ -269,8 +269,8 @@ def prepare_MIND_200k():
     generate_knowledge_entity_embedding('200k')
 
 def main():
-    # print("Prepare MIND-small...")
-    # prepare_MIND_small()
+    print("Prepare MIND-small...")
+    prepare_MIND_small()
     # print("准备 MIND-200k...")
     # prepare_MIND_200k()
     print("准备 MIND-large...")
