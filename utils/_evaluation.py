@@ -197,7 +197,7 @@ def scoring(truth_f, sub_f):
             np.mean(hit5s), np.mean(hit10s), np.mean(precision5s), np.mean(precision10s))
 
 
-def compute_scores_IPNR(config, model: nn.Module, mind_corpus: MIND_Corpus, batch_size: int, mode: str, result_file: str, dataset: str):
+def compute_scores_IPNR(config: Config, model: nn.Module, mind_corpus: MIND_Corpus, batch_size: int, mode: str, result_file: str, dataset: str):
     assert mode in ['dev', 'test'], 'mode must be chosen from \'dev\' or \'test\''
     dataloader = DataLoader(MIND_DevTest_Dataset_IPNR(mind_corpus, mode), batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=True)
     indices = (mind_corpus.dev_indices if mode == 'dev' else mind_corpus.test_indices)
@@ -207,7 +207,7 @@ def compute_scores_IPNR(config, model: nn.Module, mind_corpus: MIND_Corpus, batc
     model.eval()
     with torch.no_grad():
         for (user_ID, user_category, user_subCategory, user_title_text, user_title_mask, user_title_entity, user_content_text, user_content_mask, user_content_entity, user_history_mask, user_history_graph, user_concept_text, user_concept_mask, \
-             news_category, news_subCategory, news_title_text, news_title_mask, news_title_entity, news_content_text, news_content_mask, news_content_entity, news_concept_text, news_concept_mask) in dataloader:
+             news_category, news_subCategory, news_title_text, news_title_mask, news_title_entity, news_content_text, news_content_mask, news_content_entity, news_concept_text, news_concept_mask) in tqdm(dataloader):
             user_ID = user_ID.cuda(non_blocking=True)
             user_category = user_category.cuda(non_blocking=True)
             user_subCategory = user_subCategory.cuda(non_blocking=True)
@@ -260,7 +260,7 @@ def compute_scores_IPNR(config, model: nn.Module, mind_corpus: MIND_Corpus, batc
                 result[sub_score[j][1]] = j + 1
             result_f.write(('' if i == 0 else '\n') + str(i + 1) + ' ' + str(result).replace(' ', ''))
     if dataset != 'submission' or mode != 'test':
-        with open("./cache/" + mode + '/ref/truth-%s.txt' % dataset, 'r', encoding='utf-8') as truth_f, open(result_file, 'r', encoding='utf-8') as result_f:
+        with open("./cache/" + mode + '/ref/truth-%s.txt' % config.DATA_NAME, 'r', encoding='utf-8') as truth_f, open(result_file, 'r', encoding='utf-8') as result_f:
             auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = scoring(truth_f, result_f)
         return auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10
     else:

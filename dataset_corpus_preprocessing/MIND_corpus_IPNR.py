@@ -88,7 +88,7 @@ class MIND_Corpus_IPNR:
 
             # 2. news ID dictionay & news category dictionay & news subCategory dictionay
             for i, prefix in enumerate([config.train_root, config.dev_root, config.test_root]):
-                with open(os.path.join(prefix, 'news.tsv'), 'r', encoding='utf-8') as news_f:
+                with open(os.path.join(prefix, 'news_.tsv'), 'r', encoding='utf-8') as news_f:
                     for line in news_f:
                         news_ID, category, subCategory, title, abstract, title_entities, abstract_entities, content = line.split('\t')
                         if news_ID not in news_ID_dict:
@@ -346,19 +346,19 @@ class MIND_Corpus_IPNR:
         # generate news meta data
         news_ID_set = set(['<PAD>'])
         news_lines = []
-        with open(os.path.join(config.train_root, 'news.tsv'), 'r', encoding='utf-8') as train_news_f:
+        with open(os.path.join(config.train_root, 'news_.tsv'), 'r', encoding='utf-8') as train_news_f:
             for line in train_news_f:
                 news_ID, category, subCategory, title, abstract, title_entities, abstract_entities, content = line.split('\t')
                 if news_ID not in news_ID_set:
                     news_lines.append(line)
                     news_ID_set.add(news_ID)
-        with open(os.path.join(config.dev_root, 'news.tsv'), 'r', encoding='utf-8') as dev_news_f:
+        with open(os.path.join(config.dev_root, 'news_.tsv'), 'r', encoding='utf-8') as dev_news_f:
             for line in dev_news_f:
                 news_ID, category, subCategory, title, abstract, title_entities, abstract_entities, content = line.split('\t')
                 if news_ID not in news_ID_set:
                     news_lines.append(line)
                     news_ID_set.add(news_ID)
-        with open(os.path.join(config.test_root, 'news.tsv'), 'r', encoding='utf-8') as test_news_f:
+        with open(os.path.join(config.test_root, 'news_.tsv'), 'r', encoding='utf-8') as test_news_f:
             for line in test_news_f:
                 news_ID, category, subCategory, title, abstract, title_entities, abstract_entities, content = line.split('\t')
                 if news_ID not in news_ID_set:

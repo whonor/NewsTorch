@@ -21,6 +21,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 
 class TrainerIPNR:
     def __init__(self, model: nn.Module, config: Config, mind_corpus: MIND_Corpus_IPNR, wandb, run_index: int):
+        self.config = config
         self.model = model
         self.epoch = config.epoch
         self.batch_size = config.batch_size
@@ -82,7 +83,7 @@ class TrainerIPNR:
             model.train()
             epoch_loss = 0
             for (user_ID, user_category, user_subCategory, user_title_text, user_title_mask, user_title_entity, user_content_text, user_content_mask, user_content_entity, user_history_mask, user_history_graph, user_concept_text, user_concept_mask, \
-                news_category, news_subCategory, news_title_text, news_title_mask, news_title_entity, news_content_text, news_content_mask, news_content_entity, news_concept_text, news_concept_mask) in train_dataloader:
+                news_category, news_subCategory, news_title_text, news_title_mask, news_title_entity, news_content_text, news_content_mask, news_content_entity, news_concept_text, news_concept_mask) in tqdm(train_dataloader):
                 user_ID = user_ID.cuda(non_blocking=True)                                                                                                                       # [batch_size]
                 user_category = user_category.cuda(non_blocking=True)                                                                                                           # [batch_size, max_history_num]
                 user_subCategory = user_subCategory.cuda(non_blocking=True)                                                                                                     # [batch_size, max_history_num]
@@ -132,7 +133,7 @@ class TrainerIPNR:
             wandb.log({'epoch': e, 'train_loss': epoch_loss / len(self.train_dataset)}, step=e)
 
             # validation
-            auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = compute_scores_IPNR(Config, model, self.mind_corpus, self.batch_size * 3 // 2, 'dev', self.dev_res_dir + '/' + model.model_name + '-' + str(e) + '.txt', self._dataset)
+            auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = compute_scores_IPNR(self.config, model, self.mind_corpus, self.batch_size * 3 // 2, 'dev', self.dev_res_dir + '/' + model.model_name + '-' + str(e) + '.txt', self._dataset)
             self.auc_results.append(auc)
             self.mrr_results.append(mrr)
             self.ndcg5_results.append(ndcg5)
