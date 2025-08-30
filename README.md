@@ -58,20 +58,20 @@ With NewsTorch, researchers and practitioners can quickly implement and evaluate
 
 | Model | Paper | Year | Category |
 |-------|-------|------|----------|
-| NPA | [NPA: neural news recommendation with personalized attention](https://arxiv.org/abs/1907.08883) | 2019 | DL-based |
-| DKN | [DKN: Deep knowledge-aware network for news recommendation](https://arxiv.org/abs/1801.08284) | 2018 | DL-based |
-| LSTUR | [Neural news recommendation with long-and short-term user representations](https://arxiv.org/abs/1907.08883) | 2019 | DL-based |
-| NAML | [Neural News Recommendation with Attentive Multi-View Learning](https://arxiv.org/abs/1907.05414) | 2019 | DL-based |
-| NRMS | [Neural news recommendation with multi-head self-attention](https://arxiv.org/abs/1907.04446) | 2019 | DL-based |
-| FIM | [Fine-grained Interest Matching for Neural News Recommendation](https://arxiv.org/abs/2001.01217) | 2020 | DL-based |
-| TANR | [Neural news recommendation with topic-aware news representation](https://arxiv.org/abs/1907.08883) | 2019 | DL-based |
-| CenNewsRec | [Privacy-Preserving News Recommendation Model Learning](https://arxiv.org/abs/2006.16615) | 2020 | DL-based |
-| MINS | [News recommendation via multi-interest news sequence modelling](https://link.springer.com/chapter/10.1007/978-3-031-05936-0_10) | 2022 | DL-based |
-| CNE-SUE | [Neural News Recommendation with Collaborative News Encoding and Structural User Encoding](https://ieeexplore.ieee.org/document/9747561) | 2021 | Graph-based |
-| IPNR | [Intention-aware user modeling for personalized news recommendation](https://dl.acm.org/doi/10.1145/3539618.3591886) | 2023 | Graph-based |
-| MANNeR | [Train once, use flexibly: A modular framework for multi-aspect neural news recommendation](https://arxiv.org/abs/2401.01339) | 2024 | DL-based |
-| LKPNR | [LKPNR: Large Language Models and Knowledge Graph for Personalized News Recommendation Framework](https://arxiv.org/abs/2405.09790) | 2024 | LLM-based |
-| ONCE | [Once: Boosting content-based recommendation with both open-and closed-source large language models](https://arxiv.org/abs/2405.15292) | 2024 | LLM-based |
+| NPA | NPA: neural news recommendation with personalized attention | 2019 | DL-based |
+| DKN | DKN: Deep knowledge-aware network for news recommendation | 2018 | DL-based |
+| LSTUR | Neural news recommendation with long-and short-term user representations | 2019 | DL-based |
+| NAML | Neural News Recommendation with Attentive Multi-View Learning | 2019 | DL-based |
+| NRMS | Neural news recommendation with multi-head self-attention | 2019 | DL-based |
+| FIM | Fine-grained Interest Matching for Neural News Recommendation| 2020 | DL-based |
+| TANR | Neural news recommendation with topic-aware news representation | 2019 | DL-based |
+| CenNewsRec | Privacy-Preserving News Recommendation Model Learning | 2020 | DL-based |
+| MINS | News recommendation via multi-interest news sequence modelling | 2022 | DL-based |
+| CNE-SUE | Neural News Recommendation with Collaborative News Encoding and Structural User Encoding | 2021 | Graph-based |
+| IPNR | Intention-aware user modeling for personalized news recommendation | 2023 | Graph-based |
+| MANNeR | Train once, use flexibly: A modular framework for multi-aspect neural news recommendation | 2024 | DL-based |
+| LKPNR | LKPNR: Large Language Models and Knowledge Graph for Personalized News Recommendation Framework | 2024 | LLM-based |
+| ONCE | Once: Boosting content-based recommendation with both open-and closed-source large language models | 2024 | LLM-based |
 
 ## 🛠️ Installation
 
@@ -234,9 +234,9 @@ If you use NewsTorch in your research, please cite our work:
 
 ```bibtex
 @software{newstorch2025,
-  author = {Your Name},
+  author = {Rongyao Wang},
   title = {NewsTorch: A PyTorch Library for News Recommendation},
   year = {2025},
-  url = {https://github.com/yourusername/NewsTorch}
+  url = {https://github.com/whonor/NewsTorch}
 }
 ```
