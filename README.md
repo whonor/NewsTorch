@@ -1,74 +1,242 @@
 # NewsTorch
 
-NewsTorch is a PyTorch-based library for news recommendation. It provides implementations of various neural news recommendation models, including both ML-based and DL-based methods, as well as graph-based models. 
-The framework is designed to facilitate the development and evaluation of news recommendation systems.
-It is built on top of PyTorch and provides a unified interface for training and evaluating different models. The library also includes utilities for data preprocessing, feature extraction, and evaluation metrics.
-We also provide a general runner for most models, which allows users to easily switch between different models and datasets.
-Our motivation is to provide a comprehensive and easy-to-use framework for news recommendation research, enabling researchers and practitioners to quickly implement and evaluate different models with an original PyTorch environment.
+<p align="center">
+    <br>
+    <img src="docs/NewsTorch%20icon.png" width="400"/>
+    <br>
+<p>
 
+[//]: # (<p align="center">)
 
-This library includes implementations of the following models:
+[//]: # (<a href="README_CN.md">中文</a> &nbsp ｜ &nbsp English &nbsp)
 
-| Model | Paper                                                                                                                         | Year |
-|-------|-------------------------------------------------------------------------------------------------------------------------------|------|
-| NPA | NPA: neural news recommendation with personalized attention                                                                   | 2019 |
-| DKN | DKN: Deep knowledge-aware network for news recommendation                                                                     | 2018 |
-| LSTUR | Neural news recommendation with long-and short-term user representations                                                      | 2019 |
-| NAML | Neural News Recommendation with Attentive Multi-View Learning                                                                 | 2019 |
-| NRMS | Neural news recommendation with multi-head self-attention                                                                     | 2019 |
-| FIM | Fine-grained Interest Matching for Neural News Recommendation                                                                 | 2020 |
-| TANR | Neural news recommendation with topic-aware news representation                                                               | 2019 |
-| CenNewsRec | Privacy-Preserving News Recommendation Model Learning                                          | 2020 |
-| MINS | News recommendation via multi-interest news sequence modelling                               | 2022 |
-| CNE-SUE | Neural News Recommendation with Collaborative News Encoding and Structural User Encoding       | 2021 |
-| IPNR | Intention-aware user modeling for personalized news recommendation                           | 2023 |
-| MANNeR | Train once, use flexibly: A modular framework for multi-aspect neural news recommendation    | 2024 |
-| LKPNR | LKPNR: Large Language Models and Knowledge Graph for Personalized News Recommendation Framework | 2024 |
-| ONCE | Once: Boosting content-based recommendation with both open-and closed-source large language models | 2024 |
+[//]: # (</p>)
 
+<p align="center">
+<img src="https://img.shields.io/badge/python-3.9+-5be.svg">
+<a href="https://pytorch.org/"><img src="https://img.shields.io/badge/pytorch-%E2%89%A52.10-orange.svg"></a>
+<a href="https://github.com/whonor/NewsTorch/pulls"><img src="https://img.shields.io/badge/PR-welcome-55EB99.svg"></a>
+<a href="https://github.com/whonor/NewsTorch/LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg?labelColor=gray"></a>
+</p>
 
+___
 
- 
+## 📖 Table of Contents
+- [Introduction](#-introduction)
+- [Key Features](#-key-features)
+- [Implemented Models](#-implemented-models)
+- [Installation](#-installation)
+- [Dataset Preparation](#-dataset-preparation)
+- [Quick Start](#-quick-start)
+- [Project Structure](#-project-structure)
+- [Configuration](#-configuration)
+- [Training](#-training)
+- [Evaluation](#-evaluation)
+- [Contributing](#-contributing)
+- [License](#-license)
+- [Citation](#-citation)
 
-## Environment Requirements
+## 📝 Introduction
 
-You can create a conda environment using the following command:
-<pre><code>
-conda create -n NewsRecTorch python=3.9
-conda activate NewsRecTorch
-./intall_packages.sh
-</code></pre>
+NewsTorch is a comprehensive PyTorch-based library for news recommendation research. It provides implementations of various neural news recommendation models, including both traditional deep learning-based methods and modern graph-based and large language model (LLM)-based approaches.
 
-## Dataset Preparation
+The framework is designed to facilitate the development, training, and evaluation of news recommendation systems. Built on top of PyTorch, it offers a unified interface for training and evaluating different models while including utilities for data preprocessing, feature extraction, and evaluation metrics.
 
-The dataset preparation is divided into two steps: 
-downloading the dataset and preparing the dataset by running the 
-python files in the dataset_download_prepare file.
+With NewsTorch, researchers and practitioners can quickly implement and evaluate different news recommendation models with an original PyTorch environment.
 
-For example, dowload and prepare the MIND dataset in the following order:
-<pre><code>
-python download_mind.py
-python MIND_dataset_prepare.py
-</code></pre>
+## 🌟 Key Features
 
-## How to Run
+- **Diverse Model Implementations**: Supports a wide range of news recommendation models from classical approaches to cutting-edge techniques
+- **Unified Framework**: Consistent API for training, validation, and testing across different models
+- **Multi-Dataset Support**: Easy integration with popular datasets like MIND and EBNeRD
+- **Flexible Configuration**: YAML-based configuration system for easy experimentation
+- **Extensible Design**: Modular architecture for adding new models and datasets
+- **Comprehensive Evaluation**: Built-in support for multiple evaluation metrics (AUC, MRR, nDCG, etc.)
+- **Experiment Tracking**: Integration with Weights & Biases for experiment management
 
-Neural news recommendation baselines:
+## 🍎 Implemented Models
 
-- DL-based models: NPA, DKN, LSTUR, NAML, NRMS, FIM, TANR, CenNewsRec, MINS, MANNeR
+| Model | Paper | Year | Category |
+|-------|-------|------|----------|
+| NPA | [NPA: neural news recommendation with personalized attention](https://arxiv.org/abs/1907.08883) | 2019 | DL-based |
+| DKN | [DKN: Deep knowledge-aware network for news recommendation](https://arxiv.org/abs/1801.08284) | 2018 | DL-based |
+| LSTUR | [Neural news recommendation with long-and short-term user representations](https://arxiv.org/abs/1907.08883) | 2019 | DL-based |
+| NAML | [Neural News Recommendation with Attentive Multi-View Learning](https://arxiv.org/abs/1907.05414) | 2019 | DL-based |
+| NRMS | [Neural news recommendation with multi-head self-attention](https://arxiv.org/abs/1907.04446) | 2019 | DL-based |
+| FIM | [Fine-grained Interest Matching for Neural News Recommendation](https://arxiv.org/abs/2001.01217) | 2020 | DL-based |
+| TANR | [Neural news recommendation with topic-aware news representation](https://arxiv.org/abs/1907.08883) | 2019 | DL-based |
+| CenNewsRec | [Privacy-Preserving News Recommendation Model Learning](https://arxiv.org/abs/2006.16615) | 2020 | DL-based |
+| MINS | [News recommendation via multi-interest news sequence modelling](https://link.springer.com/chapter/10.1007/978-3-031-05936-0_10) | 2022 | DL-based |
+| CNE-SUE | [Neural News Recommendation with Collaborative News Encoding and Structural User Encoding](https://ieeexplore.ieee.org/document/9747561) | 2021 | Graph-based |
+| IPNR | [Intention-aware user modeling for personalized news recommendation](https://dl.acm.org/doi/10.1145/3539618.3591886) | 2023 | Graph-based |
+| MANNeR | [Train once, use flexibly: A modular framework for multi-aspect neural news recommendation](https://arxiv.org/abs/2401.01339) | 2024 | DL-based |
+| LKPNR | [LKPNR: Large Language Models and Knowledge Graph for Personalized News Recommendation Framework](https://arxiv.org/abs/2405.09790) | 2024 | LLM-based |
+| ONCE | [Once: Boosting content-based recommendation with both open-and closed-source large language models](https://arxiv.org/abs/2405.15292) | 2024 | LLM-based |
 
-- Graph-based models: CNE-SUE, IPNR
+## 🛠️ Installation
 
-- LLM-based models: LKPNR, ONCE
+### Requirements
+- Python 3.9+
+- PyTorch 2.1.0+
+- CUDA (for GPU training)
 
+### Installation Steps
 
-You can run the DL-based models like NRMS in the following order:
-<pre><code>python general_runner.py --model=NRMS</code></pre>
+1. Create a new conda environment:
+```bash
+conda create -n newstorch python=3.9
+conda activate newstorch
+```
 
+2. Install other dependencies:
+```bash
+cd scripts
+./install_dependencies.sh
+```
 
-## To Do
-1. Add more datasets: Adressa;
-2. Add more models: MANNeR, ONCE
-3. Adapt LKPNR to MIND-large; 
+## 📦 Dataset Preparation
 
+NewsTorch supports multiple datasets like MIND and EB-NeRD. Dataset preparation is divided into two steps:
 
+1. Downloading the dataset by running the python files in the `dataset_download_prepare` directory
+2. Preparing the dataset by running the python files in the `dataset_download_prepare` directory
+
+### MIND Dataset Example
+
+```bash
+# Download and prepare the MIND dataset
+python dataset_download_prepare/download_mind.py
+python dataset_download_prepare/MIND_dataset_prepare.py
+```
+
+The dataset files should be organized in the following structure:
+```
+MIND-small/
+├── train/
+│   ├── news.tsv
+│   ├── behaviors.tsv
+│   ├── context_embedding.vec
+│   └── entity_embedding.vec
+├── dev/
+│   ├── news.tsv
+│   ├── behaviors.tsv
+│   ├── context_embedding.vec
+│   └── entity_embedding.vec
+├── test/
+│   ├── news.tsv
+│   ├── behaviors.tsv
+│   ├── context_embedding.vec
+│   └── entity_embedding.vec
+└── dowload/
+    ├── MINDsmall_train.zip
+    ├── MINDsmall_dev.zip
+    └── wikidata-graph.zip
+```
+
+## 🚀 Quick Start
+
+To train a model (e.g., NRMS) on the MIND dataset:
+
+```bash
+python general_runner.py --model=NRMS --batch_size=64 --epoch=10
+```
+
+To test a trained model:
+```bash
+python general_runner.py --mode=test --model=NRMS --test_model_path=path/to/your/model
+```
+
+## 📁 Project Structure
+
+```
+NewsTorch/
+├── config/                 # Model configurations (YAML files)
+├── dataset_corpus_preprocessing/ # Data preprocessing modules
+├── dataset_download_prepare/     # Dataset download and preparation scripts
+├── docs/                   # Documentation and images
+├── models/                 # Model implementations
+│   ├── modules/            # Reusable model components
+│   └── [model_name].py     # Individual model files
+├── utils/                  # Utility functions
+├── general_runner.py       # Main training/evaluation script
+├── config.py               # Configuration class
+└── README.md
+```
+
+## ⚙️ Configuration
+
+NewsTorch uses a combination of command-line arguments and YAML configuration files for model-specific settings:
+
+1. **Command-line arguments**: Basic settings like model name, batch size, and epochs
+2. **YAML files**: Model-specific hyperparameters in `config/[model_name].yaml`
+
+Example configuration file (`config/nrms.yaml`):
+```yaml
+# NRMS specific hyperparameters
+head_num: 20
+head_dim: 20
+attention_dim: 200
+```
+
+## 🏃 Training
+
+The training process is handled by `general_runner.py` which supports different modes:
+
+- **Train mode**: Train a model from scratch
+- **Dev mode**: Evaluate on development set
+- **Test mode**: Evaluate on test set
+
+### Training a Model
+```bash
+python general_runner.py --model=NRMS --mode=train
+```
+
+### Key Training Features
+- Automatic checkpoint saving
+- Early stopping based on validation performance
+- Multi-GPU support
+- Experiment tracking with Weights & Biases
+
+## 📊 Evaluation
+
+NewsTorch computes multiple evaluation metrics during validation and testing:
+
+- **AUC**: Area Under the ROC Curve
+- **MRR**: Mean Reciprocal Rank
+- **nDCG@5/10**: Normalized Discounted Cumulative Gain
+- **Recall@5/10**: Recall at K
+- **Hit@5/10**: Hit Rate at K
+- **Precision@5/10**: Precision at K
+- **MAE**: Mean Absolute Error
+- **RMSE**: Root Mean Square Error
+
+Results are automatically saved to CSV files for further analysis.
+
+## 🤝 Contributing
+
+We welcome contributions to NewsTorch! Here's how you can contribute:
+
+1. Fork the repository
+2. Create a new branch for your feature
+3. Add your model or improvement
+4. Write tests if applicable
+5. Submit a pull request
+
+Please ensure your code follows the existing style and includes appropriate documentation.
+
+## 🏛 License
+
+This framework is licensed under the [MIT License](LICENSE).
+
+## 📎 Citation
+
+If you use NewsTorch in your research, please cite our work:
+
+```bibtex
+@software{newstorch2025,
+  author = {Your Name},
+  title = {NewsTorch: A PyTorch Library for News Recommendation},
+  year = {2025},
+  url = {https://github.com/yourusername/NewsTorch}
+}
+```
