@@ -64,14 +64,21 @@ class Config:
         parser.add_argument('--batch_size', type=int, default='64', help='Batch size for training')
         parser.add_argument('--seed', type=int, default=0, help='Seed')
         parser.add_argument('--epoch', type=int, default=20, help='Epoch for training')
+        parser.add_argument('--mode', type=str, default='train', help='Mode')
+        parser.add_argument('--dev_model_path', type=str,
+                            default='/home/wanro238/NewsRecTorch/cache/best_models/small/NRMS/#1/NRMS',
+                            help='The path of the best model')
+        parser.add_argument('--test_model_path', type=str,
+                            default='/home/wanro238/NewsRecTorch/cache/best_models/small/NRMS/#1/NRMS',
+                            help='The path of the best model')
         args, _ = parser.parse_known_args()
         self.model = args.model
 
         self.wandb = 'offline'  # Whether to use Weights & Biases for experiment tracking
         self.wandb_key = '510e44ae3bcf9efc088d88e2c85dcf2a5f0960b1'  # Key for Weights & Biases, if needed
-        self.mode = 'train'
-        self.dev_model_path = ''
-        self.test_model_path = ''
+        self.mode = args.mode
+        self.dev_model_path = args.dev_model_path
+        self.test_model_path = args.test_model_path
         self.test_output_file = ''
         self.seed = args.seed
         self.config_file = ''

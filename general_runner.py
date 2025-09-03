@@ -426,7 +426,7 @@ if __name__ == '__main__':
         print("Finish dev at: ", datetime.now())
     elif config.mode == 'test':
         print("Start testing at: ", datetime.now())
-        test(config)
+        test(config, corpus)
         print("Finish testing at: ", datetime.now())
 
 

@@ -243,9 +243,9 @@ class KCNN(NewsEncoder):
         self.context_embedding_dim = config.context_embedding_dim
         self.entity_embedding = nn.Embedding(num_embeddings=config.entity_size, embedding_dim=self.entity_embedding_dim)
         self.context_embedding = nn.Embedding(num_embeddings=config.entity_size, embedding_dim=self.context_embedding_dim)
-        with open(config.data_path + '/entity_embedding-%s.pkl' % config.dataset, 'rb') as entity_embedding_f:
+        with open(config.data_path + '/entity_embedding-%s.pkl' % config.dataset_size, 'rb') as entity_embedding_f:
             self.entity_embedding.weight.data.copy_(pickle.load(entity_embedding_f))
-        with open(config.data_path + '/context_embedding-%s.pkl' % config.dataset, 'rb') as context_embedding_f:
+        with open(config.data_path + '/context_embedding-%s.pkl' % config.dataset_size, 'rb') as context_embedding_f:
             self.context_embedding.weight.data.copy_(pickle.load(context_embedding_f))
         self.M_entity = nn.Linear(self.entity_embedding_dim, self.word_embedding_dim, bias=True)
         self.M_context = nn.Linear(self.context_embedding_dim, self.word_embedding_dim, bias=True)
