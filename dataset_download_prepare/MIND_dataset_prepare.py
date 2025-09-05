@@ -12,9 +12,9 @@ np.random.seed(0)
 
 root = "../"
 # root
-MIND_small_dataset_root = root + '/MIND-small'
-MIND_large_dataset_root = root + '/MIND-large'
-MIND_200k_dataset_root = root + '/MIND-200k'
+MIND_small_dataset_root = root + 'MIND-small'
+MIND_large_dataset_root = root + 'MIND-large'
+MIND_200k_dataset_root = root + 'MIND-200k'
 
 def confirm_overwrite(path: str) -> bool:
     if os.path.exists(path):
@@ -273,8 +273,8 @@ def main():
     prepare_MIND_small()
     # print("准备 MIND-200k...")
     # prepare_MIND_200k()
-    print("准备 MIND-large...")
-    prepare_MIND_large()
+    # print("准备 MIND-large...")
+    # prepare_MIND_large()
     print("All datasets are finished。")
 
 
