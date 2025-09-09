@@ -260,7 +260,7 @@ def compute_scores_IPNR(config: Config, model: nn.Module, mind_corpus: MIND_Corp
                 result[sub_score[j][1]] = j + 1
             result_f.write(('' if i == 0 else '\n') + str(i + 1) + ' ' + str(result).replace(' ', ''))
     if dataset != 'submission' or mode != 'test':
-        with open("./cache/" + mode + '/ref/truth-%s.txt' % config.DATA_NAME, 'r', encoding='utf-8') as truth_f, open(result_file, 'r', encoding='utf-8') as result_f:
+        with open("./cache/" + mode + '/ref/truth-%s.txt' % config.DATASET_ROOT, 'r', encoding='utf-8') as truth_f, open(result_file, 'r', encoding='utf-8') as result_f:
             auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = scoring(truth_f, result_f)
         return auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10
     else:
@@ -367,7 +367,7 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
                 result[sub_score[j][1]] = j + 1
             result_f.write(('' if i == 0 else '\n') + str(i + 1) + ' ' + str(result).replace(' ', ''))
     if dataset != 'submission' or mode != 'test':
-        with open(config.data_path + '/' + mode + '/ref/truth-%s.txt' % config.DATA_NAME, 'r', encoding='utf-8') as truth_f, open(result_file, 'r', encoding='utf-8') as result_f:
+        with open(config.data_path + '/' + mode + '/ref/truth-%s.txt' % config.DATASET_ROOT, 'r', encoding='utf-8') as truth_f, open(result_file, 'r', encoding='utf-8') as result_f:
             auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = scoring(truth_f, result_f)
         return auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10
     else:

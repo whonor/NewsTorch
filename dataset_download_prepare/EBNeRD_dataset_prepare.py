@@ -20,7 +20,7 @@ ebnerd_large_dataset_root = root + '/ebnerd_large'
 
 def confirm_overwrite(path: str) -> bool:
     if os.path.exists(path):
-        choice = input(f"already existed: {path}，recovered？(y/N): ").strip().lower()
+        choice = input(f"already existed: {path}, recover? (y/N): ").strip().lower()
         return choice == 'y'
     return True
 
@@ -30,13 +30,13 @@ def split_training_behaviors(size='ebnerd_demo', train_ratio=0.9):
     if not os.path.exists(behavior_file):
         raise FileNotFoundError(f"behavior file does not exist: {behavior_file}")
 
-    #  pandas  parquet
+    # Read pandas parquet
     df = pd.read_parquet(behavior_file)
 
-    #
+    # Shuffle the data
     df = df.sample(frac=1, random_state=42).reset_index(drop=True)
 
-    #
+    # Split the data
     train_num = int(len(df) * train_ratio)
     train_df = df.iloc[:train_num]
     dev_df = df.iloc[train_num:]

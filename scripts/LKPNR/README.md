@@ -14,17 +14,17 @@ Prepare the data for LKPNR model after downloading the 'KGraph_LKPNR'.
 - get_node_emb.py
 - get_all_entities_emb_dict.py
 
-# TransformJSON2pkl.py
+## TransformJSON2pkl.py
 
 This script transforms a JSON file into a Pickle file, with a key modification from the original version:
 
-## Changes Made
+### Changes Made
 
 1. **Reversed Mapping**: The original JSON mapping was `{news_id: ID}`, but we've reversed it to `{ID: news_id}` to match the expected format for downstream processing.
 
 2. **Type Conversion**: The ID values are explicitly converted to integers to ensure consistent data types.
 
-## Usage
+### Usage
 
 The script reads a JSON file where each entry maps a news identifier to an integer ID, and outputs a pickle file where each entry maps an integer ID to a news identifier.
 
@@ -32,7 +32,7 @@ Example:
 - Input JSON: `{"N12345": 1, "N67890": 2}`
 - Output Pickle: `{1: "N12345", 2: "N67890"}`
 
-## Running the Script
+### Running the Script
 
 ```bash
 python TransformJSON2pkl.py

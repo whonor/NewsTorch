@@ -65,6 +65,10 @@ class Config:
         parser.add_argument('--seed', type=int, default=0, help='Seed')
         parser.add_argument('--epoch', type=int, default=20, help='Epoch for training')
         parser.add_argument('--mode', type=str, default='train', help='Mode')
+        parser.add_argument('--DATASET_ROOT', type=str, default='MIND-small', help='Default dataset name, can be ebnerd_demo, ebnerd_small, MIND-small, or MIND-large')
+        parser.add_argument('--dataset_name', type=str, default='MIND', help='Name of the dataset to be used, MIND, EBNeRD')
+        parser.add_argument('--dataset_size', type=str, default='small', help='Dataset variant, can be small, large, or demo, if submit the predictions submission')
+
         parser.add_argument('--dev_model_path', type=str,
                             default='/home/wanro238/NewsRecTorch/cache/best_models/small/NRMS/#1/NRMS',
                             help='The path of the best model')
@@ -85,9 +89,9 @@ class Config:
 
         self.root = "."
         self.data_path = "cache/"
-        self.DATA_NAME = 'MIND-small'  # Default dataset name, can be 'ebnerd_demo', 'ebnerd_small' 'MIND-small', 'MIND-200k', or 'MIND-large'
-        self.dataset_name = 'MIND'  # Name of the dataset to be used, MIND, EBNeRD
-        self.dataset_size = 'small'  # Dataset variant, can be 'small', 'large', or 'demo', if submit the predictions 'submission'
+        self.DATASET_ROOT = args.DATASET_ROOT
+        self.dataset_name = args.dataset_name
+        self.dataset_size = args.dataset_size
         self.tokenizer = 'MIND'
         self.word_threshold = 3
         self.max_title_length = 32
@@ -121,9 +125,9 @@ class Config:
         # self.train_root = self.root + '/%s_%s/train' % (self.dataset_name, self.dataset)
         # self.dev_root = self.root + '/%s_%s/dev' % (self.dataset_name, self.dataset)
         # self.test_root = self.root + '/%s_%s/test' % (self.dataset_name, self.dataset)
-        self.train_root = self.root + '/%s/train' % self.DATA_NAME
-        self.dev_root = self.root + '/%s/dev' % self.DATA_NAME
-        self.test_root = self.root + '/%s/test' % self.DATA_NAME
+        self.train_root = self.root + '/%s/train' % self.DATASET_ROOT
+        self.dev_root = self.root + '/%s/dev' % self.DATASET_ROOT
+        self.test_root = self.root + '/%s/test' % self.DATASET_ROOT
 
         self.seed = self.seed if self.seed >= 0 else (int)(time.time())
 
@@ -206,8 +210,8 @@ class Config:
             mkdirs("cache/IPNR/")
         mkdirs("cache/%s/" % self.dataset_name)
 
-        dev_truth_path = os.path.join(data_path, f'dev/ref/truth-{self.DATA_NAME}.txt')
-        test_truth_path = os.path.join(data_path, f'test/ref/truth-{self.DATA_NAME}.txt')
+        dev_truth_path = os.path.join(data_path, f'dev/ref/truth-{self.DATASET_ROOT}.txt')
+        test_truth_path = os.path.join(data_path, f'test/ref/truth-{self.DATASET_ROOT}.txt')
 
         if dataset_name == 'MIND':
             if not os.path.exists(dev_truth_path):

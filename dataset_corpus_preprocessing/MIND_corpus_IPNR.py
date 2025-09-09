@@ -229,7 +229,7 @@ class MIND_Corpus_IPNR:
 
                 user_history_graph = np.zeros([user_history_num, graph_size, graph_size], dtype=np.float32)
 
-                graph = pickle.load(open(config.DATA_NAME + "/"+mode+"/concepts_subgraph.pkl", 'rb'))   # build by 02_build_edge_index.py
+                graph = pickle.load(open(config.DATASET_ROOT + "/" + mode + "/concepts_subgraph.pkl", 'rb'))   # build by 02_build_edge_index.py
 
                 with open(os.path.join(prefix, 'behaviors.tsv'), 'r', encoding='utf-8') as behaviors_f:
                     for line_index, line in enumerate(behaviors_f):

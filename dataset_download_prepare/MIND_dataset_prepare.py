@@ -10,7 +10,7 @@ import collections
 random.seed(0)
 np.random.seed(0)
 
-root = "../"
+root = "./"
 # root
 MIND_small_dataset_root = root + 'MIND-small'
 MIND_large_dataset_root = root + 'MIND-large'
@@ -18,7 +18,7 @@ MIND_200k_dataset_root = root + 'MIND-200k'
 
 def confirm_overwrite(path: str) -> bool:
     if os.path.exists(path):
-        choice = input(f"already existed: {path}，recovered？(y/N): ").strip().lower()
+        choice = input(f"already existed: {path}, recover? (y/N): ").strip().lower()
         return choice == 'y'
     return True
 
@@ -27,7 +27,7 @@ def split_training_behaviors(dataset_root):
     MIND_small_train_ratio = 0.9
     behavior_file = os.path.join(dataset_root, 'download', 'train', 'behaviors.tsv')
     if not os.path.exists(behavior_file):
-        raise FileNotFoundError(f"behavior file no exist: {behavior_file}")
+        raise FileNotFoundError(f"behavior file does not exist: {behavior_file}")
 
     with open(behavior_file, 'r', encoding='utf-8') as f:
         behavior_lines = [line for line in f if line.strip()]
@@ -270,12 +270,11 @@ def prepare_MIND_200k():
 
 def main():
     print("Prepare MIND-small...")
-    prepare_MIND_small()
-    # print("准备 MIND-200k...")
+    # print("Prepare MIND-200k...")
     # prepare_MIND_200k()
-    # print("准备 MIND-large...")
-    # prepare_MIND_large()
-    print("All datasets are finished。")
+    print("Prepare MIND-large...")
+    prepare_MIND_large()
+    print("All datasets are finished.")
 
 
 if __name__ == '__main__':

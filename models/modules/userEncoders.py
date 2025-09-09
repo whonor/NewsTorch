@@ -507,7 +507,7 @@ class IPNR(UserEncoder):
 
         self.pretrained_concept_embedding = torch.from_numpy(
             np.load(
-                '%s/all_concept_word_embedding.npy' %config.DATA_NAME)).float().to(
+                '%s/all_concept_word_embedding.npy' %config.DATASET_ROOT)).float().to(
             device=self.device)  # build by 03_generate_concept_embedding.py
         with open('cache/IPNR/word_embedding-' + str(config.word_threshold) + '-' + str(
                 config.word_embedding_dim) + '-' + config.tokenizer + '-' + str(config.max_title_length) + '-' + str(
