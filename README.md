@@ -71,7 +71,7 @@ With NewsTorch, researchers and practitioners can quickly implement and evaluate
 | IPNR | Intention-aware user modeling for personalized news recommendation | 2023 | Graph-based |
 | MANNeR | Train once, use flexibly: A modular framework for multi-aspect neural news recommendation | 2024 | DL-based |
 | LKPNR | LKPNR: Large Language Models and Knowledge Graph for Personalized News Recommendation Framework | 2024 | LLM-based |
-| ONCE | Once: Boosting content-based recommendation with both open-and closed-source large language models | 2024 | LLM-based |
+
 
 ## 🛠️ Installation
 
@@ -127,7 +127,7 @@ MIND-small/
 │   ├── behaviors.tsv
 │   ├── context_embedding.vec
 │   └── entity_embedding.vec
-└── dowload/
+└── download/
     ├── MINDsmall_train.zip
     ├── MINDsmall_dev.zip
     └── wikidata-graph.zip
