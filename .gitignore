@@ -60,3 +60,4 @@ cache/word_embedding-3-300-MIND-32-128-small.pkl
 .idea/workspace.xml
 /.idea
 /MIND-large
+/wandb
