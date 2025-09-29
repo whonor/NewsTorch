@@ -53,24 +53,24 @@ With NewsTorch, researchers and practitioners can quickly implement and evaluate
 - **Extensible Design**: Modular architecture for adding new models and datasets
 - **Comprehensive Evaluation**: Built-in support for multiple evaluation metrics (AUC, MRR, nDCG, etc.)
 - **Experiment Tracking**: Integration with Weights & Biases for experiment management
+- **GUI Support**: GUI for model training and evaluation
 
 ## 🍎 Implemented Models
 
-| Model | Paper | Year | Category |
-|-------|-------|------|----------|
-| NPA | NPA: neural news recommendation with personalized attention | 2019 | DL-based |
-| DKN | DKN: Deep knowledge-aware network for news recommendation | 2018 | DL-based |
-| LSTUR | Neural news recommendation with long-and short-term user representations | 2019 | DL-based |
-| NAML | Neural News Recommendation with Attentive Multi-View Learning | 2019 | DL-based |
-| NRMS | Neural news recommendation with multi-head self-attention | 2019 | DL-based |
-| FIM | Fine-grained Interest Matching for Neural News Recommendation| 2020 | DL-based |
-| TANR | Neural news recommendation with topic-aware news representation | 2019 | DL-based |
-| CenNewsRec | Privacy-Preserving News Recommendation Model Learning | 2020 | DL-based |
-| MINS | News recommendation via multi-interest news sequence modelling | 2022 | DL-based |
-| CNE-SUE | Neural News Recommendation with Collaborative News Encoding and Structural User Encoding | 2021 | Graph-based |
-| IPNR | Intention-aware user modeling for personalized news recommendation | 2023 | Graph-based |
-| MANNeR | Train once, use flexibly: A modular framework for multi-aspect neural news recommendation | 2024 | DL-based |
-| LKPNR | LKPNR: Large Language Models and Knowledge Graph for Personalized News Recommendation Framework | 2024 | LLM-based |
+| Model | Paper | Year | Category | Core Code Files                                                      | Config File           | Note                                                                                                                                                            |
+|-------|-------|------|----------|----------------------------------------------------------------------|-----------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| NPA | NPA: neural news recommendation with personalized attention | 2019 | DL-based | models/NPA.py general_runner.py                                      | config/npa.yaml       | None                                                                                                                                                            |
+| DKN | DKN: Deep knowledge-aware network for news recommendation | 2018 | DL-based | models/DKN.py general_runner.py                                      | config/dkn.yaml       | None                                                                                                                                                            |
+| LSTUR | Neural news recommendation with long-and short-term user representations | 2019 | DL-based | models/LSTUR.py  general_runner.py                                   | config/lstur.yaml     | None                                                                                                                                                            |
+| NAML | Neural News Recommendation with Attentive Multi-View Learning | 2019 | DL-based | models/NAML.py  general_runner.py                                    | config/naml.yaml      | None                                                                                                                                                            |
+| NRMS | Neural news recommendation with multi-head self-attention | 2019 | DL-based | models/NRMS.py  general_runner.py                                    | config/nrms.yaml      | None                                                                                                                                                            |
+| FIM | Fine-grained Interest Matching for Neural News Recommendation| 2020 | DL-based | models/FIM.py  general_runner.py                                     | config/fim.yaml       | None                                                                                                                                                            |
+| TANR | Neural news recommendation with topic-aware news representation | 2019 | DL-based | models/TANR.py  general_runner.py                                    | config/tanr.yaml      | None                                                                                                                                                            |
+| CenNewsRec | Privacy-Preserving News Recommendation Model Learning | 2020 | DL-based | models/CenNewsRec.py  general_runner.py                              | config/cennewsrec.yaml | None                                                                                                                                                            |
+| MINS | News recommendation via multi-interest news sequence modelling | 2022 | DL-based | models/MINS.py  general_runner.py                                    | config/mins.yaml      | None                                                                                                                                                            |
+| CNE-SUE | Neural News Recommendation with Collaborative News Encoding and Structural User Encoding | 2021 | Graph-based | models/CNE_SUE.py  general_runner.py                                 | config/cne-sue.yaml   | None                                                                                                                                                            |
+| IPNR | Intention-aware user modeling for personalized news recommendation | 2023 | Graph-based | models/IPNR.py models/modules/ipnr Conceptgraph general_runner.py    | config/ipnr.yaml      | First to download and execute Conceptgraph to generate graph data [here](https://drive.google.com/file/d/1rih15bSlXTHZg-JNdtxSoS3uiVfjjIyX/view?usp=sharing)    |
+| LKPNR | LKPNR: Large Language Models and Knowledge Graph for Personalized News Recommendation Framework | 2024 | LLM-based | models/LKPNR.py models/modules/LKPNR  KGraph_LKPNR general_runner.py | config/lkpnr.yaml | First to download and execute KGraph_LKPNR to generate required data [here](https://drive.google.com/file/d/1eGiw6Cg7yH-bdjcXJnIBmRjjPlVde69s/view?usp=sharing) |
 
 
 ## 🛠️ Installation
@@ -108,6 +108,8 @@ NewsTorch supports multiple datasets like MIND and EB-NeRD. Dataset preparation 
 python dataset_download_prepare/download_mind.py
 python dataset_download_prepare/MIND_dataset_prepare.py
 ```
+
+⚠️ Note: Due to the public URL of wikidata-graph.zip missing, we provide a direct download link. You have to manually download it from [here](https://drive.google.com/file/d/1zoH9Aj03KM4KMa5FqJx9UV5CRwSrUjN0/view?usp=sharing) and then put it into the `download` directory before executing the `download_mind.py`.
 
 The dataset files should be organized in the following structure:
 ```
@@ -160,7 +162,11 @@ NewsTorch/
 ├── utils/                  # Utility functions
 ├── general_runner.py       # Main training/evaluation script
 ├── config.py               # Configuration class
-└── README.md
+├── README.md
+├── templates /
+│   └──index.html           # Web UI template
+├── run_webui.py            # Web UI starter
+└── webui.py                # Web UI terminal
 ```
 
 ## ⚙️ Configuration
@@ -211,6 +217,47 @@ NewsTorch computes multiple evaluation metrics during validation and testing:
 - **RMSE**: Root Mean Square Error
 
 Results are automatically saved to CSV files for further analysis.
+
+
+## ▶️ Web GUI
+
+1. Run the following command in the project root directory to start the web service:
+
+```bash
+python run_webui.py
+```
+
+2. Open your browser and visit `http://localhost:5000` to use the Web GUI.
+
+### Feature Description
+
+#### Training Models
+
+1. Select "Training" mode in the Web UI
+2. Select the model and dataset to train from the dropdown menu
+3. Set the Batch Size and Epoch parameters
+4. Click the "Start Training" button to launch the training task
+
+#### Validating Models
+
+1. Select "Validation" mode in the Web UI
+2. Select the model and dataset from the dropdown menu
+3. Enter the path to the pre-trained model
+4. Click the "Start Validation" button to launch the validation task
+
+#### Testing Models
+
+1. Select "Testing" mode in the Web UI
+2. Select the model and dataset from the dropdown menu
+3. Enter the path to the pre-trained model
+4. Click the "Start Testing" button to launch the testing task
+
+#### ⚠️ Notes
+
+- Training, validation, and testing tasks will run in the background without blocking the Web interface
+- Please ensure that the selected model and dataset combination is supported
+- The model path needs to be the full path relative to the project root directory
+
 
 ## 🤝 Contributing
 
