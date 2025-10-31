@@ -27,11 +27,11 @@ def confirm_overwrite(path: str) -> bool:
 
 def split_training_behaviors(size, train_ratio=0.9):
     if size == 'ebnerd_demo':
-        behavior_file = os.path.join(ebnerd_demo_dataset_root, 'download', size, 'train', 'behaviors.parquet')
+        behavior_file = os.path.join(ebnerd_demo_dataset_root, 'download', size, 'train', 'behaviors_.parquet')
     elif size == 'ebnerd_small':
-        behavior_file = os.path.join(ebnerd_small_dataset_root, 'download', size, 'train', 'behaviors.parquet')
+        behavior_file = os.path.join(ebnerd_small_dataset_root, 'download', size, 'train', 'behaviors_.parquet')
     elif size == 'ebnerd_large':
-        behavior_file = os.path.join(ebnerd_large_dataset_root, 'download', size, 'train', 'behaviors.parquet')
+        behavior_file = os.path.join(ebnerd_large_dataset_root, 'download', size, 'train', 'behaviors_.parquet')
 
     if not os.path.exists(behavior_file):
         raise FileNotFoundError(f"behavior file does not exist: {behavior_file}")
@@ -74,9 +74,9 @@ def preprocess_ebnerd_demo(size):
         # save behaviors.parquet
         df.to_parquet(os.path.join(out_dir, 'behaviors.parquet'), index=False)
 
-        # copy articles.parquet, history.parquet
-        src_news = os.path.join(root, 'download', size, 'articles.parquet')
-        dst_news = os.path.join(out_dir, 'articles.parquet')
+        # copy news.parquet, history.parquet
+        src_news = os.path.join(root, 'download', size, 'news.parquet')
+        dst_news = os.path.join(out_dir, 'news.parquet')
         if confirm_overwrite(dst_news):
             if not os.path.exists(src_news):
                 raise FileNotFoundError(f"news file does not exist: {src_news}")
@@ -104,13 +104,13 @@ def preprocess_ebnerd_demo(size):
         shutil.rmtree(test_dir)
     os.makedirs(test_dir)
 
-    for fname in ('behaviors.parquet', 'articles.parquet', 'history.parquet'):
-        if fname == 'behaviors.parquet':
+    for fname in ('behaviors_.parquet', 'news.parquet', 'history.parquet'):
+        if fname == 'behaviors_.parquet':
             src = os.path.join(root, 'download', size, 'validation', fname)
             dst = os.path.join(test_dir, 'behaviors.parquet')
-        elif fname == 'articles.parquet':
+        elif fname == 'news.parquet':
             src = os.path.join(root, 'download', size, fname)
-            dst = os.path.join(test_dir, 'articles.parquet')
+            dst = os.path.join(test_dir, 'news.parquet')
         else:
             src = os.path.join(root, 'download', size, 'validation', fname)
             dst = os.path.join(test_dir, 'history.parquet')

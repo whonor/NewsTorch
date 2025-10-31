@@ -395,6 +395,9 @@ def test(config: Config, corpus):
 
 
 if __name__ == '__main__':
+
+    global corpus
+
     config = Config()
     wandb.login(anonymous="allow", key=config.wandb_key)  # Login to Weights & Biases
     run = wandb.init(

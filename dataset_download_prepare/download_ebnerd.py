@@ -59,7 +59,7 @@ def _load_news(source_file_path, dst_dir):
     'total_read_time', 'sentiment_score', 'sentiment_label']
 
     '''
-    """加载新闻数据"""
+    """load news"""
     parsed_news_file = os.path.join(dst_dir, "news.parquet")
     article_file = os.path.join(source_file_path, "articles.parquet")
     print("News not parsed. Loading and parsing raw data.")
@@ -143,8 +143,8 @@ def _load_behaviors(source_file_path, dst_dir, split="train"):
             seed=42,
         )
     '''
-    column_names = ["impression_id", "user_id", "impression_time", "article_id_fixed", "article_ids_inview",
-                    "article_ids_clicked", "labels"]
+    # column_names = ["impression_id", "user_id", "impression_time", "article_id_fixed", "article_ids_inview",
+    #                 "article_ids_clicked", "labels"]
     new_names = ["impid", "uid", "time", "history", "impressions", "labels"]
     behaviors = df_behaviors.rename({"impression_id": "impid",
                                           "user_id": "uid",
@@ -159,7 +159,7 @@ def _load_behaviors(source_file_path, dst_dir, split="train"):
     结束时间: 2023-05-25 06:59:52
     总跨度: 6 days, 23:59:49
     """
-    last_dt = behaviors["time"].max() - dt.timedelta(days=1)
+    # last_dt = behaviors["time"].max() - dt.timedelta(days=1)
 
     # behaviors["time"] = pd.to_datetime(behaviors["time"], format="%m/%d/%Y %I:%M:%S %p")
 
@@ -197,13 +197,15 @@ def main():
 
     print("\nAll downloads and extractions completed.")
 
-    print("\n===Preparing EB-NeRD news data. ===")
-    _load_news(source_file_path=str(root / "ebnerd_demo/download/ebnerd_demo/"), dst_dir=str(root / "ebnerd_demo/download/ebnerd_demo/"))
-    print("\n=== Preparing EB-NeRD users behaviour data. ===")
-    _load_behaviors(source_file_path=str(root / "ebnerd_demo/download/ebnerd_demo/"), dst_dir=str(root / "ebnerd_demo/download/ebnerd_demo/"), split="train")
-    _load_behaviors(source_file_path=str(root / "ebnerd_demo/download/ebnerd_demo/"), dst_dir=str(root / "ebnerd_demo/download/ebnerd_demo/"), split="validation")
-
-
+    for name, url in datasets.items():
+        print("\n===Preparing EB-NeRD %s news data. ===", name)
+        _load_news(source_file_path=str(root / name / "download" / name),
+                   dst_dir=str(root / name / "download" / name))
+        print("\n=== Preparing EB-NeRD %s users behaviour data. ===", name)
+        _load_behaviors(source_file_path=str(root / name / "download" / name),
+                        dst_dir=str(root / name / "download" / name), split="train")
+        _load_behaviors(source_file_path=str(root / name / "download" / name),
+                        dst_dir=str(root / name / "download" / name), split="validation")
 
 
 def clean_data(input_path, output_path):
