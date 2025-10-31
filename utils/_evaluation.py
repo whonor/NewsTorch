@@ -269,7 +269,7 @@ def compute_scores_IPNR(config: Config, model: nn.Module, mind_corpus: MIND_Corp
 
 def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mode: str, result_file: str, dataset: str):
     assert mode in ['dev', 'test'], 'mode must be chosen from \'dev\' or \'test\''
-    if config.dataset_name == 'EBNeRD':
+    if config.dataset_name == 'ebnerd':
         corpus = EBNeRD_Corpus(config)
     elif config.dataset_name == 'MIND':
         corpus = MIND_Corpus(config)
