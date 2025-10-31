@@ -79,7 +79,7 @@ class Config:
         self.model = args.model
 
         self.wandb = 'offline'  # Whether to use Weights & Biases for experiment tracking
-        self.wandb_key = '510e44ae3bcf9efc088d88e2c85dcf2a5f0960b1'  # Key for Weights & Biases, if needed
+        self.wandb_key = ''  # Key for Weights & Biases, if needed
         self.mode = args.mode
         self.dev_model_path = args.dev_model_path
         self.test_model_path = args.test_model_path
