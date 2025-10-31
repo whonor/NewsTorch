@@ -13,7 +13,7 @@ from utils._behaviors import ebnerd_from_path, sampling_strategy_wu2019, create_
 def download_file(url: str, dest: Path, chunk_size: int = 1024):
     dest.parent.mkdir(parents=True, exist_ok=True)
     if dest.exists() and dest.stat().st_size > 0:
-        print(f"already existed, skip download: {dest}")
+        print(f"already existed，skip download: {dest}")
         return
     resp = requests.get(url, stream=True)
     resp.raise_for_status()
@@ -28,7 +28,7 @@ def download_file(url: str, dest: Path, chunk_size: int = 1024):
 
 def extract_zip(zip_path: Path, extract_to: Path):
     if extract_to.exists() and any(extract_to.iterdir()):
-        print(f"existed and not empty, skip extraction: {extract_to}")
+        print(f"existed and no empty，skip extracted: {extract_to}")
         return
     print(f"Extracting {zip_path} → {extract_to}")
     extract_to.mkdir(parents=True, exist_ok=True)
@@ -59,7 +59,7 @@ def _load_news(source_file_path, dst_dir):
     'total_read_time', 'sentiment_score', 'sentiment_label']
 
     '''
-    """Load news data"""
+    """加载新闻数据"""
     parsed_news_file = os.path.join(dst_dir, "news.parquet")
     article_file = os.path.join(source_file_path, "articles.parquet")
     print("News not parsed. Loading and parsing raw data.")
@@ -89,7 +89,7 @@ def _load_news(source_file_path, dst_dir):
 
 
 def _load_behaviors(source_file_path, dst_dir, split="train"):
-    """Load user behavior data"""
+    """load the user behaviors"""
     source_file_path = os.path.join(
         source_file_path, split
     )
@@ -154,10 +154,10 @@ def _load_behaviors(source_file_path, dst_dir, split="train"):
     behaviors = behaviors[new_names]
 
     """
-    === behaviors time range analysis ===
-    Start time: 2023-05-18 07:00:03
-    End time: 2023-05-25 06:59:52
-    Total span: 6 days, 23:59:49
+    === behaviors 时间范围分析 ===
+    起始时间: 2023-05-18 07:00:03
+    结束时间: 2023-05-25 06:59:52
+    总跨度: 6 days, 23:59:49
     """
     last_dt = behaviors["time"].max() - dt.timedelta(days=1)
 
@@ -182,9 +182,9 @@ def _load_behaviors(source_file_path, dst_dir, split="train"):
 
 def main():
     datasets = {
-        'ebnerd_demo': 'https://ebnerd-dataset.s3.eu-west-1.amazonaws.com/ebnerd_demo.zip',
-        # 'ebnerd_small': 'https://ebnerd-dataset.s3.eu-west-1.amazonaws.com/ebnerd_small.zip',
-        # 'ebnerd_large': 'https://ebnerd-dataset.s3.eu-west-1.amazonaws.com/ebnerd_large.zip'
+        # 'ebnerd_demo': 'https://ebnerd-dataset.s3.eu-west-1.amazonaws.com/ebnerd_demo.zip',
+        'ebnerd_small': 'https://ebnerd-dataset.s3.eu-west-1.amazonaws.com/ebnerd_small.zip',
+        'ebnerd_large': 'https://ebnerd-dataset.s3.eu-west-1.amazonaws.com/ebnerd_large.zip'
     }
 
     root = Path(__file__).resolve().parent.parent
@@ -229,7 +229,7 @@ if __name__ == '__main__':
         import requests
         from tqdm import tqdm
     except ImportError:
-        print("Please install dependencies: pip install requests tqdm", file=sys.stderr)
+        print("Please install dependencies：pip install requests tqdm", file=sys.stderr)
         sys.exit(1)
     main()
 
