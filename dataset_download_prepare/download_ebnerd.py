@@ -7,6 +7,14 @@ import datetime as dt
 import pandas as pd
 from zipfile import ZipFile
 
+import sys
+from pathlib import Path
+
+# Add path into sys.path
+ROOT = str(Path(__file__).resolve().parents[1])
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
+
 from utils._behaviors import ebnerd_from_path, sampling_strategy_wu2019, create_binary_labels_column
 
 

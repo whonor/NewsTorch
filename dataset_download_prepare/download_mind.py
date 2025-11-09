@@ -6,6 +6,14 @@ import requests
 from zipfile import ZipFile
 from tqdm import tqdm
 
+import sys
+from pathlib import Path
+
+# Add path into sys.path
+ROOT = str(Path(__file__).resolve().parents[1])
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
+
 def download_file(url: str, dest: Path, chunk_size: int = 1024):
     dest.parent.mkdir(parents=True, exist_ok=True)
     if dest.exists() and dest.stat().st_size > 0:

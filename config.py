@@ -60,7 +60,7 @@ class Config:
 
     def __init__(self):
         parser = argparse.ArgumentParser()
-        parser.add_argument('--model', type=str, default='NRMS', help='Model name')
+        parser.add_argument('--model', type=str, default='NRMS', help='Model name: NRMS, LSTUR, TANR, DKN, NAML, NPA, FIM, MINS, CenNewsRec, IPNR, CNE-SUE, LKPNR')
         parser.add_argument('--batch_size', type=int, default='64', help='Batch size for training')
         parser.add_argument('--seed', type=int, default=0, help='Seed')
         parser.add_argument('--epoch', type=int, default=20, help='Epoch for training')

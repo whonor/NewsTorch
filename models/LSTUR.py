@@ -35,7 +35,7 @@ class LSTUR(nn.Module):
                                                 user_history_mask, user_history_graph, user_history_category_mask, user_history_category_indices, user_embedding, news_representation)
         # Ensure user_representation is 2D before unsqueeze
         if user_representation.dim() != 2:
-            user_representation = user_representation.view(self.config.batch_size, -1)
+            user_representation = user_representation.reshape(self.config.batch_size, -1)
 
         # Ensure news_representation is 3D before permute
         if news_representation.dim() != 3:
