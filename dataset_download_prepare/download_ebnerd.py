@@ -74,12 +74,23 @@ def _load_news(source_file_path, dst_dir):
 
     df_articles = pl.read_parquet(article_file,
                                   columns=[
-                                      "article_id",
-                                      "category",
-                                      "subcategory",
-                                      "title",
-                                      "subtitle",
-                                      "topics",
+                                      "article_id", # i32
+                                      "category", # list[i16]
+                                      "subcategory", # list[i16]
+                                      "title", # str
+                                      "subtitle", # str
+                                      "topics", # list[str]
+                                      'body', # str
+                                      'image_ids', # list[i64]
+                                      'article_type', # str
+                                      'ner_clusters', # list[str]
+                                      'entity_groups', # list[str]
+                                      'category_str', # str
+                                      "total_inviews", # i32
+                                      "total_pageviews", # i32
+                                      "total_read_time", # f32
+                                      "sentiment_score", # f32
+                                      "sentiment_label" # str
                                   ])
 
     news = df_articles.rename({
@@ -190,9 +201,9 @@ def _load_behaviors(source_file_path, dst_dir, split="train"):
 
 def main():
     datasets = {
-        # 'ebnerd_demo': 'https://ebnerd-dataset.s3.eu-west-1.amazonaws.com/ebnerd_demo.zip',
-        'ebnerd_small': 'https://ebnerd-dataset.s3.eu-west-1.amazonaws.com/ebnerd_small.zip',
-        'ebnerd_large': 'https://ebnerd-dataset.s3.eu-west-1.amazonaws.com/ebnerd_large.zip'
+        'ebnerd_demo': 'https://ebnerd-dataset.s3.eu-west-1.amazonaws.com/ebnerd_demo.zip',
+        # 'ebnerd_small': 'https://ebnerd-dataset.s3.eu-west-1.amazonaws.com/ebnerd_small.zip',
+        # 'ebnerd_large': 'https://ebnerd-dataset.s3.eu-west-1.amazonaws.com/ebnerd_large.zip'
     }
 
     root = Path(__file__).resolve().parent.parent

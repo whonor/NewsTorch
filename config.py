@@ -60,14 +60,14 @@ class Config:
 
     def __init__(self):
         parser = argparse.ArgumentParser()
-        parser.add_argument('--model', type=str, default='NRMS', help='Model name: NRMS, LSTUR, TANR, DKN, NAML, NPA, FIM, MINS, CenNewsRec, IPNR, CNE-SUE, LKPNR')
+        parser.add_argument('--model', type=str, default='SentiDebias', help='Model name: NRMS, LSTUR, TANR, DKN, NAML, NPA, FIM, MINS, CenNewsRec, IPNR, CNE-SUE, LKPNR')
         parser.add_argument('--batch_size', type=int, default='64', help='Batch size for training')
         parser.add_argument('--seed', type=int, default=0, help='Seed')
         parser.add_argument('--epoch', type=int, default=20, help='Epoch for training')
         parser.add_argument('--mode', type=str, default='train', help='Mode')
-        parser.add_argument('--DATASET_ROOT', type=str, default='ebnerd_small', help='Default dataset name, can be ebnerd_demo, ebnerd_small, ebnerd_large, MIND-small, or MIND-large')
+        parser.add_argument('--DATASET_ROOT', type=str, default='ebnerd_demo', help='Default dataset name, can be ebnerd_demo, ebnerd_small, ebnerd_large, MIND-small, or MIND-large')
         parser.add_argument('--dataset_name', type=str, default='ebnerd', help='Name of the dataset to be used, MIND, ebnerd')
-        parser.add_argument('--dataset_size', type=str, default='small', help='Dataset variant, can be small, large, or demo, if submit the predictions submission')
+        parser.add_argument('--dataset_size', type=str, default='demo', help='Dataset variant, can be small, large, or demo, if submit the predictions submission')
 
         parser.add_argument('--dev_model_path', type=str,
                             default='/home/wanro238/NewsRecTorch/cache/best_models/small/NRMS/#1/NRMS',
@@ -108,6 +108,8 @@ class Config:
         self.world_size = 1
         self.dev_criterion = 'avg'
         self.early_stopping_epoch = 5
+
+        self.word_embedding_dim = 300
         self.category_embedding_dim = 50
         self.subCategory_embedding_dim = 50
         self.entity_embedding_dim = 100

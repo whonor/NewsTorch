@@ -16,7 +16,9 @@ from models.NPA import NPA
 from models.NRMS import NRMS
 from models.TANR import TANR
 from models.CenNewsRec import CenNewsRec
+from models.SentiDebias import SentiDebias
 from models.modules.ipnr.trainer import TrainerIPNR
+from models.modules.senti_debias.trainer import TrainerSentiDebias
 from utils._evaluation import get_run_index, compute_scores_IPNR
 from datetime import datetime
 import wandb
@@ -227,7 +229,8 @@ def train(config: Config, corpus, wandb):
         'CENNEWSREC': CenNewsRec,
         'IPNR': IPNR,
         'CNE-SUE': CNE_SUE,
-        'LKPNR': LKPNR
+        'LKPNR': LKPNR,
+        'SentiDebias': SentiDebias
     }
 
     if config.model not in model_classes:
@@ -241,12 +244,18 @@ def train(config: Config, corpus, wandb):
         if config.model == 'IPNR':
             trainer = TrainerIPNR(model, config, corpus, wandb, run_index)
             trainer.train()
+        elif config.model == 'SentiDebias':
+            trainer = TrainerSentiDebias(model, config, corpus, wandb, run_index)
+            trainer.train()
         else:
             trainer = Trainer(model, config, corpus, wandb, run_index)
             trainer.train()
     elif config.dataset_name == 'ebnerd':
         if config.model == 'IPNR':
             trainer = TrainerIPNR(model, config, corpus, wandb, run_index)
+            trainer.train()
+        elif config.model == 'SentiDebias':
+            trainer = TrainerSentiDebias(model, config, corpus, wandb, run_index)
             trainer.train()
         else:
             trainer = Trainer(model, config, corpus, wandb, run_index)
@@ -267,7 +276,8 @@ def dev(config: Config, corpus):
         'CENNEWSREC': CenNewsRec,
         'IPNR': IPNR,
         'CNE-SUE': CNE_SUE,
-        'LKPNR': LKPNR
+        'LKPNR': LKPNR,
+        'SentiDebias': SentiDebias
     }
 
     if config.model not in model_classes:
@@ -314,7 +324,8 @@ def test(config: Config, corpus):
         'CENNEWSREC': CenNewsRec,
         'IPNR': IPNR,
         'CNE-SUE': CNE_SUE,
-        'LKPNR': LKPNR
+        'LKPNR': LKPNR,
+        'SentiDebias': SentiDebias
     }
 
     if config.model not in model_classes:

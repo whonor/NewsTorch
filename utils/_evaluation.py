@@ -4,7 +4,7 @@ import torch.nn as nn
 from torchmetrics import MeanSquaredError, MeanAbsoluteError
 from tqdm import tqdm
 
-from dataset_corpus_preprocessing.EBNeRD_corpus_main import EBNeRD_Corpus
+from dataset_corpus_preprocessing.EBNeRD_corpus_main import EBNeRD_Corpus, Ebnerd_DevTest_Dataset
 from dataset_corpus_preprocessing.MIND_corpus_IPNR import MIND_DevTest_Dataset_IPNR
 from dataset_corpus_preprocessing.MIND_corpus_main import MIND_Corpus, MIND_DevTest_Dataset
 from torch.utils.data import DataLoader
@@ -271,9 +271,11 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
     assert mode in ['dev', 'test'], 'mode must be chosen from \'dev\' or \'test\''
     if config.dataset_name == 'ebnerd':
         corpus = EBNeRD_Corpus(config)
+        dataset = Ebnerd_DevTest_Dataset(corpus, mode)
     elif config.dataset_name == 'MIND':
         corpus = MIND_Corpus(config)
-    dataloader = DataLoader(MIND_DevTest_Dataset(corpus, mode), batch_size=batch_size, shuffle=False,
+        dataset = MIND_DevTest_Dataset(corpus, mode)
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False,
                             num_workers=batch_size // 16, pin_memory=True)
     indices = (corpus.dev_indices if mode == 'dev' else corpus.test_indices)
     scores = torch.zeros([len(indices)]).cuda()
@@ -282,7 +284,7 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
 
     with torch.no_grad():
         for (user_ID, user_category, user_subCategory, user_title_text, user_title_mask, user_title_entity, user_content_text, user_content_mask, user_content_entity, user_history_mask, user_history_graph, user_history_category_mask, user_history_category_indices, \
-             news_category, news_subCategory, news_title_text, news_title_mask, news_title_entity, news_content_text, news_content_mask, news_content_entity, history_index, candidate_news_index) in tqdm(dataloader):
+             news_category, news_subCategory, news_title_text, news_title_mask, news_title_entity, news_content_text, news_content_mask, news_content_entity, user_hist_sentiment, news_sentiment, history_index, candidate_news_index) in tqdm(dataloader):
             user_ID = user_ID.cuda(non_blocking=True)
             user_category = user_category.cuda(non_blocking=True)
             user_subCategory = user_subCategory.cuda(non_blocking=True)
@@ -304,8 +306,10 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
             news_content_text = news_content_text.cuda(non_blocking=True)
             news_content_mask = news_content_mask.cuda(non_blocking=True)
             news_content_entity = news_content_entity.cuda(non_blocking=True)
-            history_index = history_index.cuda(non_blocking=True)
-            candidate_news_index = candidate_news_index.cuda(non_blocking=True)
+            user_hist_sentiment = user_hist_sentiment.cuda(non_blocking=True)
+            news_sentiment = news_sentiment.cuda(non_blocking=True)
+            # history_index = history_index.cuda(non_blocking=True)
+            # candidate_news_index = candidate_news_index.cuda(non_blocking=True)
 
             batch_size = user_ID.size(0)
             news_category = news_category.unsqueeze(dim=1)
@@ -344,6 +348,15 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
                                                           news_title_mask, news_title_entity, news_content_text,
                                                           news_content_mask, news_content_entity, history_index,
                                                           candidate_news_index).squeeze(dim=1)  # [batch_size]
+            elif config.model == "SentiDebias":
+                scores[index: index + batch_size] = model(user_ID, user_category, user_subCategory, user_title_text,
+                                                          user_title_mask, user_title_entity, user_content_text,
+                                                          user_content_mask, user_content_entity, user_history_mask,
+                                                          user_history_graph, user_history_category_mask,
+                                                          user_history_category_indices, \
+                                                          news_category, news_subCategory, news_title_text,
+                                                          news_title_mask, news_title_entity, news_content_text,
+                                                          news_content_mask, news_content_entity, user_hist_sentiment, news_sentiment)[0]
 
             else:
                 scores[index: index + batch_size] = model(user_ID, user_category, user_subCategory, user_title_text,
