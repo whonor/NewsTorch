@@ -3,6 +3,8 @@ import torch
 import torch.nn as nn
 from models.modules.newsEncoders import MHSA as NewsEncoder
 from models.modules.click_predictor import DotProduct
+import torch.nn.functional as F
+from models.modules.layers import MultiHeadAttention, Attention
 
 
 class Discriminator(nn.Module):
@@ -17,13 +19,41 @@ class Discriminator(nn.Module):
         return pred_hist_sent, pred_cand_sent
 
 
+class SentiDebiasUserEncoder(nn.Module):
+    def __init__(self, config: Config):
+        super().__init__()
+        self.news_encoder = NewsEncoder(config)
+        self.multiheadAttention = MultiHeadAttention(config.head_num, self.news_encoder.news_embedding_dim,
+                                                     config.max_history_num, config.max_history_num,
+                                                     self.news_encoder.news_embedding_dim // config.head_num,
+                                                     self.news_encoder.news_embedding_dim // config.head_num)
+        self.affine = nn.Linear(self.news_encoder.news_embedding_dim, self.news_encoder.news_embedding_dim, bias=True)
+        self.attention = Attention(self.news_encoder.news_embedding_dim, self.news_encoder.news_embedding_dim)
+        self.config = config
+
+    def initialize(self):
+        self.multiheadAttention.initialize()
+        nn.init.xavier_uniform_(self.affine.weight, gain=nn.init.calculate_gain('relu'))
+        nn.init.zeros_(self.affine.bias)
+        self.attention.initialize()
+
+    def forward(self, history_embedding, user_history_mask):
+        # [batch_size, max_history_num, head_num * head_dim]
+        h = self.multiheadAttention(history_embedding, history_embedding, history_embedding, user_history_mask)
+        # [batch_size, max_history_num, news_embedding_dim]
+        h = F.relu(F.dropout(self.affine(h), training=self.training, inplace=True), inplace=True)
+        # [batch_size, news_embedding_dim]
+        user_representation = self.attention(h)
+        return user_representation
+
+
 class Generator(nn.Module):
     def __init__(self, config: Config):
         super(Generator, self).__init__()
         self.news_encoder = NewsEncoder(config)
         self.user_encoder = SentiDebiasUserEncoder(config)
-        self.sentiment_encoder = nn.Embedding(config.num_sent_classes, config.word_embedding_dim)
-        self.sentiment_projector = nn.Linear(config.word_embedding_dim, self.news_encoder.news_embedding_dim)
+        # self.sentiment_encoder = nn.Embedding(config.num_sent_classes, config.word_embedding_dim) # Removed
+        self.sentiment_projector = nn.Linear(1, self.news_encoder.news_embedding_dim) # Changed input dim to 1
         self.click_predictor_bias_free = DotProduct()
         self.click_predictor_bias_aware = DotProduct()
         self.config = config
@@ -33,15 +63,14 @@ class Generator(nn.Module):
                 user_hist_sentiment, news_sentiment):
         
         # Encode history news
-        # The news_encoder in NewsTorch expects a user_embedding argument, which is not used here. I'll pass None.
         hist_news_vector = self.news_encoder(user_title_text, user_title_mask, user_title_entity, user_content_text, user_content_mask, user_content_entity, user_category, user_subCategory, None)
 
         # Encode candidate news
         cand_news_vector = self.news_encoder(news_title_text, news_title_mask, news_title_entity, news_content_text, news_content_mask, news_content_entity, news_category, news_subCategory, None)
 
-        # Encode sentiment
-        hist_sentiment_vector = self.sentiment_projector(self.sentiment_encoder(user_hist_sentiment))
-        cand_sentiment_vector = self.sentiment_projector(self.sentiment_encoder(news_sentiment))
+        # Project sentiment scores to vectors
+        hist_sentiment_vector = self.sentiment_projector(user_hist_sentiment.unsqueeze(-1).float())
+        cand_sentiment_vector = self.sentiment_projector(news_sentiment.unsqueeze(-1).float())
 
         # User representations
         user_representation_bias_free = self.user_encoder(hist_news_vector, user_history_mask)
@@ -99,8 +128,9 @@ class SentiDebias(nn.Module):
     def initialize(self):
         self.generator.news_encoder.initialize()
         self.generator.user_encoder.initialize()
-        nn.init.uniform_(self.generator.sentiment_encoder.weight, -0.1, 0.1)
-        nn.init.zeros_(self.generator.sentiment_encoder.weight[0])
+        nn.init.xavier_uniform_(self.generator.sentiment_projector.weight)
+        if self.generator.sentiment_projector.bias is not None:
+            nn.init.zeros_(self.generator.sentiment_projector.bias)
 
     def forward(self, user_ID, user_category, user_subCategory, user_title_text, user_title_mask, user_title_entity, user_content_text, user_content_mask, user_content_entity, user_history_mask, user_history_graph, user_history_category_mask, user_history_category_indices, \
                 news_category, news_subCategory, news_title_text, news_title_mask, news_title_entity, news_content_text, news_content_mask, news_content_entity, \
@@ -110,39 +140,3 @@ class SentiDebias(nn.Module):
                 news_category, news_subCategory, news_title_text, news_title_mask, news_title_entity, news_content_text, news_content_mask, news_content_entity, \
                 user_hist_sentiment, news_sentiment)
 
-
-
-
-import torch.nn as nn
-import torch.nn.functional as F
-
-from models.modules.layers import MultiHeadAttention, Attention
-from config import Config
-
-
-class SentiDebiasUserEncoder(nn.Module):
-    def __init__(self, config: Config):
-        super().__init__()
-        self.news_encoder = NewsEncoder(config)
-        self.multiheadAttention = MultiHeadAttention(config.head_num, self.news_encoder.news_embedding_dim,
-                                                     config.max_history_num, config.max_history_num,
-                                                     self.news_encoder.news_embedding_dim // config.head_num,
-                                                     self.news_encoder.news_embedding_dim // config.head_num)
-        self.affine = nn.Linear(self.news_encoder.news_embedding_dim, self.news_encoder.news_embedding_dim, bias=True)
-        self.attention = Attention(self.news_encoder.news_embedding_dim, self.news_encoder.news_embedding_dim)
-        self.config = config
-
-    def initialize(self):
-        self.multiheadAttention.initialize()
-        nn.init.xavier_uniform_(self.affine.weight, gain=nn.init.calculate_gain('relu'))
-        nn.init.zeros_(self.affine.bias)
-        self.attention.initialize()
-
-    def forward(self, history_embedding, user_history_mask):
-        # [batch_size, max_history_num, head_num * head_dim]
-        h = self.multiheadAttention(history_embedding, history_embedding, history_embedding, user_history_mask)
-        # [batch_size, max_history_num, news_embedding_dim]
-        h = F.relu(F.dropout(self.affine(h), training=self.training, inplace=True), inplace=True)
-        # [batch_size, news_embedding_dim]
-        user_representation = self.attention(h)
-        return user_representation

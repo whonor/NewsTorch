@@ -1,0 +1,13 @@
+# NRMS base parameters
+word_embedding_dim: 300
+category_embedding_dim: 50
+subCategory_embedding_dim: 50
+head_num: 20
+head_dim: 20
+attention_dim: 200
+
+# SentiRec specific parameters
+# Weight for the sentiment prediction loss (lambda in the paper)
+sent_pred_loss_coef: 0.4
+# Weight for the sentiment diversity regularization loss (mu in the paper)
+sent_div_loss_coef: 10

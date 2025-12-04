@@ -432,8 +432,6 @@ class EBNeRD_Corpus:
 
             self.test_user_history_category_indices = user_history_data['test_user_history_category_indices']
 
-
-
         # meta cache
 
         self.negative_sample_num = config.negative_sample_num                                          # negative sample number for training
@@ -448,7 +446,7 @@ class EBNeRD_Corpus:
 
         self.news_subCategory = np.zeros([self.news_num], dtype=np.int32)                               # [news_num]
 
-        self.news_sentiment = np.zeros([self.news_num], dtype=np.int32)
+        self.news_sentiment = np.zeros([self.news_num], dtype=np.float32)
 
         self.news_title_text = np.zeros([self.news_num, self.max_title_length], dtype=np.int32)         # [news_num, max_title_length]
 
@@ -476,330 +474,165 @@ class EBNeRD_Corpus:
 
         self.abstract_word_num = 0
 
-
-
         news_ID_set = set(['<PAD>'])
 
         news_records = []
 
-
-
         for prefix in [config.train_root, config.dev_root, config.test_root]:
-
             news_parquet = os.path.join(prefix, 'news.parquet')
-
             df_news = pd.read_parquet(news_parquet)
-
-
-
             for _, row in df_news.iterrows():
-
                 news_ID = str(row['nid']).strip()
-
                 if news_ID not in news_ID_set:
-
                     news_records.append(row)
-
                     news_ID_set.add(news_ID)
-
-
-
         assert self.news_num == len(news_ID_set), f'news num mismatch {self.news_num} v.s. {len(news_ID_set)}'
-
-
-
+        sentiment_label_map = {'Positive': 1.0, 'Neutral': 0.0, 'Negative': -1.0}
         for row in news_records:
-
             news_ID = str(row['nid']).strip()
-
             category = str(row['category']).strip()
-
             subCategory = str(row['subcategory']).strip()
-
             sentiment_label = str(row['sentiment_label']).strip()
-
             title = str(row['title'])
-
             abstract = str(row['abstract'])
-
-
-
             index = self.news_ID_dict[news_ID]
-
             self.news_category[index] = self.category_dict.get(category, 0)
-
             self.news_subCategory[index] = self.subCategory_dict.get(subCategory, 0)
-
-            self.news_sentiment[index] = self.sentiment_dict.get(sentiment_label, 1) # Default to neutral
-
-
+            self.news_sentiment[index] = sentiment_label_map.get(sentiment_label, 0.0) # Default to neutral
 
             words = pat.findall(title.lower()) if config.tokenizer == 'MIND' else word_tokenize(title.lower())
-
             offsets = [-1] * len(title)
-
             offset_index = 0
-
             for i, word in enumerate(words):
-
                 if i == self.max_title_length:
-
                     break
-
                 if is_number(word):
-
                     self.news_title_text[index][i] = self.word_dict['<NUM>']
-
                 else:
-
                     self.news_title_text[index][i] = self.word_dict.get(word, 1)
-
                 self.news_title_mask[index][i] = 1
-
                 while offset_index < len(title) and title[offset_index] in [' ', '\t']:
-
                     offset_index += 1
-
                 for _ in range(len(word)):
-
                     if offset_index < len(offsets):
-
                         offsets[offset_index] = i
-
                         offset_index += 1
-
-
-
             self.title_word_num += len(words)
 
-
-
             words = pat.findall(abstract.lower()) if config.tokenizer == 'MIND' else word_tokenize(abstract.lower())
-
             offsets = [-1] * len(abstract)
-
             offset_index = 0
-
             for i, word in enumerate(words):
-
                 if i == self.max_abstract_length:
-
                     break
-
                 if is_number(word):
-
                     self.news_abstract_text[index][i] = self.word_dict['<NUM>']
-
                 else:
-
                     self.news_abstract_text[index][i] = self.word_dict.get(word, 1)
-
                 self.news_abstract_mask[index][i] = 1
-
                 while offset_index < len(abstract) and abstract[offset_index] in [' ', '\t']:
-
                     offset_index += 1
-
                 for _ in range(len(word)):
-
                     if offset_index < len(offsets):
-
                         offsets[offset_index] = i
-
                         offset_index += 1
-
-
-
             self.abstract_word_num += len(words)
 
-
-
         self.news_title_mask[0][0] = 1  # for <PAD> news
-
         self.news_abstract_mask[0][0] = 1  # for <PAD> news
 
 
-
-        # generate behavior meta cache
+    # generate behavior meta cache
 
         def process_behavior_df(df, mode='train'):
-
             for behavior_index, row in df.iterrows():
-
                 user_ID = str(row['uid'])  # or your actual user ID col name
-
                 history = row['history']  # assumed list or string like '[id1,id2,...]'
-
                 labels = row.get('labels', None)  # might be None for dev/test
-
                 impressions = row['candidates']  # string/list of impression IDs
-
-
-
                 # print(type(row['candidates']), row['candidates'])
-
                 # print(type(row['history']), row['history'])
-
                 # Parse impressions & labels for train (labels required to split clicks/non-clicks)
-
                 click_impressions = []
-
                 non_click_impressions = []
-
                 if mode == 'train' and labels is not None:
-
                     labels_list = [int(l) for l in labels]
-
                     impressions_list = [str(x).strip() for x in impressions]
-
                     for impression, label in zip(impressions_list, labels_list):
-
                         imp_id = self.news_ID_dict[impression.strip()]
-
                         if label == '0':
-
                             non_click_impressions.append(imp_id)
-
                         else:
-
                             click_impressions.append(imp_id)
-
                 else:
-
                     # For dev/test, impressions are processed differently
-
                     impressions_list = [str(x).strip() for x in impressions]
-
-
-
                 # Process user history
-
                 if isinstance(history, str):
-
                     history_list = list(
-
                         map(lambda x: self.news_ID_dict[x], history.strip('[]').split(','))) if history.strip(
-
                         '[]') else []
-
                 elif isinstance(history, list):
-
                     history_list = list(map(lambda x: self.news_ID_dict[x], history)) if history else []
-
                 else:
-
                     history_list = []
 
-
-
                 padding_num = max(0, self.max_history_num - len(history_list))
-
                 user_history = history_list[-self.max_history_num:] + [0] * padding_num
-
                 user_history_mask = np.zeros(self.max_history_num, dtype=np.float32)
-
                 user_history_mask[:min(len(history_list), self.max_history_num)] = 1.0
 
-
-
                 if mode == 'train':
-
                     for click_imp in click_impressions:
-
                         self.train_behaviors.append([
-
                             self.user_ID_dict[user_ID],
-
                             user_history,
-
                             user_history_mask,
-
                             click_imp,
-
                             non_click_impressions,
-
                             behavior_index
-
                         ])
-
                 elif mode == 'dev':
-
                     for impression in impressions_list:
-
                         imp_id = self.news_ID_dict[impression.strip()]
-
                         self.dev_indices.append(behavior_index)
-
                         self.dev_behaviors.append([
-
                             self.user_ID_dict.get(user_ID, 0),
-
                             user_history,
-
                             user_history_mask,
-
                             imp_id,
-
                             behavior_index
-
                         ])
-
                 elif mode == 'test':
-
                     for impression in impressions_list:
-
                         imp_id = self.news_ID_dict.get(impression.strip(), 0)
-
                         self.test_indices.append(behavior_index)
-
                         self.test_behaviors.append([
-
                             self.user_ID_dict.get(user_ID, 0),
-
                             user_history,
-
                             user_history_mask,
-
                             imp_id,
-
                             behavior_index
-
                         ])
-
-
 
         # Load parquet files and process
 
         train_path = os.path.join(config.train_root, 'behaviors.parquet')
-
         dev_path = os.path.join(config.dev_root, 'behaviors.parquet')
-
         test_path = os.path.join(config.test_root, 'behaviors.parquet')
 
-
-
         train_df = pd.read_parquet(train_path)
-
         dev_df = pd.read_parquet(dev_path)
-
         test_df = pd.read_parquet(test_path)
 
-
-
         process_behavior_df(train_df, 'train')
-
         process_behavior_df(dev_df, 'dev')
-
         process_behavior_df(test_df, 'test')
 
     
 
-
-
 import time
-
 from numpy.random import randint
-
 import torch.utils.data as data
 
 

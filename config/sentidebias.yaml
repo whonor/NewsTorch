@@ -1,0 +1,11 @@
+word_embedding_dim: 300
+head_num: 20
+head_dim: 20
+attention_dim: 200
+
+num_sent_classes: 3
+hidden_dim: 100
+lr_g: 0.0001
+lr_d: 0.0001
+alpha_coefficient: 0.1
+beta_coefficient: 0.1
