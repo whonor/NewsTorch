@@ -118,7 +118,7 @@ class TrainerSentiDebias:
                 news_category, news_subCategory, news_title_text, news_title_mask, news_title_entity, news_content_text, news_content_mask, news_content_entity, \
                 user_hist_sentiment, news_sentiment)
                 
-                pred_hist_sent, pred_cand_sent = model.module.discriminator(hist_news_vector.detach(), cand_news_vector.detach())
+                pred_hist_sent, pred_cand_sent = model.discriminator(hist_news_vector.detach(), cand_news_vector.detach())
                 
                 rec_loss = self.rec_loss(combined_scores)
                 
@@ -130,7 +130,7 @@ class TrainerSentiDebias:
                 epoch_g_loss += g_loss.mean().item()
                 g_loss.mean().backward()
                 if self.gradient_clip_norm > 0:
-                    nn.utils.clip_grad_norm_(model.module.generator.parameters(), self.gradient_clip_norm)
+                    nn.utils.clip_grad_norm_(model.generator.parameters(), self.gradient_clip_norm)
                 self.optimizer_g.step()
 
                 # Train Discriminator
@@ -139,14 +139,14 @@ class TrainerSentiDebias:
                 news_category, news_subCategory, news_title_text, news_title_mask, news_title_entity, news_content_text, news_content_mask, news_content_entity, \
                 user_hist_sentiment, news_sentiment)
                 
-                pred_hist_sent, pred_cand_sent = model.module.discriminator(hist_news_vector.detach(), cand_news_vector.detach())
+                pred_hist_sent, pred_cand_sent = model.discriminator(hist_news_vector.detach(), cand_news_vector.detach())
 
                 d_loss = self.adv_loss(pred_hist_sent.view(-1, self.config.num_sent_classes), user_hist_sentiment.view(-1).long()) + self.adv_loss(pred_cand_sent.view(-1, self.config.num_sent_classes), news_sentiment.view(-1).long())
                 
                 epoch_d_loss += d_loss.mean().item()
                 d_loss.mean().backward()
                 if self.gradient_clip_norm > 0:
-                    nn.utils.clip_grad_norm_(model.module.discriminator.parameters(), self.gradient_clip_norm)
+                    nn.utils.clip_grad_norm_(model.discriminator.parameters(), self.gradient_clip_norm)
                 self.optimizer_d.step()
 
             print('Epoch %d : train done' % e)
