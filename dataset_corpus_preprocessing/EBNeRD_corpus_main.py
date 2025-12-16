@@ -100,8 +100,9 @@ class EBNeRD_Corpus:
         entity_file = 'cache/ebnerd/entity-%s.json' % config.dataset_size
         entity_embedding_file = 'cache/ebnerd/entity_embedding-%s.pkl' % config.dataset_size
         context_embedding_file = 'cache/ebnerd/context_embedding-%s.pkl' % config.dataset_size
+        image_embedding_file = 'cache/ebnerd/image_embedding-%s.pkl' % config.dataset_size
         user_history_graph_file = 'cache/ebnerd/user_history_graph-' + str(config.max_history_num) + ('' if config.no_self_connection else '-self') + ('' if config.no_adjacent_normalization else '-normalize-' + config.gcn_normalization_type) + '-' + config.dataset_size + '.pkl'
-        preprocessed_data_files = [user_ID_file, news_ID_file, category_file, subCategory_file, vocabulary_file, word_embedding_file, entity_file, entity_embedding_file, context_embedding_file, user_history_graph_file, sentiment_file]
+        preprocessed_data_files = [user_ID_file, news_ID_file, category_file, subCategory_file, vocabulary_file, word_embedding_file, entity_file, entity_embedding_file, context_embedding_file, user_history_graph_file, sentiment_file, image_embedding_file]
 
         if not all(list(map(os.path.exists, preprocessed_data_files))):
             user_ID_dict = {'<UNK>': 0}
@@ -273,8 +274,15 @@ class EBNeRD_Corpus:
                     embedding_dim=300,
                     output_pkl_path=word_embedding_file
                 )
-            else:
-                pass
+            
+            # 5. Image embeddings
+            if not os.path.exists(image_embedding_file):
+                print("Preprocessing image embeddings...")
+                image_df = pd.read_parquet('Ekstra_Bladet_image_embeddings/download/Ekstra_Bladet_image_embeddings/Ekstra_Bladet_image_embeddings/image_embeddings.parquet')
+                image_embedding_dict = {str(row['article_id']): row['image_embedding'] for _, row in image_df.iterrows()}
+                with open(image_embedding_file, 'wb') as f:
+                    pickle.dump(image_embedding_dict, f)
+                print("Image embeddings preprocessed and saved.")
 
 
             # build graph
@@ -404,11 +412,8 @@ class EBNeRD_Corpus:
 
             config.vocabulary_size = len(self.word_dict)
 
-        # with open('cache/ebnerd/entity-%s.json' % config.dataset, 'r', encoding='utf-8') as entity_f:
-
-        #     self.entity_dict = json.load(entity_f)
-
-        #     config.entity_size = len(self.entity_dict)
+        with open('cache/ebnerd/image_embedding-%s.pkl' % config.dataset_size, 'rb') as f:
+            image_embedding_dict = pickle.load(f)
 
         with open('cache/ebnerd/user_history_graph-' + str(config.max_history_num) + ('' if config.no_self_connection else '-self') + ('' if config.no_adjacent_normalization else '-normalize-' + config.gcn_normalization_type) + '-' + config.dataset_size + '.pkl', 'rb') as user_history_graph_f:
 
@@ -447,6 +452,8 @@ class EBNeRD_Corpus:
         self.news_subCategory = np.zeros([self.news_num], dtype=np.int32)                               # [news_num]
 
         self.news_sentiment = np.zeros([self.news_num], dtype=np.float32)
+        
+        self.news_image_embeddings = np.zeros([self.news_num, 1024], dtype=np.float32)
 
         self.news_title_text = np.zeros([self.news_num, self.max_title_length], dtype=np.int32)         # [news_num, max_title_length]
 
@@ -496,6 +503,8 @@ class EBNeRD_Corpus:
             title = str(row['title'])
             abstract = str(row['abstract'])
             index = self.news_ID_dict[news_ID]
+            if news_ID in image_embedding_dict:
+                self.news_image_embeddings[index] = image_embedding_dict[news_ID]
             self.news_category[index] = self.category_dict.get(category, 0)
             self.news_subCategory[index] = self.subCategory_dict.get(subCategory, 0)
             self.news_sentiment[index] = sentiment_label_map.get(sentiment_label, 0.0) # Default to neutral
@@ -649,6 +658,8 @@ class Ebnerd_Train_Dataset(data.Dataset):
         self.news_subCategory = corpus.news_subCategory
 
         self.news_sentiment = corpus.news_sentiment
+        
+        self.news_image_embeddings = corpus.news_image_embeddings
 
         self.news_title_text =  corpus.news_title_text
 
@@ -731,7 +742,8 @@ class Ebnerd_Train_Dataset(data.Dataset):
         behavior_index = train_behavior[5]
 
         return (train_behavior[0], self.news_category[history_index], self.news_subCategory[history_index], self.news_title_text[history_index], self.news_title_mask[history_index], self.news_title_entity[history_index], self.news_abstract_text[history_index], self.news_abstract_mask[history_index], self.news_abstract_entity[history_index], train_behavior[2], self.user_history_graph[behavior_index], self.user_history_category_mask[behavior_index], self.user_history_category_indices[behavior_index],
-                self.news_category[sample_index], self.news_subCategory[sample_index], self.news_title_text[sample_index], self.news_title_mask[sample_index], self.news_title_entity[sample_index], self.news_abstract_text[sample_index], self.news_abstract_mask[sample_index], self.news_abstract_entity[sample_index], self.news_sentiment[history_index], self.news_sentiment[sample_index], history_index, sample_index)
+                self.news_category[sample_index], self.news_subCategory[sample_index], self.news_title_text[sample_index], self.news_title_mask[sample_index], self.news_title_entity[sample_index], self.news_abstract_text[sample_index], self.news_abstract_mask[sample_index], self.news_abstract_entity[sample_index], self.news_sentiment[history_index], self.news_sentiment[sample_index], history_index, sample_index,
+                self.news_image_embeddings[history_index], self.news_image_embeddings[sample_index])
 
     def __len__(self):
         return self.num
@@ -751,6 +763,8 @@ class Ebnerd_DevTest_Dataset(data.Dataset):
         self.news_subCategory = corpus.news_subCategory
 
         self.news_sentiment = corpus.news_sentiment
+        
+        self.news_image_embeddings = corpus.news_image_embeddings
 
         self.news_title_text =  corpus.news_title_text
 
@@ -787,9 +801,8 @@ class Ebnerd_DevTest_Dataset(data.Dataset):
         behavior_index = behavior[4]
 
         return (behavior[0], self.news_category[history_index], self.news_subCategory[history_index], self.news_title_text[history_index], self.news_title_mask[history_index], self.news_title_entity[history_index], self.news_abstract_text[history_index], self.news_abstract_mask[history_index], self.news_abstract_entity[history_index], behavior[2], self.user_history_graph[behavior_index], self.user_history_category_mask[behavior_index], self.user_history_category_indices[behavior_index],
-                self.news_category[candidate_news_index], self.news_subCategory[candidate_news_index], self.news_title_text[candidate_news_index], self.news_title_mask[candidate_news_index], self.news_title_entity[candidate_news_index], self.news_abstract_text[candidate_news_index], self.news_abstract_mask[candidate_news_index], self.news_abstract_entity[candidate_news_index], self.news_sentiment[history_index], self.news_sentiment[candidate_news_index], history_index, candidate_news_index)
+                self.news_category[candidate_news_index], self.news_subCategory[candidate_news_index], self.news_title_text[candidate_news_index], self.news_title_mask[candidate_news_index], self.news_title_entity[candidate_news_index], self.news_abstract_text[candidate_news_index], self.news_abstract_mask[candidate_news_index], self.news_abstract_entity[candidate_news_index], self.news_sentiment[history_index], self.news_sentiment[candidate_news_index], history_index, candidate_news_index,
+                self.news_image_embeddings[history_index], self.news_image_embeddings[candidate_news_index])
 
     def __len__(self):
         return self.num
-
-    

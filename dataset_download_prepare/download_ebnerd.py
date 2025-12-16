@@ -218,14 +218,15 @@ def main():
     print("\nAll downloads and extractions completed.")
 
     for name, url in datasets.items():
-        print("\n=== Preparing EB-NeRD %s news data. ===" % name)
-        _load_news(source_file_path=str(root / name / "download" / name),
-                   dst_dir=str(root / name / "download" / name))
-        print("\n=== Preparing EB-NeRD %s users behaviour data. ===" % name)
-        _load_behaviors(source_file_path=str(root / name / "download" / name),
-                        dst_dir=str(root / name / "download" / name), split="train")
-        _load_behaviors(source_file_path=str(root / name / "download" / name),
-                        dst_dir=str(root / name / "download" / name), split="validation")
+        if name != "Ekstra_Bladet_image_embeddings":
+            print("\n=== Preparing EB-NeRD %s news data. ===" % name)
+            _load_news(source_file_path=str(root / name / "download" / name),
+                       dst_dir=str(root / name / "download" / name))
+            print("\n=== Preparing EB-NeRD %s users behaviour data. ===" % name)
+            _load_behaviors(source_file_path=str(root / name / "download" / name),
+                            dst_dir=str(root / name / "download" / name), split="train")
+            _load_behaviors(source_file_path=str(root / name / "download" / name),
+                            dst_dir=str(root / name / "download" / name), split="validation")
 
 
 def clean_data(input_path, output_path):

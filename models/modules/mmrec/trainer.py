@@ -26,30 +26,20 @@ class TrainerMMRec(Trainer):
             epoch_loss = 0
 
             for data_tuple in tqdm(train_dataloader):
-                # Unpack data for ebnerd dataset (assuming a multimodal version)
-                # This part is an assumption and might need to be adjusted based on the actual dataset implementation.
-                # Based on the MMRec model, we expect:
-                # news_feature: a dict of tensors for the news encoder
-                # input_ids: candidate news indices
-                # log_ids: history news indices
-                # log_mask: history mask
-                # targets: click labels
-                
-                # NOTE: The following unpacking is a placeholder based on SentiRec's trainer.
-                # It will need to be adapted for MMRec's data format, especially for image features.
                 (user_ID, user_category, user_subCategory, user_title_text, user_title_mask, user_title_entity, user_content_text, user_content_mask, user_content_entity, user_history_mask, user_history_graph, user_history_category_mask, user_history_category_indices,
-                 news_category, news_subCategory, news_title_text, news_title_mask, news_title_entity, news_content_text, news_content_mask, news_content_entity, history_sentiment, candidate_sentiment, history_index, sample_index) = data_tuple
+                 news_category, news_subCategory, news_title_text, news_title_mask, news_title_entity, news_content_text, news_content_mask, news_content_entity, history_sentiment, candidate_sentiment, history_index, sample_index,
+                 history_image_embedding, candidate_image_embedding) = data_tuple
 
                 news_feature = {
                     "input_ids": news_title_text.cuda(non_blocking=True),
                     "attention_mask": news_title_mask.cuda(non_blocking=True),
-                    "input_imgs": torch.zeros(news_title_text.shape[0], news_title_text.shape[1], 1, 2048).cuda(non_blocking=True),
+                    "input_imgs": candidate_image_embedding.unsqueeze(2).cuda(non_blocking=True),
                     "image_loc": torch.zeros(news_title_text.shape[0], news_title_text.shape[1], 1, 5).cuda(non_blocking=True),
                 }
                 history_feature = {
                     "input_ids": user_title_text.cuda(non_blocking=True),
                     "attention_mask": user_title_mask.cuda(non_blocking=True),
-                    "input_imgs": torch.zeros(user_title_text.shape[0], user_title_text.shape[1], 1, 2048).cuda(non_blocking=True),
+                    "input_imgs": history_image_embedding.unsqueeze(2).cuda(non_blocking=True),
                     "image_loc": torch.zeros(user_title_text.shape[0], user_title_text.shape[1], 1, 5).cuda(non_blocking=True),
                 }
 
@@ -126,4 +116,3 @@ class TrainerMMRec(Trainer):
         print('MRR : %.4f' % self.mrr_results[self.best_dev_epoch - 1])
         print('nDCG@5 : %.4f' % self.ndcg5_results[self.best_dev_epoch - 1])
         print('nDCG@10 : %.4f' % self.ndcg10_results[self.best_dev_epoch - 1])
-
