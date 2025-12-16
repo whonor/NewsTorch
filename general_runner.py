@@ -4,6 +4,7 @@ import shutil
 
 from dataset_corpus_preprocessing.EBNeRD_corpus_main import EBNeRD_Corpus, Ebnerd_Train_Dataset
 from dataset_corpus_preprocessing.MIND_corpus_IPNR import MIND_Corpus_IPNR
+from models.MMRec import MMRec
 from models.CNE_SUE import CNE_SUE
 from models.DKN import DKN
 from models.FIM import FIM
@@ -19,9 +20,10 @@ from models.TANR import TANR
 from models.CenNewsRec import CenNewsRec
 from models.SentiDebias import SentiDebias
 from models.modules.ipnr.trainer import TrainerIPNR
+from models.modules.mmrec.trainer import TrainerMMRec
 from models.modules.senti_debias.trainer import TrainerSentiDebias
 from models.modules.sentirec.trainer import TrainerSentiRec
-from utils._evaluation import get_run_index, compute_scores_IPNR
+from utils._evaluation import get_run_index, compute_scores_IPNR, compute_scores_mmrec
 from datetime import datetime
 import wandb
 from config import Config
@@ -64,7 +66,8 @@ def train(config: Config, corpus, wandb):
         'CNE-SUE': CNE_SUE,
         'LKPNR': LKPNR,
         'SentiDebias': SentiDebias,
-        'SentiRec': SentiRec
+        'SentiRec': SentiRec,
+        'MMRec': MMRec
     }
 
     if config.model not in model_classes:
@@ -78,9 +81,6 @@ def train(config: Config, corpus, wandb):
         if config.model == 'IPNR':
             trainer = TrainerIPNR(model, config, corpus, wandb, run_index)
             trainer.train()
-        elif config.model == 'SentiDebias':
-            trainer = TrainerSentiDebias(model, config, corpus, wandb, run_index)
-            trainer.train()
         else:
             trainer = Trainer(model, config, corpus, wandb, run_index)
             trainer.train()
@@ -93,6 +93,9 @@ def train(config: Config, corpus, wandb):
             trainer.train()
         elif config.model == 'SentiRec':
             trainer = TrainerSentiRec(model, config, corpus, wandb, run_index)
+            trainer.train()
+        elif config.model == 'MMRec':
+            trainer = TrainerMMRec(model, config, corpus, wandb, run_index)
             trainer.train()
         else:
             trainer = Trainer(model, config, corpus, wandb, run_index)
@@ -115,7 +118,8 @@ def dev(config: Config, corpus):
         'CNE-SUE': CNE_SUE,
         'LKPNR': LKPNR,
         'SentiDebias': SentiDebias,
-        'SentiRec': SentiRec
+        'SentiRec': SentiRec,
+        'MMRec': MMRec
     }
 
     if config.model not in model_classes:
@@ -164,7 +168,8 @@ def test(config: Config, corpus):
         'CNE-SUE': CNE_SUE,
         'LKPNR': LKPNR,
         'SentiDebias': SentiDebias,
-        'SentiRec': SentiRec
+        'SentiRec': SentiRec,
+        'MMRec': MMRec
     }
 
     if config.model not in model_classes:
@@ -197,6 +202,9 @@ def test(config: Config, corpus):
         if config.model == 'IPNR':
             auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = compute_scores_IPNR(config, model, corpus, config.batch_size, 'test',
                                                           test_res_dir + '/' + config.model + '.txt', config.dataset_size)
+        elif config.model == 'MMRec':
+            auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = compute_scores_mmrec(config, model, corpus, config.batch_size,
+                                                                                                                               'test', test_res_dir + '/' + config.model + '.txt', config.dataset_size)
         else:
             auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = compute_scores(config, model, corpus, config.batch_size,
                                                      'test',

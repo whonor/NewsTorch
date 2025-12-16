@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from base_trainer import Trainer
-from utils._evaluation import compute_scores, AvgMetric
+from utils._evaluation import compute_scores_mmrec, AvgMetric
 
 
 class TrainerMMRec(Trainer):
@@ -38,27 +38,44 @@ class TrainerMMRec(Trainer):
                 # NOTE: The following unpacking is a placeholder based on SentiRec's trainer.
                 # It will need to be adapted for MMRec's data format, especially for image features.
                 (user_ID, user_category, user_subCategory, user_title_text, user_title_mask, user_title_entity, user_content_text, user_content_mask, user_content_entity, user_history_mask, user_history_graph, user_history_category_mask, user_history_category_indices,
-                 news_category, news_subCategory, news_title_text, news_title_mask, news_title_entity, news_content_text, news_content_mask, news_content_entity, 
-                 # Assuming the dataloader for ebnerd with images will provide these:
-                 news_images, news_image_locs,
-                 history_index, sample_index, targets) = data_tuple
+                 news_category, news_subCategory, news_title_text, news_title_mask, news_title_entity, news_content_text, news_content_mask, news_content_entity, history_sentiment, candidate_sentiment, history_index, sample_index) = data_tuple
 
-                # Create the news_feature dictionary for the model
                 news_feature = {
-                    "input_txt": news_title_text.cuda(non_blocking=True),
-                    "input_imgs": news_images.cuda(non_blocking=True),
-                    "image_loc": news_image_locs.cuda(non_blocking=True),
+                    "input_ids": news_title_text.cuda(non_blocking=True),
                     "attention_mask": news_title_mask.cuda(non_blocking=True),
-                    # Other masks and token_type_ids can be added if needed
+                    "input_imgs": torch.zeros(news_title_text.shape[0], news_title_text.shape[1], 1, 2048).cuda(non_blocking=True),
+                    "image_loc": torch.zeros(news_title_text.shape[0], news_title_text.shape[1], 1, 5).cuda(non_blocking=True),
                 }
-                
-                input_ids = sample_index.cuda(non_blocking=True)
-                log_ids = history_index.cuda(non_blocking=True)
+                history_feature = {
+                    "input_ids": user_title_text.cuda(non_blocking=True),
+                    "attention_mask": user_title_mask.cuda(non_blocking=True),
+                    "input_imgs": torch.zeros(user_title_text.shape[0], user_title_text.shape[1], 1, 2048).cuda(non_blocking=True),
+                    "image_loc": torch.zeros(user_title_text.shape[0], user_title_text.shape[1], 1, 5).cuda(non_blocking=True),
+                }
+
                 log_mask = user_history_mask.cuda(non_blocking=True)
-                targets = targets.cuda(non_blocking=True)
+                targets = torch.zeros(user_ID.size(0), dtype=torch.long).cuda(non_blocking=True)
+
+                user_ID = user_ID.cuda(non_blocking=True)
+                user_category = user_category.cuda(non_blocking=True)
+                user_subCategory = user_subCategory.cuda(non_blocking=True)
+                user_content_text = user_content_text.cuda(non_blocking=True)
+                user_content_mask = user_content_mask.cuda(non_blocking=True)
+                user_content_entity = user_content_entity.cuda(non_blocking=True)
+                user_history_graph = user_history_graph.cuda(non_blocking=True)
+                user_history_category_mask = user_history_category_mask.cuda(non_blocking=True)
+                user_history_category_indices = user_history_category_indices.cuda(non_blocking=True)
+                news_category = news_category.cuda(non_blocking=True)
+                news_subCategory = news_subCategory.cuda(non_blocking=True)
+                news_title_entity = news_title_entity.cuda(non_blocking=True)
+                news_content_text = news_content_text.cuda(non_blocking=True)
+                news_content_mask = news_content_mask.cuda(non_blocking=True)
+                news_content_entity = news_content_entity.cuda(non_blocking=True)
+                history_sentiment = history_sentiment.cuda(non_blocking=True)
+                candidate_sentiment = candidate_sentiment.cuda(non_blocking=True)
 
 
-                loss, score = model(news_feature, input_ids, log_ids, log_mask, targets, compute_loss=True)
+                loss, score = model(news_feature, history_feature, log_mask, targets, compute_loss=True)
                 
                 loss = loss.mean() # Average loss for data parallel
                 
@@ -74,7 +91,7 @@ class TrainerMMRec(Trainer):
             self.wandb.log({'train epoch': e, 'loss': epoch_loss / len(self.train_dataset)})
 
             # validation
-            auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = compute_scores(self.config, model, self._corpus, self.batch_size,
+            auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = compute_scores_mmrec(self.config, model, self._corpus, self.batch_size,
                                                      'dev', self.dev_res_dir + '/' + self.config.model + '-' + str(
                     e) + '.txt', self._dataset)
             
