@@ -9,9 +9,17 @@ from random import randint
 import pandas as pd
 from nltk.tokenize import word_tokenize
 from torchtext.vocab import GloVe
+from tqdm import tqdm
+
 from config import Config
 import torch
 import numpy as np
+
+# Imports for image processing
+from PIL import Image
+import torchvision.models as models
+import torchvision.transforms as transforms
+from torch.autograd import Variable
 
 
 def is_number(s):
@@ -26,6 +34,60 @@ pat = re.compile(r"[\w]+|[.,!?;|]")
 import urllib.request
 import gzip
 import shutil
+
+# --- Image Encoding Functions ---
+
+def get_image_transforms():
+    """Returns a composition of image transformations for ResNet-50."""
+    return transforms.Compose([
+        transforms.Resize(256),
+        transforms.CenterCrop(224),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+    ])
+
+def get_resnet_model():
+    """Initializes and returns a pre-trained ResNet-50 model."""
+    resnet50 = models.resnet50(pretrained=True)
+    # Remove the final fully connected layer to get the feature vector
+    model = torch.nn.Sequential(*(list(resnet50.children())[:-1]))
+    model.eval()
+    return model
+
+def extract_image_features(image_dir, model, transforms):
+    """
+    Extracts feature vectors from all images in a directory.
+    """
+    print(f"🖼️  Extracting features from images in {image_dir}...")
+    image_embedding_dict = {}
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model.to(device)
+
+    image_files = [f for f in os.listdir(image_dir) if os.path.isfile(os.path.join(image_dir, f))]
+    for image_name in tqdm(image_files):
+        try:
+            article_id = os.path.splitext(image_name)[0]
+            image_path = os.path.join(image_dir, image_name)
+            
+            # Open image and handle potential RGBA to RGB conversion
+            img = Image.open(image_path).convert("RGB")
+            
+            transformed_img = transforms(img)
+            batch = Variable(transformed_img.unsqueeze(0))
+            batch = batch.to(device)
+
+            with torch.no_grad():
+                feature_vector = model(batch)
+            
+            # Flatten the feature vector and move to CPU
+            feature_vector_flat = feature_vector.view(feature_vector.size(0), -1)
+            image_embedding_dict[article_id] = feature_vector_flat.cpu().numpy().squeeze()
+        except Exception as e:
+            print(f"Could not process image {image_name}: {e}")
+            
+    print(f"✅ Extracted features for {len(image_embedding_dict)} images.")
+    return image_embedding_dict
+
 
 # Step 1: Auto-download and extract FastText Danish vector
 def download_fasttext_vec_if_needed(vec_file_path):
@@ -278,8 +340,9 @@ class EBNeRD_Corpus:
             # 5. Image embeddings
             if not os.path.exists(image_embedding_file):
                 print("Preprocessing image embeddings...")
-                image_df = pd.read_parquet('Ekstra_Bladet_image_embeddings/download/Ekstra_Bladet_image_embeddings/Ekstra_Bladet_image_embeddings/image_embeddings.parquet')
-                image_embedding_dict = {str(row['article_id']): row['image_embedding'] for _, row in image_df.iterrows()}
+                model = get_resnet_model()
+                transforms = get_image_transforms()
+                image_embedding_dict = extract_image_features('downloaded_images', model, transforms)
                 with open(image_embedding_file, 'wb') as f:
                     pickle.dump(image_embedding_dict, f)
                 print("Image embeddings preprocessed and saved.")
@@ -298,7 +361,10 @@ class EBNeRD_Corpus:
                 df_behaviors = pd.read_parquet(behaviors_parquet)
                 user_history_num = len(df_behaviors)
 
-                user_history_graph = np.zeros([user_history_num, graph_size, graph_size], dtype=np.float32)
+                graph_path = os.path.join('cache/ebnerd', f'{config.dataset_size}-{mode}_user_history_graph.npy')
+                if os.path.exists(graph_path):
+                    os.remove(graph_path)
+                user_history_graph = np.memmap(graph_path, dtype=np.float32, mode='w+', shape=(user_history_num, graph_size, graph_size))
                 user_history_category_mask = np.zeros([user_history_num, category_num + 1], dtype=np.float32)
                 user_history_category_indices = np.full([user_history_num, config.max_history_num], category_num,
                                                         dtype=np.int64)
@@ -363,9 +429,11 @@ class EBNeRD_Corpus:
                     user_history_category_mask[line_index] = history_category_mask
                     user_history_category_indices[line_index] = history_category_indices
 
-                user_history_graph_data[f'{mode}_user_history_graph'] = user_history_graph
+                user_history_graph.flush()
+                user_history_graph_data[f'{mode}_user_history_graph_path'] = graph_path
                 user_history_graph_data[f'{mode}_user_history_category_mask'] = user_history_category_mask
                 user_history_graph_data[f'{mode}_user_history_category_indices'] = user_history_category_indices
+                del user_history_graph
 
             with open(user_history_graph_file, 'wb') as f:
                 pickle.dump(user_history_graph_data, f)
@@ -415,27 +483,47 @@ class EBNeRD_Corpus:
         with open('cache/ebnerd/image_embedding-%s.pkl' % config.dataset_size, 'rb') as f:
             image_embedding_dict = pickle.load(f)
 
-        with open('cache/ebnerd/user_history_graph-' + str(config.max_history_num) + ('' if config.no_self_connection else '-self') + ('' if config.no_adjacent_normalization else '-normalize-' + config.gcn_normalization_type) + '-' + config.dataset_size + '.pkl', 'rb') as user_history_graph_f:
+            with open('cache/ebnerd/user_history_graph-' + str(config.max_history_num) + ('' if config.no_self_connection else '-self') + ('' if config.no_adjacent_normalization else '-normalize-' + config.gcn_normalization_type) + '-' + config.dataset_size + '.pkl', 'rb') as user_history_graph_f:
 
-            user_history_data = pickle.load(user_history_graph_f)
+                user_history_data = pickle.load(user_history_graph_f)
 
-            self.train_user_history_graph = user_history_data['train_user_history_graph']
+                graph_size = config.max_history_num + config.category_num
 
-            self.train_user_history_category_mask = user_history_data['train_user_history_category_mask']
 
-            self.train_user_history_category_indices = user_history_data['train_user_history_category_indices']
 
-            self.dev_user_history_graph = user_history_data['dev_user_history_graph']
+                train_user_history_num = len(pd.read_parquet(os.path.join(config.train_root, 'behaviors.parquet')))
 
-            self.dev_user_history_category_mask = user_history_data['dev_user_history_category_mask']
+                train_graph_shape = (train_user_history_num, graph_size, graph_size)
 
-            self.dev_user_history_category_indices = user_history_data['dev_user_history_category_indices']
+                self.train_user_history_graph = np.memmap(user_history_data['train_user_history_graph_path'], dtype=np.float32, mode='r', shape=train_graph_shape)
 
-            self.test_user_history_graph = user_history_data['test_user_history_graph']
+                self.train_user_history_category_mask = user_history_data['train_user_history_category_mask']
 
-            self.test_user_history_category_mask = user_history_data['test_user_history_category_mask']
+                self.train_user_history_category_indices = user_history_data['train_user_history_category_indices']
 
-            self.test_user_history_category_indices = user_history_data['test_user_history_category_indices']
+
+
+                dev_user_history_num = len(pd.read_parquet(os.path.join(config.dev_root, 'behaviors.parquet')))
+
+                dev_graph_shape = (dev_user_history_num, graph_size, graph_size)
+
+                self.dev_user_history_graph = np.memmap(user_history_data['dev_user_history_graph_path'], dtype=np.float32, mode='r', shape=dev_graph_shape)
+
+                self.dev_user_history_category_mask = user_history_data['dev_user_history_category_mask']
+
+                self.dev_user_history_category_indices = user_history_data['dev_user_history_category_indices']
+
+
+
+                test_user_history_num = len(pd.read_parquet(os.path.join(config.test_root, 'behaviors.parquet')))
+
+                test_graph_shape = (test_user_history_num, graph_size, graph_size)
+
+                self.test_user_history_graph = np.memmap(user_history_data['test_user_history_graph_path'], dtype=np.float32, mode='r', shape=test_graph_shape)
+
+                self.test_user_history_category_mask = user_history_data['test_user_history_category_mask']
+
+                self.test_user_history_category_indices = user_history_data['test_user_history_category_indices']
 
         # meta cache
 
@@ -453,7 +541,7 @@ class EBNeRD_Corpus:
 
         self.news_sentiment = np.zeros([self.news_num], dtype=np.float32)
         
-        self.news_image_embeddings = np.zeros([self.news_num, 1024], dtype=np.float32)
+        self.news_image_embeddings = np.zeros([self.news_num, 2048], dtype=np.float32)
 
         self.news_title_text = np.zeros([self.news_num, self.max_title_length], dtype=np.int32)         # [news_num, max_title_length]
 

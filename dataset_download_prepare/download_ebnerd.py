@@ -203,8 +203,8 @@ def main():
     datasets = {
         'ebnerd_demo': 'https://ebnerd-dataset.s3.eu-west-1.amazonaws.com/ebnerd_demo.zip',
         'ebnerd_small': 'https://ebnerd-dataset.s3.eu-west-1.amazonaws.com/ebnerd_small.zip',
-        # 'ebnerd_large': 'https://ebnerd-dataset.s3.eu-west-1.amazonaws.com/ebnerd_large.zip',
-        'Ekstra_Bladet_image_embeddings': 'https://ebnerd-dataset.s3.eu-west-1.amazonaws.com/artifacts/Ekstra_Bladet_image_embeddings.zip'
+        'ebnerd_large': 'https://ebnerd-dataset.s3.eu-west-1.amazonaws.com/ebnerd_large.zip',
+        # 'Ekstra_Bladet_image_embeddings': 'https://ebnerd-dataset.s3.eu-west-1.amazonaws.com/artifacts/Ekstra_Bladet_image_embeddings.zip'
     }
 
     root = Path(__file__).resolve().parent.parent
@@ -218,15 +218,16 @@ def main():
     print("\nAll downloads and extractions completed.")
 
     for name, url in datasets.items():
-        if name != "Ekstra_Bladet_image_embeddings":
-            print("\n=== Preparing EB-NeRD %s news data. ===" % name)
-            _load_news(source_file_path=str(root / name / "download" / name),
-                       dst_dir=str(root / name / "download" / name))
-            print("\n=== Preparing EB-NeRD %s users behaviour data. ===" % name)
-            _load_behaviors(source_file_path=str(root / name / "download" / name),
-                            dst_dir=str(root / name / "download" / name), split="train")
-            _load_behaviors(source_file_path=str(root / name / "download" / name),
-                            dst_dir=str(root / name / "download" / name), split="validation")
+        print("\n=== Preparing EB-NeRD %s news data. ===" % name)
+        _load_news(source_file_path=str(root / name / "download" / name),
+                   dst_dir=str(root / name / "download" / name))
+        print("\n=== Preparing EB-NeRD %s users behaviour data. ===" % name)
+        _load_behaviors(source_file_path=str(root / name / "download" / name),
+                        dst_dir=str(root / name / "download" / name), split="train")
+        _load_behaviors(source_file_path=str(root / name / "download" / name),
+                        dst_dir=str(root / name / "download" / name), split="validation")
+
+    print("\nAll news and behaviors data process completed.")
 
 
 def clean_data(input_path, output_path):
