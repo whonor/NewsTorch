@@ -162,7 +162,8 @@ class BertConfig(object):
         in_batch_pairs=False,
         fusion_method="mul",
         intra_gate=False,
-        with_coattention=True
+        with_coattention=True,
+        image_embedding_dim=2048
     ):
 
         """Constructs BertConfig.
@@ -236,6 +237,7 @@ class BertConfig(object):
             self.fusion_method = fusion_method
             self.intra_gate = intra_gate
             self.with_coattention=with_coattention
+            self.image_embedding_dim=image_embedding_dim
         else:
             raise ValueError(
                 "First argument must be either a vocabulary size (int)"
@@ -1195,7 +1197,7 @@ class BertImageEmbeddings(nn.Module):
     """
     def __init__(self, config):
         super(BertImageEmbeddings, self).__init__()
-        self.image_embeddings = nn.Linear(config.v_feature_size, config.v_hidden_size)
+        self.image_embeddings = nn.Linear(config.image_embedding_dim, config.v_hidden_size)
         self.image_location_embeddings = nn.Linear(5, config.v_hidden_size)
         self.LayerNorm = BertLayerNorm(config.v_hidden_size, eps=1e-12)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)

@@ -144,6 +144,9 @@ class Config:
         else:
             print(f"Warning: Model config file {yaml_path} not found, using default parameters")
 
+        self.image_embedding_dim = 2048
+
+
         self.attribute_dict = self.__dict__.copy()
         if self.config_file != '':
             if os.path.exists(self.config_file):

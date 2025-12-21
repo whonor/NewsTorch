@@ -41,7 +41,8 @@ class MMRec(torch.nn.Module):
             fixed_t_layer=self.config.fixed_t_layer,
             in_batch_pairs=self.config.in_batch_pairs,
             fusion_method=self.config.fusion_method,
-            with_coattention=self.config.with_coattention
+            with_coattention=self.config.with_coattention,
+            image_embedding_dim=self.config.image_embedding_dim
         )
         self.news_encoder = NewsEncoder(config=bert_config)
         self.user_encoder = UserEncoder()

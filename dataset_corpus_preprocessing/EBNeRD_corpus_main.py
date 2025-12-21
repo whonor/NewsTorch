@@ -123,30 +123,32 @@ def load_fasttext_vec(filepath):
 
 # Step 3: Build embedding matrix from word_dict
 def build_danish_word_embedding(word_dict, vec_file, embedding_dim, output_pkl_path):
-    # Auto-download if file missing
     download_fasttext_vec_if_needed(vec_file)
-
-    print("📥 Loading FastText Danish vectors...")
-    word_to_vec = load_fasttext_vec(vec_file)
-
     print("🛠️ Building word embedding matrix...")
-    all_vecs = torch.stack(list(word_to_vec.values()))
-    mean_vector = torch.mean(all_vecs, dim=0)
-
-    word_embedding_vectors = torch.zeros([len(word_dict), embedding_dim])
-    for word, index in word_dict.items():
-        if index == 0:
-            continue
-        if word in word_to_vec:
-            word_embedding_vectors[index, :] = word_to_vec[word]
-        else:
-            random_vec = torch.randn(embedding_dim) * 0.1
-            word_embedding_vectors[index, :] = random_vec + mean_vector
+    
+    word_embedding_vectors = torch.randn([len(word_dict), embedding_dim]) * 0.1
+    found_words = 0
+    
+    with open(vec_file, 'r', encoding='utf-8') as f:
+        f.readline()
+        for line in tqdm(f, desc="Processing vectors"):
+            parts = line.rstrip().split(' ')
+            word = parts[0]
+            if word in word_dict:
+                try:
+                    vec = torch.tensor([float(x) for x in parts[1:]], dtype=torch.float32)
+                    index = word_dict[word]
+                    if index > 0:
+                        word_embedding_vectors[index, :] = vec
+                        found_words += 1
+                except (ValueError, IndexError):
+                    continue
 
     with open(output_pkl_path, 'wb') as f:
         pickle.dump(word_embedding_vectors, f)
 
     print(f"✅ Saved to {output_pkl_path}, shape: {word_embedding_vectors.shape}")
+    print(f"Found {found_words} out of {len(word_dict)} words in the pre-trained embeddings.")
 
 
 class EBNeRD_Corpus:
@@ -349,94 +351,95 @@ class EBNeRD_Corpus:
 
 
             # build graph
-            category_num = len(category_dict)
-            graph_size = config.max_history_num + category_num  # |V_n| + |V_p|
-            prefix_mode = ['train', 'dev', 'test']
-            user_history_graph_data = {}
+            if config.dataset_size != 'large':
+                category_num = len(category_dict)
+                graph_size = config.max_history_num + category_num  # |V_n| + |V_p|
+                prefix_mode = ['train', 'dev', 'test']
+                user_history_graph_data = {}
 
-            for prefix_index, prefix in enumerate([config.train_root, config.dev_root, config.test_root]):
-                mode = prefix_mode[prefix_index]
-                behaviors_parquet = os.path.join(prefix, 'behaviors.parquet')
+                for prefix_index, prefix in enumerate([config.train_root, config.dev_root, config.test_root]):
+                    mode = prefix_mode[prefix_index]
+                    behaviors_parquet = os.path.join(prefix, 'behaviors.parquet')
 
-                df_behaviors = pd.read_parquet(behaviors_parquet)
-                user_history_num = len(df_behaviors)
+                    df_behaviors = pd.read_parquet(behaviors_parquet)
+                    user_history_num = len(df_behaviors)
 
-                graph_path = os.path.join('cache/ebnerd', f'{config.dataset_size}-{mode}_user_history_graph.npy')
-                if os.path.exists(graph_path):
-                    os.remove(graph_path)
-                user_history_graph = np.memmap(graph_path, dtype=np.float32, mode='w+', shape=(user_history_num, graph_size, graph_size))
-                user_history_category_mask = np.zeros([user_history_num, category_num + 1], dtype=np.float32)
-                user_history_category_indices = np.full([user_history_num, config.max_history_num], category_num,
-                                                        dtype=np.int64)
+                    graph_path = os.path.join('cache/ebnerd', f'{config.dataset_size}-{mode}_user_history_graph.npy')
+                    if os.path.exists(graph_path):
+                        os.remove(graph_path)
+                    user_history_graph = np.memmap(graph_path, dtype=np.float32, mode='w+', shape=(user_history_num, graph_size, graph_size))
+                    user_history_category_mask = np.zeros([user_history_num, category_num + 1], dtype=np.float32)
+                    user_history_category_indices = np.full([user_history_num, config.max_history_num], category_num,
+                                                            dtype=np.int64)
 
-                for line_index, row in df_behaviors.iterrows():
-                    history = str(row['history']).strip()
+                    for line_index, row in df_behaviors.iterrows():
+                        history = str(row['history']).strip()
 
-                    if config.no_self_connection:
-                        history_graph = np.zeros([graph_size, graph_size], dtype=np.float32)
-                    else:
-                        history_graph = np.identity(graph_size, dtype=np.float32)
+                        if config.no_self_connection:
+                            history_graph = np.zeros([graph_size, graph_size], dtype=np.float32)
+                        else:
+                            history_graph = np.identity(graph_size, dtype=np.float32)
 
-                    history_category_mask = np.zeros(category_num + 1, dtype=np.float32)
-                    history_category_indices = np.full(config.max_history_num, category_num, dtype=np.int64)
+                        history_category_mask = np.zeros(category_num + 1, dtype=np.float32)
+                        history_category_indices = np.full(config.max_history_num, category_num, dtype=np.int64)
 
-                    if len(history.strip('[] ')) > 0:
-                        history_news_ID = history.strip('[] ').split(',')
-                        history_news_ID = [nid.strip() for nid in history_news_ID if nid.strip() != '']
+                        if len(history.strip('[] ')) > 0:
+                            history_news_ID = history.strip('[] ').split(',')
+                            history_news_ID = [nid.strip() for nid in history_news_ID if nid.strip() != '']
 
-                        offset = max(0, len(history_news_ID) - config.max_history_num)
-                        history_news_num = min(len(history_news_ID), config.max_history_num)
+                            offset = max(0, len(history_news_ID) - config.max_history_num)
+                            history_news_num = min(len(history_news_ID), config.max_history_num)
 
-                        for i in range(history_news_num):
-                            news_id = history_news_ID[i + offset]
-                            category_index = news_category_dict.get(news_id, category_num)
+                            for i in range(history_news_num):
+                                news_id = history_news_ID[i + offset]
+                                category_index = news_category_dict.get(news_id, category_num)
 
-                            if category_index >= category_num:
-                                continue  # skip invalid category
-
-                            history_category_mask[category_index] = 1.0
-                            history_category_indices[i] = category_index
-
-                            history_graph[i, config.max_history_num + category_index] = 1
-                            history_graph[config.max_history_num + category_index, i] = 1
-
-                            for j in range(i + 1, history_news_num):
-                                other_news_id = history_news_ID[j + offset]
-                                other_category_index = news_category_dict.get(other_news_id, category_num)
-
-                                if other_category_index >= category_num:
+                                if category_index >= category_num:
                                     continue  # skip invalid category
 
-                                if category_index == other_category_index:
-                                    history_graph[i, j] = 1
-                                    history_graph[j, i] = 1
+                                history_category_mask[category_index] = 1.0
+                                history_category_indices[i] = category_index
+
+                                history_graph[i, config.max_history_num + category_index] = 1
+                                history_graph[config.max_history_num + category_index, i] = 1
+
+                                for j in range(i + 1, history_news_num):
+                                    other_news_id = history_news_ID[j + offset]
+                                    other_category_index = news_category_dict.get(other_news_id, category_num)
+
+                                    if other_category_index >= category_num:
+                                        continue  # skip invalid category
+
+                                    if category_index == other_category_index:
+                                        history_graph[i, j] = 1
+                                        history_graph[j, i] = 1
+                                    else:
+                                        history_graph[
+                                            config.max_history_num + category_index, config.max_history_num + other_category_index] = 1
+                                        history_graph[
+                                            config.max_history_num + other_category_index, config.max_history_num + category_index] = 1
+
+                            if not config.no_adjacent_normalization:
+                                degrees = history_graph.sum(axis=1)
+                                if config.gcn_normalization_type == 'asymmetric':
+                                    D_inv = np.diag(1 / np.clip(degrees, a_min=1e-12, a_max=None))
+                                    history_graph = D_inv @ history_graph
                                 else:
-                                    history_graph[
-                                        config.max_history_num + category_index, config.max_history_num + other_category_index] = 1
-                                    history_graph[
-                                        config.max_history_num + other_category_index, config.max_history_num + category_index] = 1
+                                    D_inv_sqrt = np.diag(np.sqrt(1 / np.clip(degrees, a_min=1e-12, a_max=None)))
+                                    history_graph = D_inv_sqrt @ history_graph @ D_inv_sqrt
 
-                        if not config.no_adjacent_normalization:
-                            degrees = history_graph.sum(axis=1)
-                            if config.gcn_normalization_type == 'asymmetric':
-                                D_inv = np.diag(1 / np.clip(degrees, a_min=1e-12, a_max=None))
-                                history_graph = D_inv @ history_graph
-                            else:
-                                D_inv_sqrt = np.diag(np.sqrt(1 / np.clip(degrees, a_min=1e-12, a_max=None)))
-                                history_graph = D_inv_sqrt @ history_graph @ D_inv_sqrt
+                        user_history_graph[line_index] = history_graph
+                        user_history_category_mask[line_index] = history_category_mask
+                        user_history_category_indices[line_index] = history_category_indices
 
-                    user_history_graph[line_index] = history_graph
-                    user_history_category_mask[line_index] = history_category_mask
-                    user_history_category_indices[line_index] = history_category_indices
+                    user_history_graph.flush()
+                    user_history_graph_data[f'{mode}_user_history_graph_path'] = graph_path
+                    user_history_graph_data[f'{mode}_user_history_category_mask'] = user_history_category_mask
+                    user_history_graph_data[f'{mode}_user_history_category_indices'] = user_history_category_indices
+                    del user_history_graph
 
-                user_history_graph.flush()
-                user_history_graph_data[f'{mode}_user_history_graph_path'] = graph_path
-                user_history_graph_data[f'{mode}_user_history_category_mask'] = user_history_category_mask
-                user_history_graph_data[f'{mode}_user_history_category_indices'] = user_history_category_indices
-                del user_history_graph
-
-            with open(user_history_graph_file, 'wb') as f:
-                pickle.dump(user_history_graph_data, f)
+                with open(user_history_graph_file, 'wb') as f:
+                    pickle.dump(user_history_graph_data, f)
 
     def __init__(self, config: Config):
 
@@ -483,47 +486,69 @@ class EBNeRD_Corpus:
         with open('cache/ebnerd/image_embedding-%s.pkl' % config.dataset_size, 'rb') as f:
             image_embedding_dict = pickle.load(f)
 
-            with open('cache/ebnerd/user_history_graph-' + str(config.max_history_num) + ('' if config.no_self_connection else '-self') + ('' if config.no_adjacent_normalization else '-normalize-' + config.gcn_normalization_type) + '-' + config.dataset_size + '.pkl', 'rb') as user_history_graph_f:
+            if config.dataset_size != 'large':
 
-                user_history_data = pickle.load(user_history_graph_f)
+                with open('cache/ebnerd/user_history_graph-' + str(config.max_history_num) + ('' if config.no_self_connection else '-self') + ('' if config.no_adjacent_normalization else '-normalize-' + config.gcn_normalization_type) + '-' + config.dataset_size + '.pkl', 'rb') as user_history_graph_f:
 
-                graph_size = config.max_history_num + config.category_num
+                    user_history_data = pickle.load(user_history_graph_f)
 
-
-
-                train_user_history_num = len(pd.read_parquet(os.path.join(config.train_root, 'behaviors.parquet')))
-
-                train_graph_shape = (train_user_history_num, graph_size, graph_size)
-
-                self.train_user_history_graph = np.memmap(user_history_data['train_user_history_graph_path'], dtype=np.float32, mode='r', shape=train_graph_shape)
-
-                self.train_user_history_category_mask = user_history_data['train_user_history_category_mask']
-
-                self.train_user_history_category_indices = user_history_data['train_user_history_category_indices']
+                    graph_size = config.max_history_num + config.category_num
 
 
 
-                dev_user_history_num = len(pd.read_parquet(os.path.join(config.dev_root, 'behaviors.parquet')))
+                    train_user_history_num = len(pd.read_parquet(os.path.join(config.train_root, 'behaviors.parquet')))
 
-                dev_graph_shape = (dev_user_history_num, graph_size, graph_size)
+                    train_graph_shape = (train_user_history_num, graph_size, graph_size)
 
-                self.dev_user_history_graph = np.memmap(user_history_data['dev_user_history_graph_path'], dtype=np.float32, mode='r', shape=dev_graph_shape)
+                    self.train_user_history_graph = np.memmap(user_history_data['train_user_history_graph_path'], dtype=np.float32, mode='r', shape=train_graph_shape)
 
-                self.dev_user_history_category_mask = user_history_data['dev_user_history_category_mask']
+                    self.train_user_history_category_mask = user_history_data['train_user_history_category_mask']
 
-                self.dev_user_history_category_indices = user_history_data['dev_user_history_category_indices']
+                    self.train_user_history_category_indices = user_history_data['train_user_history_category_indices']
 
 
 
-                test_user_history_num = len(pd.read_parquet(os.path.join(config.test_root, 'behaviors.parquet')))
+                    dev_user_history_num = len(pd.read_parquet(os.path.join(config.dev_root, 'behaviors.parquet')))
 
-                test_graph_shape = (test_user_history_num, graph_size, graph_size)
+                    dev_graph_shape = (dev_user_history_num, graph_size, graph_size)
 
-                self.test_user_history_graph = np.memmap(user_history_data['test_user_history_graph_path'], dtype=np.float32, mode='r', shape=test_graph_shape)
+                    self.dev_user_history_graph = np.memmap(user_history_data['dev_user_history_graph_path'], dtype=np.float32, mode='r', shape=dev_graph_shape)
 
-                self.test_user_history_category_mask = user_history_data['test_user_history_category_mask']
+                    self.dev_user_history_category_mask = user_history_data['dev_user_history_category_mask']
 
-                self.test_user_history_category_indices = user_history_data['test_user_history_category_indices']
+                    self.dev_user_history_category_indices = user_history_data['dev_user_history_category_indices']
+
+
+
+                    test_user_history_num = len(pd.read_parquet(os.path.join(config.test_root, 'behaviors.parquet')))
+
+                    test_graph_shape = (test_user_history_num, graph_size, graph_size)
+
+                    self.test_user_history_graph = np.memmap(user_history_data['test_user_history_graph_path'], dtype=np.float32, mode='r', shape=test_graph_shape)
+
+                    self.test_user_history_category_mask = user_history_data['test_user_history_category_mask']
+
+                    self.test_user_history_category_indices = user_history_data['test_user_history_category_indices']
+
+            else:
+
+                self.train_user_history_graph = None
+
+                self.train_user_history_category_mask = None
+
+                self.train_user_history_category_indices = None
+
+                self.dev_user_history_graph = None
+
+                self.dev_user_history_category_mask = None
+
+                self.dev_user_history_category_indices = None
+
+                self.test_user_history_graph = None
+
+                self.test_user_history_category_mask = None
+
+                self.test_user_history_category_indices = None
 
         # meta cache
 
