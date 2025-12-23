@@ -26,44 +26,26 @@ class TrainerMMRec(Trainer):
             epoch_loss = 0
 
             for data_tuple in tqdm(train_dataloader):
-                (user_ID, user_category, user_subCategory, user_title_text, user_title_mask, user_title_entity, user_content_text, user_content_mask, user_content_entity, user_history_mask, user_history_graph, user_history_category_mask, user_history_category_indices,
-                 news_category, news_subCategory, news_title_text, news_title_mask, news_title_entity, news_content_text, news_content_mask, news_content_entity, history_sentiment, candidate_sentiment, history_index, sample_index,
+                data_tuple = [item.cuda(non_blocking=True) if isinstance(item, torch.Tensor) else item for item in data_tuple]
+                (user_ID, _, _, user_title_text, user_title_mask, _, _, _, _, user_history_mask, _, _, _,
+                 _, _, news_title_text, news_title_mask, _, _, _, _, _, _, _, _,
                  history_image_embedding, candidate_image_embedding) = data_tuple
 
                 news_feature = {
-                    "input_ids": news_title_text.cuda(non_blocking=True),
-                    "attention_mask": news_title_mask.cuda(non_blocking=True),
-                    "input_imgs": candidate_image_embedding.unsqueeze(2).cuda(non_blocking=True),
+                    "input_ids": news_title_text,
+                    "attention_mask": news_title_mask,
+                    "input_imgs": candidate_image_embedding.unsqueeze(2),
                     "image_loc": torch.zeros(news_title_text.shape[0], news_title_text.shape[1], 1, 5).cuda(non_blocking=True),
                 }
                 history_feature = {
-                    "input_ids": user_title_text.cuda(non_blocking=True),
-                    "attention_mask": user_title_mask.cuda(non_blocking=True),
-                    "input_imgs": history_image_embedding.unsqueeze(2).cuda(non_blocking=True),
+                    "input_ids": user_title_text,
+                    "attention_mask": user_title_mask,
+                    "input_imgs": history_image_embedding.unsqueeze(2),
                     "image_loc": torch.zeros(user_title_text.shape[0], user_title_text.shape[1], 1, 5).cuda(non_blocking=True),
                 }
 
-                log_mask = user_history_mask.cuda(non_blocking=True)
+                log_mask = user_history_mask
                 targets = torch.zeros(user_ID.size(0), dtype=torch.long).cuda(non_blocking=True)
-
-                user_ID = user_ID.cuda(non_blocking=True)
-                user_category = user_category.cuda(non_blocking=True)
-                user_subCategory = user_subCategory.cuda(non_blocking=True)
-                user_content_text = user_content_text.cuda(non_blocking=True)
-                user_content_mask = user_content_mask.cuda(non_blocking=True)
-                user_content_entity = user_content_entity.cuda(non_blocking=True)
-                user_history_graph = user_history_graph.cuda(non_blocking=True)
-                user_history_category_mask = user_history_category_mask.cuda(non_blocking=True)
-                user_history_category_indices = user_history_category_indices.cuda(non_blocking=True)
-                news_category = news_category.cuda(non_blocking=True)
-                news_subCategory = news_subCategory.cuda(non_blocking=True)
-                news_title_entity = news_title_entity.cuda(non_blocking=True)
-                news_content_text = news_content_text.cuda(non_blocking=True)
-                news_content_mask = news_content_mask.cuda(non_blocking=True)
-                news_content_entity = news_content_entity.cuda(non_blocking=True)
-                history_sentiment = history_sentiment.cuda(non_blocking=True)
-                candidate_sentiment = candidate_sentiment.cuda(non_blocking=True)
-
 
                 loss, score = model(news_feature, history_feature, log_mask, targets, compute_loss=True)
                 

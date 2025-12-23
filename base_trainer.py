@@ -85,60 +85,23 @@ class Trainer:
             train_dataloader = DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.batch_size // 16, pin_memory=True)
             model.train()
             epoch_loss = 0
-            for (user_ID, user_category, user_subCategory, user_title_text, user_title_mask, user_title_entity, user_content_text, user_content_mask, user_content_entity, user_history_mask, user_history_graph, user_history_category_mask, user_history_category_indices,
-                news_category, news_subCategory, news_title_text, news_title_mask, news_title_entity, news_content_text, news_content_mask, news_content_entity, history_index, sample_index) in tqdm(train_dataloader):
-                user_ID = user_ID.cuda(non_blocking=True)
-                user_category = user_category.cuda(non_blocking=True)
-                user_subCategory = user_subCategory.cuda(non_blocking=True)
-                user_title_text = user_title_text.cuda(non_blocking=True)
-                user_title_mask = user_title_mask.cuda(non_blocking=True)
-                user_title_entity = user_title_entity.cuda(non_blocking=True)
-                user_content_text = user_content_text.cuda(non_blocking=True)
-                user_content_mask = user_content_mask.cuda(non_blocking=True)
-                user_content_entity = user_content_entity.cuda(non_blocking=True)
-                user_history_mask = user_history_mask.cuda(non_blocking=True)
-                user_history_graph = user_history_graph.cuda(non_blocking=True)
-                user_history_category_mask = user_history_category_mask.cuda(non_blocking=True)
-                user_history_category_indices = user_history_category_indices.cuda(non_blocking=True)
-                news_category = news_category.cuda(non_blocking=True)
-                news_subCategory = news_subCategory.cuda(non_blocking=True)
-                news_title_text = news_title_text.cuda(non_blocking=True)
-                news_title_mask = news_title_mask.cuda(non_blocking=True)
-                news_title_entity = news_title_entity.cuda(non_blocking=True)
-                news_content_text = news_content_text.cuda(non_blocking=True)
-                news_content_mask = news_content_mask.cuda(non_blocking=True)
-                news_content_entity = news_content_entity.cuda(non_blocking=True)
-
+            for data_batch in tqdm(train_dataloader):
+                data_batch = [item.cuda(non_blocking=True) if isinstance(item, torch.Tensor) else item for item in data_batch]
                 if self.config.model == "TANR":
-                    logits, topic_pred_loss = model(user_ID, user_category, user_subCategory, user_title_text, user_title_mask,
-                                   user_title_entity, user_content_text, user_content_mask, user_content_entity,
-                                   user_history_mask, user_history_graph, user_history_category_mask,
-                                   user_history_category_indices, \
-                                   news_category, news_subCategory, news_title_text, news_title_mask, news_title_entity,
-                                   news_content_text, news_content_mask,
-                                   news_content_entity)  # [batch_size, 1 + negative_sample_num]
-                    # topic classification loss
+                    logits, topic_pred_loss = self.model(*data_batch[:21])
                     loss = self.loss(logits) + self.config.topic_pred_loss_coef * topic_pred_loss
                 elif self.config.model == "LKPNR":
-                    logits = model(user_ID, user_category, user_subCategory, user_title_text, user_title_mask,
-                                   user_title_entity, user_content_text, user_content_mask, user_content_entity,
-                                   user_history_mask, user_history_graph, user_history_category_mask,
-                                   user_history_category_indices, \
-                                   news_category, news_subCategory, news_title_text, news_title_mask, news_title_entity,
-                                   news_content_text, news_content_mask, news_content_entity, history_index,
-                                   sample_index)
+                    if self.config.dataset_name == 'ebnerd':
+                        model_args = data_batch[:21] + data_batch[23:25]
+                        logits = self.model(*model_args)
+                    else:
+                        logits = self.model(*data_batch)
                     loss = self.loss(logits)
                 else:
-                    logits = model(user_ID, user_category, user_subCategory, user_title_text, user_title_mask,
-                                   user_title_entity, user_content_text, user_content_mask, user_content_entity,
-                                   user_history_mask, user_history_graph, user_history_category_mask,
-                                   user_history_category_indices, \
-                                   news_category, news_subCategory, news_title_text, news_title_mask, news_title_entity,
-                                   news_content_text, news_content_mask,
-                                   news_content_entity)  # [batch_size, 1 + negative_sample_num]
+                    logits = self.model(*data_batch[:21])  # For other models like NRMS, NPA, etc.
                     loss = self.loss(logits)
 
-                epoch_loss += float(loss) * user_ID.size(0)
+                epoch_loss += float(loss) * data_batch[0].size(0)
                 self.optimizer.zero_grad()
                 loss.backward()
                 if self.gradient_clip_norm > 0:

@@ -217,18 +217,45 @@ class MHSA(NewsEncoder):
         self.attention.initialize()
 
     def forward(self, title_text, title_mask, title_entity, content_text, content_mask, content_entity, category, subCategory, user_embedding):
-        batch_size = title_text.size(0)
-        news_num = title_text.size(1)
-        batch_news_num = batch_size * news_num
-        mask = title_mask.view([batch_news_num, self.max_sentence_length])
-        # 1. word embedding
-        w = self.dropout(self.word_embedding(title_text)).view([batch_news_num, self.max_sentence_length, self.word_embedding_dim])
-        # 2. multi-head self-attention
-        c = self.dropout(self.multiheadAttention(w, w, w, mask))
-        # 3. attention layer
-        news_representation = self.attention(c, mask=mask).view([batch_size, news_num, self.feature_dim])
-        # 4. feature fusion
-        news_representation = self.feature_fusion(news_representation, category, subCategory)
+        if title_text.dim() == 3:  # Training path: [batch_size, news_num, max_title_length]
+            batch_size = title_text.size(0)
+            news_num = title_text.size(1)
+            batch_news_num = batch_size * news_num
+            # Reshape 3D title_mask to 2D [batch_size * news_num, max_title_length]
+            mask = title_mask.view([batch_news_num, self.max_sentence_length])
+            # Reshape 4D word embeddings to 3D [batch_size * news_num, max_title_length, word_embedding_dim]
+            w = self.dropout(self.word_embedding(title_text)).view([batch_news_num, self.max_sentence_length, self.word_embedding_dim])
+            # Multi-head self-attention
+            c = self.dropout(self.multiheadAttention(w, w, w, mask))
+            # Attention layer, reshape back to 3D [batch_size, news_num, feature_dim]
+            news_representation = self.attention(c, mask=mask).view([batch_size, news_num, self.feature_dim])
+            # Feature fusion
+            news_representation = self.feature_fusion(news_representation, category, subCategory)
+        elif title_text.dim() == 2:  # Dev/Test path: [batch_size, max_title_length] (single news item per batch entry)
+            batch_size = title_text.size(0)
+            # In this case, news_num is implicitly 1.
+            # title_mask is already [batch_size, max_title_length]
+            mask = title_mask
+            # Word embedding, resulting in [batch_size, max_title_length, word_embedding_dim]
+            w = self.dropout(self.word_embedding(title_text))
+            # Multi-head self-attention
+            c = self.dropout(self.multiheadAttention(w, w, w, mask))
+            # Attention layer, output is [batch_size, feature_dim]
+            news_representation = self.attention(c, mask=mask)
+
+            # For feature fusion, category and subCategory also need to be unsqueezed
+            # news_representation becomes [batch_size, 1, feature_dim]
+            # category becomes [batch_size, 1]
+            # subCategory becomes [batch_size, 1]
+            # Then feature_fusion returns [batch_size, 1, news_embedding_dim]
+            # Squeeze back to [batch_size, news_embedding_dim]
+            news_representation = self.feature_fusion(
+                news_representation.unsqueeze(1),
+                category.unsqueeze(1),
+                subCategory.unsqueeze(1)
+            ).squeeze(1)
+        else:
+            raise ValueError(f"Unexpected title_text dimension: {title_text.dim()}")
         # [batch_size, news_num, news_embedding_dim]
         return news_representation
 

@@ -32,6 +32,8 @@ class NRMS(nn.Module):
         user_representation = self.user_encoder(user_title_text, user_title_mask, user_title_entity, user_content_text, user_content_mask, user_content_entity, user_category, user_subCategory, \
                                                 user_history_mask, user_history_graph, user_history_category_mask, user_history_category_indices, user_embedding, news_representation)
         # [batch, 5]
+        if news_representation.dim() == 2:
+            news_representation = news_representation.unsqueeze(1)
         logits = self.click_predictor(user_representation.unsqueeze(dim=1), news_representation.permute(0, 2, 1)).squeeze(dim=1)
 
 

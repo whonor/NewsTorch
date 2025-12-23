@@ -82,38 +82,10 @@ class TrainerIPNR:
             train_dataloader = DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=0, pin_memory=True, drop_last=True)
             model.train()
             epoch_loss = 0
-            for (user_ID, user_category, user_subCategory, user_title_text, user_title_mask, user_title_entity, user_content_text, user_content_mask, user_content_entity, user_history_mask, user_history_graph, user_concept_text, user_concept_mask, \
-                news_category, news_subCategory, news_title_text, news_title_mask, news_title_entity, news_content_text, news_content_mask, news_content_entity, news_concept_text, news_concept_mask) in tqdm(train_dataloader):
-                user_ID = user_ID.cuda(non_blocking=True)                                                                                                                       # [batch_size]
-                user_category = user_category.cuda(non_blocking=True)                                                                                                           # [batch_size, max_history_num]
-                user_subCategory = user_subCategory.cuda(non_blocking=True)                                                                                                     # [batch_size, max_history_num]
-                user_title_text = user_title_text.cuda(non_blocking=True)                                                                                                       # [batch_size, max_history_num, max_title_length]
-                user_title_mask = user_title_mask.cuda(non_blocking=True)                                                                                                       # [batch_size, max_history_num, max_title_length]
-                user_title_entity = user_title_entity.cuda(non_blocking=True)                                                                                                   # [batch_size, max_history_num, max_title_length]
-                user_content_text = user_content_text.cuda(non_blocking=True)                                                                                                   # [batch_size, max_history_num, max_content_length]
-                user_content_mask = user_content_mask.cuda(non_blocking=True)                                                                                                   # [batch_size, max_history_num, max_content_length]
-                user_content_entity = user_content_entity.cuda(non_blocking=True)                                                                                               # [batch_size, max_history_num, max_content_length]
-                user_history_mask = user_history_mask.cuda(non_blocking=True)                                                                                                   # [batch_size, max_history_num]
-                user_history_graph = user_history_graph.cuda(non_blocking=True)                                                                                                 # [batch_size, max_history_num, max_history_num]
-                # user_history_category_mask = user_history_category_mask.cuda(non_blocking=True)                                                                                 # [batch_size, category_num + 1]
-                # user_history_category_indices = user_history_category_indices.cuda(non_blocking=True)                                                                           # [batch_size, max_history_num]
-                news_category = news_category.cuda(non_blocking=True)                                                                                                           # [batch_size, 1 + negative_sample_num]
-                news_subCategory = news_subCategory.cuda(non_blocking=True)                                                                                                     # [batch_size, 1 + negative_sample_num]
-                news_title_text = news_title_text.cuda(non_blocking=True)                                                                                                       # [batch_size, 1 + negative_sample_num, max_title_length]
-                news_title_mask = news_title_mask.cuda(non_blocking=True)                                                                                                       # [batch_size, 1 + negative_sample_num, max_title_length]
-                news_title_entity = news_title_entity.cuda(non_blocking=True)                                                                                                   # [batch_size, 1 + negative_sample_num, max_title_length]
-                news_content_text = news_content_text.cuda(non_blocking=True)                                                                                                   # [batch_size, 1 + negative_sample_num, max_content_length]
-                news_content_mask = news_content_mask.cuda(non_blocking=True)                                                                                                   # [batch_size, 1 + negative_sample_num, max_content_length]
-                news_content_entity = news_content_entity.cuda(non_blocking=True)                                                                                               # [batch_size, 1 + negative_sample_num, max_content_length]
+            for data_batch in tqdm(train_dataloader):
+                data_batch = [item.cuda(non_blocking=True) if isinstance(item, torch.Tensor) else item for item in data_batch]
 
-                user_concept_text = user_concept_text.cuda(non_blocking=True)  # [batch_size, max_history_num, max_title_length]
-                user_concept_mask = user_concept_mask.cuda(non_blocking=True)
-                news_concept_text = news_concept_text.cuda(non_blocking=True)  # [batch_size, 1 + negative_sample_num, max_title_length]
-                news_concept_mask = news_concept_mask.cuda(non_blocking=True)
-
-
-                logits = model(user_ID, user_category, user_subCategory, user_title_text, user_title_mask, user_title_entity, user_content_text, user_content_mask, user_content_entity, user_history_mask, user_history_graph, user_concept_text, user_concept_mask, \
-                               news_category, news_subCategory, news_title_text, news_title_mask, news_title_entity, news_content_text, news_content_mask, news_content_entity, news_concept_text, news_concept_mask) # [batch_size, 1 + negative_sample_num]
+                logits = model(*data_batch) # [batch_size, 1 + negative_sample_num]
 
                 loss = self.loss(logits)
                 if model.news_encoder.auxiliary_loss is not None:
@@ -122,7 +94,7 @@ class TrainerIPNR:
                 if model.user_encoder.auxiliary_loss is not None:
                     user_encoder_auxiliary_loss = model.user_encoder.auxiliary_loss.mean()
                     loss += user_encoder_auxiliary_loss
-                epoch_loss += float(loss) * user_ID.size(0)
+                epoch_loss += float(loss) * data_batch[0].size(0)
                 self.optimizer.zero_grad()
                 loss.backward()
                 if self.gradient_clip_norm > 0:

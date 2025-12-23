@@ -206,34 +206,10 @@ def compute_scores_IPNR(config: Config, model: nn.Module, mind_corpus: MIND_Corp
     torch.cuda.empty_cache()
     model.eval()
     with torch.no_grad():
-        for (user_ID, user_category, user_subCategory, user_title_text, user_title_mask, user_title_entity, user_content_text, user_content_mask, user_content_entity, user_history_mask, user_history_graph, user_concept_text, user_concept_mask, \
-             news_category, news_subCategory, news_title_text, news_title_mask, news_title_entity, news_content_text, news_content_mask, news_content_entity, news_concept_text, news_concept_mask) in tqdm(dataloader):
-            user_ID = user_ID.cuda(non_blocking=True)
-            user_category = user_category.cuda(non_blocking=True)
-            user_subCategory = user_subCategory.cuda(non_blocking=True)
-            user_title_text = user_title_text.cuda(non_blocking=True)
-            user_title_mask = user_title_mask.cuda(non_blocking=True)
-            user_title_entity = user_title_entity.cuda(non_blocking=True)
-            user_content_text = user_content_text.cuda(non_blocking=True)
-            user_content_mask = user_content_mask.cuda(non_blocking=True)
-            user_content_entity = user_content_entity.cuda(non_blocking=True)
-            user_history_mask = user_history_mask.cuda(non_blocking=True)
-            user_history_graph = user_history_graph.cuda(non_blocking=True)
-            # user_history_category_mask = user_history_category_mask.cuda(non_blocking=True)
-            # user_history_category_indices = user_history_category_indices.cuda(non_blocking=True)
-            user_concept_text = user_concept_text.cuda(non_blocking=True)
-            user_concept_mask = user_concept_mask.cuda(non_blocking=True)
-
-            news_category = news_category.cuda(non_blocking=True)
-            news_subCategory = news_subCategory.cuda(non_blocking=True)
-            news_title_text = news_title_text.cuda(non_blocking=True)
-            news_title_mask = news_title_mask.cuda(non_blocking=True)
-            news_title_entity = news_title_entity.cuda(non_blocking=True)
-            news_content_text = news_content_text.cuda(non_blocking=True)
-            news_content_mask = news_content_mask.cuda(non_blocking=True)
-            news_content_entity = news_content_entity.cuda(non_blocking=True)
-            news_concept_text = news_concept_text.cuda(non_blocking=True)
-            news_concept_mask = news_concept_mask.cuda(non_blocking=True)
+        for data_batch in tqdm(dataloader):
+            data_batch = [item.cuda(non_blocking=True) if isinstance(item, torch.Tensor) else item for item in data_batch]
+            (user_ID, _, _, _, _, _, _, _, _, _, _, _, _,
+             news_category, news_subCategory, news_title_text, news_title_mask, _, news_content_text, news_content_mask, _, news_concept_text, news_concept_mask) = data_batch
 
             batch_size = user_ID.size(0)
             news_category = news_category.unsqueeze(dim=1)
@@ -245,8 +221,7 @@ def compute_scores_IPNR(config: Config, model: nn.Module, mind_corpus: MIND_Corp
             news_concept_text = news_concept_text.unsqueeze(dim=1)
             news_concept_mask = news_concept_mask.unsqueeze(dim=1)
 
-            scores[index: index+batch_size] = model(user_ID, user_category, user_subCategory, user_title_text, user_title_mask, user_title_entity, user_content_text, user_content_mask, user_content_entity, user_history_mask, user_history_graph, user_concept_text, user_concept_mask, \
-                                                    news_category, news_subCategory, news_title_text, news_title_mask, news_title_entity, news_content_text, news_content_mask, news_content_entity, news_concept_text, news_concept_mask).squeeze(dim=1) # [batch_size]
+            scores[index: index+batch_size] = model(*data_batch).squeeze(dim=1) # [batch_size]
             index += batch_size
     scores = scores.tolist()
     sub_scores = [[] for _ in range(indices[-1] + 1)]
@@ -283,33 +258,16 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
     model.eval()
 
     with torch.no_grad():
-        for (user_ID, user_category, user_subCategory, user_title_text, user_title_mask, user_title_entity, user_content_text, user_content_mask, user_content_entity, user_history_mask, user_history_graph, user_history_category_mask, user_history_category_indices, \
-             news_category, news_subCategory, news_title_text, news_title_mask, news_title_entity, news_content_text, news_content_mask, news_content_entity, user_hist_sentiment, news_sentiment, history_index, candidate_news_index) in tqdm(dataloader):
-            user_ID = user_ID.cuda(non_blocking=True)
-            user_category = user_category.cuda(non_blocking=True)
-            user_subCategory = user_subCategory.cuda(non_blocking=True)
-            user_title_text = user_title_text.cuda(non_blocking=True)
-            user_title_mask = user_title_mask.cuda(non_blocking=True)
-            user_title_entity = user_title_entity.cuda(non_blocking=True)
-            user_content_text = user_content_text.cuda(non_blocking=True)
-            user_content_mask = user_content_mask.cuda(non_blocking=True)
-            user_content_entity = user_content_entity.cuda(non_blocking=True)
-            user_history_mask = user_history_mask.cuda(non_blocking=True)
-            user_history_graph = user_history_graph.cuda(non_blocking=True)
-            user_history_category_mask = user_history_category_mask.cuda(non_blocking=True)
-            user_history_category_indices = user_history_category_indices.cuda(non_blocking=True)
-            news_category = news_category.cuda(non_blocking=True)
-            news_subCategory = news_subCategory.cuda(non_blocking=True)
-            news_title_text = news_title_text.cuda(non_blocking=True)
-            news_title_mask = news_title_mask.cuda(non_blocking=True)
-            news_title_entity = news_title_entity.cuda(non_blocking=True)
-            news_content_text = news_content_text.cuda(non_blocking=True)
-            news_content_mask = news_content_mask.cuda(non_blocking=True)
-            news_content_entity = news_content_entity.cuda(non_blocking=True)
-            user_hist_sentiment = user_hist_sentiment.cuda(non_blocking=True)
-            news_sentiment = news_sentiment.cuda(non_blocking=True)
-            # history_index = history_index.cuda(non_blocking=True)
-            # candidate_news_index = candidate_news_index.cuda(non_blocking=True)
+        for data_batch in tqdm(dataloader):
+            data_batch = [item.cuda(non_blocking=True) if isinstance(item, torch.Tensor) else item for item in data_batch]
+            user_ID = data_batch[0]
+            news_category = data_batch[13]
+            news_subCategory = data_batch[14]
+            news_title_text = data_batch[15]
+            news_title_mask = data_batch[16]
+            news_content_text = data_batch[18]
+            news_content_mask = data_batch[19]
+            candidate_news_index = data_batch[25]
 
             batch_size = user_ID.size(0)
             news_category = news_category.unsqueeze(dim=1)
@@ -321,52 +279,21 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
             candidate_news_index = candidate_news_index.unsqueeze(dim=1)
 
             if config.model == "TANR":
-                scores[index: index + batch_size], _ = model(user_ID, user_category, user_subCategory, user_title_text,
-                                                          user_title_mask, user_title_entity, user_content_text,
-                                                          user_content_mask, user_content_entity, user_history_mask,
-                                                          user_history_graph, user_history_category_mask,
-                                                          user_history_category_indices, \
-                                                          news_category, news_subCategory, news_title_text,
-                                                          news_title_mask, news_title_entity, news_content_text,
-                                                          news_content_mask, news_content_entity)  # [batch_size]
+                score, _ = model(*data_batch[:21])
+                scores[index: index + batch_size] = score
             elif config.model == "CNE-SUE" or config.model == "DKN" or config.model == "FIM":
-                scores[index: index + batch_size] = model(user_ID, user_category, user_subCategory, user_title_text,
-                                                          user_title_mask, user_title_entity, user_content_text,
-                                                          user_content_mask, user_content_entity, user_history_mask,
-                                                          user_history_graph, user_history_category_mask,
-                                                          user_history_category_indices, \
-                                                          news_category, news_subCategory, news_title_text,
-                                                          news_title_mask, news_title_entity, news_content_text,
-                                                          news_content_mask, news_content_entity).squeeze(1)  # [batch_size]
+                scores[index: index + batch_size] = model(*data_batch[:21]).squeeze(1)
             elif config.model == "LKPNR":
-                scores[index: index + batch_size] = model(user_ID, user_category, user_subCategory, user_title_text,
-                                                          user_title_mask, user_title_entity, user_content_text,
-                                                          user_content_mask, user_content_entity, user_history_mask,
-                                                          user_history_graph, user_history_category_mask,
-                                                          user_history_category_indices, \
-                                                          news_category, news_subCategory, news_title_text,
-                                                          news_title_mask, news_title_entity, news_content_text,
-                                                          news_content_mask, news_content_entity, history_index,
-                                                          candidate_news_index).squeeze(dim=1)  # [batch_size]
+                if config.dataset_name == 'ebnerd':
+                    model_args = data_batch[:21] + data_batch[23:26]
+                    scores[index: index + batch_size] = model(*model_args).squeeze(dim=1)
+                else:
+                    scores[index: index + batch_size] = model(*data_batch).squeeze(dim=1)
             elif config.model == "SentiDebias":
-                scores[index: index + batch_size] = model(user_ID, user_category, user_subCategory, user_title_text,
-                                                          user_title_mask, user_title_entity, user_content_text,
-                                                          user_content_mask, user_content_entity, user_history_mask,
-                                                          user_history_graph, user_history_category_mask,
-                                                          user_history_category_indices, \
-                                                          news_category, news_subCategory, news_title_text,
-                                                          news_title_mask, news_title_entity, news_content_text,
-                                                          news_content_mask, news_content_entity, user_hist_sentiment, news_sentiment)[0]
+                scores[index: index + batch_size] = model(*data_batch[:23])[0]
 
             else:
-                scores[index: index + batch_size] = model(user_ID, user_category, user_subCategory, user_title_text,
-                                                          user_title_mask, user_title_entity, user_content_text,
-                                                          user_content_mask, user_content_entity, user_history_mask,
-                                                          user_history_graph, user_history_category_mask,
-                                                          user_history_category_indices, \
-                                                          news_category, news_subCategory, news_title_text,
-                                                          news_title_mask, news_title_entity, news_content_text,
-                                                          news_content_mask, news_content_entity) # [batch_size, 5]
+                scores[index: index + batch_size] = model(*data_batch[:21])
             index += batch_size
     scores = scores.tolist()
     sub_scores = [[] for _ in range(indices[-1] + 1)]
@@ -403,22 +330,22 @@ def compute_scores_mmrec(config: Config, model: nn.Module, corpus, batch_size: i
     model.eval()
 
     with torch.no_grad():
-        for (user_ID, user_category, user_subCategory, user_title_text, user_title_mask, user_title_entity, user_content_text, user_content_mask, user_content_entity, user_history_mask, user_history_graph, user_history_category_mask, user_history_category_indices, \
-             news_category, news_subCategory, news_title_text, news_title_mask, news_title_entity, news_content_text, news_content_mask, news_content_entity, user_hist_sentiment, news_sentiment, history_index, candidate_news_index, \
-             history_image_embedding, candidate_image_embedding) in tqdm(dataloader):
-            
-            user_history_mask = user_history_mask.cuda(non_blocking=True)
+        for data_batch in tqdm(dataloader):
+            data_batch = [item.cuda(non_blocking=True) if isinstance(item, torch.Tensor) else item for item in data_batch]
+            (user_ID, _, _, user_title_text, user_title_mask, _, _, _, _, user_history_mask, _, _, _,
+             _, _, news_title_text, news_title_mask, _, _, _, _, _, _, _, _, _,
+             history_image_embedding, candidate_image_embedding) = data_batch
 
             news_feature = {
-                "input_ids": news_title_text.cuda(non_blocking=True),
-                "attention_mask": news_title_mask.cuda(non_blocking=True),
-                "input_imgs": candidate_image_embedding.unsqueeze(1).cuda(non_blocking=True),
+                "input_ids": news_title_text,
+                "attention_mask": news_title_mask,
+                "input_imgs": candidate_image_embedding.unsqueeze(1),
                 "image_loc": torch.zeros(news_title_text.shape[0], 1, 5).cuda(non_blocking=True),
             }
             history_feature = {
-                "input_ids": user_title_text.cuda(non_blocking=True),
-                "attention_mask": user_title_mask.cuda(non_blocking=True),
-                "input_imgs": history_image_embedding.unsqueeze(2).cuda(non_blocking=True),
+                "input_ids": user_title_text,
+                "attention_mask": user_title_mask,
+                "input_imgs": history_image_embedding.unsqueeze(2),
                 "image_loc": torch.zeros(user_title_text.shape[0], user_title_text.shape[1], 1, 5).cuda(non_blocking=True),
             }
             batch_size = user_ID.size(0)

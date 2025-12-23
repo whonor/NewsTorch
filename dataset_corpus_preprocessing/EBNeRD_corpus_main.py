@@ -351,7 +351,7 @@ class EBNeRD_Corpus:
 
 
             # build graph
-            if config.dataset_size != 'large':
+            if config.dataset_size != 'large' and config.model == 'CNE-SUE':
                 category_num = len(category_dict)
                 graph_size = config.max_history_num + category_num  # |V_n| + |V_p|
                 prefix_mode = ['train', 'dev', 'test']
@@ -442,6 +442,7 @@ class EBNeRD_Corpus:
                     pickle.dump(user_history_graph_data, f)
 
     def __init__(self, config: Config):
+        self.config = config
 
         # preprocess cache
 
@@ -486,7 +487,7 @@ class EBNeRD_Corpus:
         with open('cache/ebnerd/image_embedding-%s.pkl' % config.dataset_size, 'rb') as f:
             image_embedding_dict = pickle.load(f)
 
-            if config.dataset_size != 'large':
+            if config.dataset_size != 'large' and config.model == 'CNE-SUE':
 
                 with open('cache/ebnerd/user_history_graph-' + str(config.max_history_num) + ('' if config.no_self_connection else '-self') + ('' if config.no_adjacent_normalization else '-normalize-' + config.gcn_normalization_type) + '-' + config.dataset_size + '.pkl', 'rb') as user_history_graph_f:
 
@@ -762,7 +763,7 @@ class Ebnerd_Train_Dataset(data.Dataset):
 
     def __init__(self, corpus: EBNeRD_Corpus):
 
-        self.config = Config()
+        self.config = corpus.config
 
         self.negative_sample_num = self.config.negative_sample_num
 
@@ -854,7 +855,17 @@ class Ebnerd_Train_Dataset(data.Dataset):
 
         behavior_index = train_behavior[5]
 
-        return (train_behavior[0], self.news_category[history_index], self.news_subCategory[history_index], self.news_title_text[history_index], self.news_title_mask[history_index], self.news_title_entity[history_index], self.news_abstract_text[history_index], self.news_abstract_mask[history_index], self.news_abstract_entity[history_index], train_behavior[2], self.user_history_graph[behavior_index], self.user_history_category_mask[behavior_index], self.user_history_category_indices[behavior_index],
+        if self.config.model == 'CNE-SUE':
+            user_history_graph = self.user_history_graph[behavior_index]
+            user_history_category_mask = self.user_history_category_mask[behavior_index]
+            user_history_category_indices = self.user_history_category_indices[behavior_index]
+        else:
+            graph_size = self.config.max_history_num + self.config.category_num
+            user_history_graph = np.zeros((graph_size, graph_size), dtype=np.float32)
+            user_history_category_mask = np.zeros(self.config.category_num + 1, dtype=np.float32)
+            user_history_category_indices = np.zeros(self.config.max_history_num, dtype=np.int64)
+
+        return (train_behavior[0], self.news_category[history_index], self.news_subCategory[history_index], self.news_title_text[history_index], self.news_title_mask[history_index], self.news_title_entity[history_index], self.news_abstract_text[history_index], self.news_abstract_mask[history_index], self.news_abstract_entity[history_index], train_behavior[2], user_history_graph, user_history_category_mask, user_history_category_indices,
                 self.news_category[sample_index], self.news_subCategory[sample_index], self.news_title_text[sample_index], self.news_title_mask[sample_index], self.news_title_entity[sample_index], self.news_abstract_text[sample_index], self.news_abstract_mask[sample_index], self.news_abstract_entity[sample_index], self.news_sentiment[history_index], self.news_sentiment[sample_index], history_index, sample_index,
                 self.news_image_embeddings[history_index], self.news_image_embeddings[sample_index])
 
@@ -868,7 +879,7 @@ class Ebnerd_Train_Dataset(data.Dataset):
 class Ebnerd_DevTest_Dataset(data.Dataset):
 
     def __init__(self, corpus: EBNeRD_Corpus, mode: str):
-
+        self.config = corpus.config
         assert mode in ['dev', 'test'], 'mode must be chosen from \'dev\' or \'test\''
 
         self.news_category = corpus.news_category
@@ -913,7 +924,17 @@ class Ebnerd_DevTest_Dataset(data.Dataset):
 
         behavior_index = behavior[4]
 
-        return (behavior[0], self.news_category[history_index], self.news_subCategory[history_index], self.news_title_text[history_index], self.news_title_mask[history_index], self.news_title_entity[history_index], self.news_abstract_text[history_index], self.news_abstract_mask[history_index], self.news_abstract_entity[history_index], behavior[2], self.user_history_graph[behavior_index], self.user_history_category_mask[behavior_index], self.user_history_category_indices[behavior_index],
+        if self.config.model == 'CNE-SUE':
+            user_history_graph = self.user_history_graph[behavior_index]
+            user_history_category_mask = self.user_history_category_mask[behavior_index]
+            user_history_category_indices = self.user_history_category_indices[behavior_index]
+        else:
+            graph_size = self.config.max_history_num + self.config.category_num
+            user_history_graph = np.zeros((graph_size, graph_size), dtype=np.float32)
+            user_history_category_mask = np.zeros(self.config.category_num + 1, dtype=np.float32)
+            user_history_category_indices = np.zeros(self.config.max_history_num, dtype=np.int64)
+
+        return (behavior[0], self.news_category[history_index], self.news_subCategory[history_index], self.news_title_text[history_index], self.news_title_mask[history_index], self.news_title_entity[history_index], self.news_abstract_text[history_index], self.news_abstract_mask[history_index], self.news_abstract_entity[history_index], behavior[2], user_history_graph, user_history_category_mask, user_history_category_indices,
                 self.news_category[candidate_news_index], self.news_subCategory[candidate_news_index], self.news_title_text[candidate_news_index], self.news_title_mask[candidate_news_index], self.news_title_entity[candidate_news_index], self.news_abstract_text[candidate_news_index], self.news_abstract_mask[candidate_news_index], self.news_abstract_entity[candidate_news_index], self.news_sentiment[history_index], self.news_sentiment[candidate_news_index], history_index, candidate_news_index,
                 self.news_image_embeddings[history_index], self.news_image_embeddings[candidate_news_index])
 
