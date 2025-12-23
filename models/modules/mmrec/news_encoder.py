@@ -1149,12 +1149,12 @@ class BertModel(BertPreTrainedModel):
         extended_image_attention_mask = image_attention_mask.unsqueeze(1).unsqueeze(2)
 
         extended_attention_mask = extended_attention_mask.to(
-            dtype=next(self.parameters()).dtype
+            dtype=self.embeddings.word_embeddings.weight.dtype
         )
         extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
 
         extended_image_attention_mask = extended_image_attention_mask.to(
-            dtype=next(self.parameters()).dtype
+            dtype=self.embeddings.word_embeddings.weight.dtype
         )
         extended_image_attention_mask = (1.0 - extended_image_attention_mask) * -10000.0
 
@@ -1164,7 +1164,7 @@ class BertModel(BertPreTrainedModel):
         extended_co_attention_mask = co_attention_mask.unsqueeze(1)
         extended_co_attention_mask = extended_co_attention_mask * 5.0
         extended_co_attention_mask = extended_co_attention_mask.to(
-            dtype=next(self.parameters()).dtype
+            dtype=self.embeddings.word_embeddings.weight.dtype
         )
 
         embedding_output = self.embeddings(input_txt, token_type_ids)
