@@ -14,6 +14,7 @@ from tqdm import tqdm
 from config import Config
 import torch
 import numpy as np
+from transformers import AutoTokenizer, AutoModel
 
 # Imports for image processing
 from PIL import Image
@@ -89,66 +90,72 @@ def extract_image_features(image_dir, model, transforms):
     return image_embedding_dict
 
 
-# Step 1: Auto-download and extract FastText Danish vector
+# Step 1: Auto-download and extract FastText Danish vector (Deprecated)
 def download_fasttext_vec_if_needed(vec_file_path):
-    if os.path.exists(vec_file_path):
-        print(f"✅ Vector file already exists at: {vec_file_path}")
+    pass
+
+# Step 2: Load FastText .vec file into dictionary (Deprecated)
+def load_fasttext_vec(filepath):
+    pass
+
+# Step 3: Build embedding matrix from word_dict using XLM-Roberta-large
+def build_pretrain_word_embedding(word_dict, embedding_dim, output_pkl_path):
+    print("🛠️ Building word embedding matrix using XLM-Roberta-large...")
+    
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    print(f"Using device: {device}")
+
+    model_name = "xlm-roberta-large"
+    print(f"Loading {model_name}...")
+    try:
+        tokenizer = AutoTokenizer.from_pretrained(model_name)
+        model = AutoModel.from_pretrained(model_name).to(device)
+    except Exception as e:
+        print(f"Error loading model: {e}")
         return
 
-    vec_gz_url = "https://dl.fbaipublicfiles.com/fasttext/vectors-crawl/cc.da.300.vec.gz"
-    vec_gz_path = vec_file_path + ".gz"
-
-    print(f"⬇️ Downloading FastText Danish vectors from {vec_gz_url} ...")
-    urllib.request.urlretrieve(vec_gz_url, vec_gz_path)
-
-    print(f"📦 Extracting {vec_gz_path} ...")
-    with gzip.open(vec_gz_path, 'rb') as f_in:
-        with open(vec_file_path, 'wb') as f_out:
-            shutil.copyfileobj(f_in, f_out)
-
-    os.remove(vec_gz_path)
-    print(f"✅ Extracted to {vec_file_path}")
-
-# Step 2: Load FastText .vec file into dictionary
-def load_fasttext_vec(filepath):
-    word_to_vec = {}
-    with open(filepath, 'r', encoding='utf-8') as f:
-        first_line = f.readline()  # Skip header
-        for line in f:
-            parts = line.rstrip().split(' ')
-            word = parts[0]
-            vec = torch.tensor([float(x) for x in parts[1:]], dtype=torch.float32)
-            word_to_vec[word] = vec
-    return word_to_vec
-
-# Step 3: Build embedding matrix from word_dict
-def build_danish_word_embedding(word_dict, vec_file, embedding_dim, output_pkl_path):
-    download_fasttext_vec_if_needed(vec_file)
-    print("🛠️ Building word embedding matrix...")
+    model.eval()
     
-    word_embedding_vectors = torch.randn([len(word_dict), embedding_dim]) * 0.1
-    found_words = 0
+    model_dim = model.config.hidden_size
+    if embedding_dim != model_dim:
+        print(f"⚠️ Warning: Requested embedding_dim {embedding_dim} does not match model dim {model_dim}. Using {model_dim}.")
+        embedding_dim = model_dim
     
-    with open(vec_file, 'r', encoding='utf-8') as f:
-        f.readline()
-        for line in tqdm(f, desc="Processing vectors"):
-            parts = line.rstrip().split(' ')
-            word = parts[0]
-            if word in word_dict:
-                try:
-                    vec = torch.tensor([float(x) for x in parts[1:]], dtype=torch.float32)
-                    index = word_dict[word]
-                    if index > 0:
-                        word_embedding_vectors[index, :] = vec
-                        found_words += 1
-                except (ValueError, IndexError):
-                    continue
+    # Initialize with zeros
+    word_embedding_vectors = torch.zeros([len(word_dict), embedding_dim])
+    
+    batch_size = 64
+    words = list(word_dict.keys())
+    
+    # Process in batches
+    for i in tqdm(range(0, len(words), batch_size), desc="Generating embeddings"):
+        batch_words = words[i:i+batch_size]
+        
+        inputs = tokenizer(batch_words, padding=True, truncation=True, return_tensors="pt").to(device)
+        
+        with torch.no_grad():
+            outputs = model(**inputs)
+            # Mean pooling
+            attention_mask = inputs['attention_mask']
+            token_embeddings = outputs.last_hidden_state
+            
+            input_mask_expanded = attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
+            sum_embeddings = torch.sum(token_embeddings * input_mask_expanded, 1)
+            sum_mask = torch.clamp(input_mask_expanded.sum(1), min=1e-9)
+            batch_embeddings = sum_embeddings / sum_mask
+            
+        batch_embeddings = batch_embeddings.cpu()
+            
+        for j, word in enumerate(batch_words):
+            index = word_dict[word]
+            if 0 <= index < len(word_embedding_vectors):
+                word_embedding_vectors[index] = batch_embeddings[j]
 
     with open(output_pkl_path, 'wb') as f:
         pickle.dump(word_embedding_vectors, f)
 
     print(f"✅ Saved to {output_pkl_path}, shape: {word_embedding_vectors.shape}")
-    print(f"Found {found_words} out of {len(word_dict)} words in the pre-trained embeddings.")
 
 
 class EBNeRD_Corpus:
@@ -160,7 +167,7 @@ class EBNeRD_Corpus:
         subCategory_file = 'cache/ebnerd/subCategory-%s.json' % config.dataset_size
         sentiment_file = 'cache/ebnerd/sentiment-%s.json' % config.dataset_size
         vocabulary_file = 'cache/ebnerd/vocabulary-' + str(config.word_threshold) + '-' + config.tokenizer + '-' + str(config.max_title_length) + '-' + str(config.max_abstract_length) + '-' + config.dataset_size + '.json'
-        word_embedding_file = 'cache/ebnerd/word_embedding-' + str(config.word_threshold) + '-' + str(config.word_embedding_dim) + '-' + config.tokenizer + '-' + str(config.max_title_length) + '-' + str(config.max_abstract_length) + '-' + config.dataset_size + '.pkl'
+        word_embedding_file = 'cache/ebnerd/bert_word_embedding-' + str(config.word_threshold) + '-' + str(config.word_embedding_dim) + '-' + config.tokenizer + '-' + str(config.max_title_length) + '-' + str(config.max_abstract_length) + '-' + config.dataset_size + '.pkl'
         entity_file = 'cache/ebnerd/entity-%s.json' % config.dataset_size
         entity_embedding_file = 'cache/ebnerd/entity_embedding-%s.pkl' % config.dataset_size
         context_embedding_file = 'cache/ebnerd/context_embedding-%s.pkl' % config.dataset_size
@@ -330,12 +337,11 @@ class EBNeRD_Corpus:
             with open(vocabulary_file, 'w', encoding='utf-8') as vocabulary_f:
                 json.dump(word_dict, vocabulary_f)
 
-            # 4. Danish word embedding using fastText
+            # 4. Word embedding using XLM-Roberta-large
             if not os.path.exists(word_embedding_file):
-                build_danish_word_embedding(
+                build_pretrain_word_embedding(
                     word_dict,
-                    vec_file='cc.da.300.vec',
-                    embedding_dim=300,
+                    embedding_dim=config.word_embedding_dim,
                     output_pkl_path=word_embedding_file
                 )
             

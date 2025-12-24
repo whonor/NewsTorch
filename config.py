@@ -109,7 +109,7 @@ class Config:
         self.dev_criterion = 'avg'
         self.early_stopping_epoch = 5
 
-        self.word_embedding_dim = 300
+        self.word_embedding_dim = 1024
         self.category_embedding_dim = 50
         self.subCategory_embedding_dim = 50
         self.entity_embedding_dim = 100
