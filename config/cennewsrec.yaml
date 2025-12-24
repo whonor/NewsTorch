@@ -1,4 +1,4 @@
-word_embedding_dim: 300
+
 category_embedding_dim: 50
 subCategory_embedding_dim: 50
 cnn_num_filters: 400

@@ -1,4 +1,4 @@
-word_embedding_dim: 300
+
 head_num: 20
 head_dim: 20
 attention_dim: 200
