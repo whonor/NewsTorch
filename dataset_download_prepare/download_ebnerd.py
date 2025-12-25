@@ -144,13 +144,13 @@ def _load_behaviors(source_file_path, dst_dir, split="train"):
             "impression_id",
             "user_id"
         ])
-        .pipe(
-            sampling_strategy_wu2019,
-            npratio=4,
-            shuffle=True,
-            with_replacement=True,
-            seed=42,
-        )
+        # .pipe(
+        #     sampling_strategy_wu2019,
+        #     npratio=4,
+        #     shuffle=True,
+        #     with_replacement=True,
+        #     seed=42,
+        # )
         .pipe(create_binary_labels_column)
     )
     '''
