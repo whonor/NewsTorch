@@ -167,7 +167,9 @@ class EBNeRD_Corpus:
         subCategory_file = 'cache/ebnerd/subCategory-%s.json' % config.dataset_size
         sentiment_file = 'cache/ebnerd/sentiment-%s.json' % config.dataset_size
         vocabulary_file = 'cache/ebnerd/vocabulary-' + str(config.word_threshold) + '-' + config.tokenizer + '-' + str(config.max_title_length) + '-' + str(config.max_abstract_length) + '-' + config.dataset_size + '.json'
-        word_embedding_file = 'cache/ebnerd/bert_word_embedding-' + str(config.word_threshold) + '-' + str(config.word_embedding_dim) + '-' + config.tokenizer + '-' + str(config.max_title_length) + '-' + str(config.max_abstract_length) + '-' + config.dataset_size + '.pkl'
+        word_embedding_file = 'cache/%s/word_embedding-' % config.dataset_name + str(config.word_threshold) + '-' + str(
+            config.word_embedding_dim) + '-' + config.tokenizer + '-' + str(
+            config.max_title_length) + '-' + str(config.max_abstract_length) + '-' + config.dataset_size + '.pkl'
         entity_file = 'cache/ebnerd/entity-%s.json' % config.dataset_size
         entity_embedding_file = 'cache/ebnerd/entity_embedding-%s.pkl' % config.dataset_size
         context_embedding_file = 'cache/ebnerd/context_embedding-%s.pkl' % config.dataset_size
@@ -689,7 +691,7 @@ class EBNeRD_Corpus:
                     impressions_list = [str(x).strip() for x in impressions]
                     for impression, label in zip(impressions_list, labels_list):
                         imp_id = self.news_ID_dict[impression.strip()]
-                        if label == '0':
+                        if label == 0:
                             non_click_impressions.append(imp_id)
                         else:
                             click_impressions.append(imp_id)
@@ -713,14 +715,15 @@ class EBNeRD_Corpus:
 
                 if mode == 'train':
                     for click_imp in click_impressions:
-                        self.train_behaviors.append([
-                            self.user_ID_dict[user_ID],
-                            user_history,
-                            user_history_mask,
-                            click_imp,
-                            non_click_impressions,
-                            behavior_index
-                        ])
+                        if len(non_click_impressions) > 0:
+                            self.train_behaviors.append([
+                                self.user_ID_dict[user_ID],
+                                user_history,
+                                user_history_mask,
+                                click_imp,
+                                non_click_impressions,
+                                behavior_index
+                            ])
                 elif mode == 'dev':
                     for impression in impressions_list:
                         imp_id = self.news_ID_dict[impression.strip()]

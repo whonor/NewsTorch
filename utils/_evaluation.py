@@ -101,9 +101,6 @@ def parse_line(l):
         parts = [p for p in content.split(',') if p.strip().isdigit()]
         ranks_fixed = [int(p.strip()) for p in parts]
         ranks = ranks_fixed
-        # try to fix this issue
-        ranks_fixed = '[' + ','.join(ranks.strip('[] ').split()) + ']'
-        ranks = json.loads(ranks_fixed)
 
     return impid, ranks
 

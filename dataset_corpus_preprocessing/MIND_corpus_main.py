@@ -404,7 +404,8 @@ class MIND_Corpus:
                     user_history_mask = np.zeros([self.max_history_num], dtype=np.float32)
                     user_history_mask[:min(len(history), self.max_history_num)] = 1.0
                     for click_impression in click_impressions:
-                        self.train_behaviors.append([self.user_ID_dict[user_ID], user_history, user_history_mask, click_impression, non_click_impressions, behavior_index])
+                        if len(non_click_impressions) > 0:
+                            self.train_behaviors.append([self.user_ID_dict[user_ID], user_history, user_history_mask, click_impression, non_click_impressions, behavior_index])
                 else:
                     for click_impression in click_impressions:
                         self.train_behaviors.append([self.user_ID_dict[user_ID], [0 for _ in range(self.max_history_num)], np.zeros([self.max_history_num], dtype=np.float32), click_impression, non_click_impressions, behavior_index])

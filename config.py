@@ -248,8 +248,10 @@ class Config:
                 with open(dev_truth_path, 'w', encoding='utf-8') as truth_f:
                     for dev_ID, row in dev_df.iterrows():
                         labels = row['labels']
+                        if hasattr(labels, 'tolist'):
+                            labels = labels.tolist()
                         # remove space if string like '0 1 1 0'
-                        label_str = str(labels).replace(' ', ',')
+                        label_str = str(labels).replace(' ', '')
                         truth_f.write(('' if dev_ID == 0 else '\n') + str(dev_ID + 1) + ' ' + label_str)
 
             # Load parquet for test
@@ -258,6 +260,8 @@ class Config:
                 with open(test_truth_path, 'w', encoding='utf-8') as truth_f:
                     for test_ID, row in test_df.iterrows():
                         labels = row['labels']
-                        label_str = str(labels).replace(' ', ',')
+                        if hasattr(labels, 'tolist'):
+                            labels = labels.tolist()
+                        label_str = str(labels).replace(' ', '')
                         truth_f.write(('' if test_ID == 0 else '\n') + str(test_ID + 1) + ' ' + label_str)
 
