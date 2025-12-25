@@ -275,6 +275,14 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
             news_content_mask = news_content_mask.unsqueeze(dim=1)
             candidate_news_index = candidate_news_index.unsqueeze(dim=1)
 
+            data_batch[13] = news_category
+            data_batch[14] = news_subCategory
+            data_batch[15] = news_title_text
+            data_batch[16] = news_title_mask
+            data_batch[18] = news_content_text
+            data_batch[19] = news_content_mask
+            data_batch[25] = candidate_news_index
+
             if config.model == "TANR":
                 score, _ = model(*data_batch[:21])
                 scores[index: index + batch_size] = score

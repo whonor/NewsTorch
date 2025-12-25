@@ -139,8 +139,7 @@ class LSTUR(UserEncoder):
         _, desorted_indices = torch.sort(sorted_indices, descending=False)
         nonzero_indices = sorted_user_history_num.nonzero(as_tuple=False).squeeze(dim=1)
         if nonzero_indices.size(0) == 0:
-            user_representation = user_embedding.unsqueeze(dim=1).expand(-1, news_num, -1)
-            return user_representation
+            return user_embedding
         index = nonzero_indices[-1]
         if index + 1 == batch_size:
             sorted_user_embedding = user_embedding.index_select(0, sorted_indices)
