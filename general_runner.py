@@ -19,10 +19,13 @@ from models.SentiRec import SentiRec
 from models.TANR import TANR
 from models.CenNewsRec import CenNewsRec
 from models.SentiDebias import SentiDebias
+from models.CNRCL import CNRCL
+from models.modules.cnrcl.trainer import TrainerCNRCL
 from models.modules.ipnr.trainer import TrainerIPNR
 from models.modules.mmrec.trainer import TrainerMMRec
 from models.modules.senti_debias.trainer import TrainerSentiDebias
 from models.modules.sentirec.trainer import TrainerSentiRec
+
 from utils._evaluation import get_run_index, compute_scores_IPNR, compute_scores_mmrec
 from datetime import datetime
 import wandb
@@ -67,7 +70,8 @@ def train(config: Config, corpus, wandb):
         'LKPNR': LKPNR,
         'SentiDebias': SentiDebias,
         'SentiRec': SentiRec,
-        'MMRec': MMRec
+        'MMRec': MMRec,
+        'CNRCL': CNRCL
     }
 
     if config.model not in model_classes:
@@ -97,6 +101,9 @@ def train(config: Config, corpus, wandb):
         elif config.model == 'MMRec':
             trainer = TrainerMMRec(model, config, corpus, wandb, run_index)
             trainer.train()
+        elif config.model == 'CNRCL':
+            trainer = TrainerCNRCL(model, config, corpus, wandb, run_index)
+            trainer.train()
         else:
             trainer = Trainer(model, config, corpus, wandb, run_index)
             trainer.train()
@@ -119,7 +126,8 @@ def dev(config: Config, corpus):
         'LKPNR': LKPNR,
         'SentiDebias': SentiDebias,
         'SentiRec': SentiRec,
-        'MMRec': MMRec
+        'MMRec': MMRec,
+        'CNRCL': CNRCL
     }
 
     if config.model not in model_classes:
@@ -169,7 +177,8 @@ def test(config: Config, corpus):
         'LKPNR': LKPNR,
         'SentiDebias': SentiDebias,
         'SentiRec': SentiRec,
-        'MMRec': MMRec
+        'MMRec': MMRec,
+        'CNRCL': CNRCL
     }
 
     if config.model not in model_classes:

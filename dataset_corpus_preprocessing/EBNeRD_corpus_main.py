@@ -14,13 +14,13 @@ from tqdm import tqdm
 from config import Config
 import torch
 import numpy as np
-from transformers import AutoTokenizer, AutoModel
+# from transformers import AutoTokenizer, AutoModel # Moved inside function
 
 # Imports for image processing
-from PIL import Image
-import torchvision.models as models
-import torchvision.transforms as transforms
-from torch.autograd import Variable
+# from PIL import Image
+# import torchvision.models as models
+# import torchvision.transforms as transforms
+# from torch.autograd import Variable
 
 
 def is_number(s):
@@ -40,6 +40,7 @@ import shutil
 
 def get_image_transforms():
     """Returns a composition of image transformations for ResNet-50."""
+    import torchvision.transforms as transforms
     return transforms.Compose([
         transforms.Resize(256),
         transforms.CenterCrop(224),
@@ -49,6 +50,7 @@ def get_image_transforms():
 
 def get_resnet_model():
     """Initializes and returns a pre-trained ResNet-50 model."""
+    import torchvision.models as models
     resnet50 = models.resnet50(pretrained=True)
     # Remove the final fully connected layer to get the feature vector
     model = torch.nn.Sequential(*(list(resnet50.children())[:-1]))
@@ -59,6 +61,8 @@ def extract_image_features(image_dir, model, transforms):
     """
     Extracts feature vectors from all images in a directory.
     """
+    from PIL import Image
+    from torch.autograd import Variable
     print(f"🖼️  Extracting features from images in {image_dir}...")
     image_embedding_dict = {}
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -101,6 +105,7 @@ def load_fasttext_vec(filepath):
 # Step 3: Build embedding matrix from word_dict using XLM-Roberta-large
 def build_pretrain_word_embedding(word_dict, embedding_dim, output_pkl_path):
     print("🛠️ Building word embedding matrix using XLM-Roberta-large...")
+    from transformers import AutoTokenizer, AutoModel
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -352,7 +357,7 @@ class EBNeRD_Corpus:
                 print("Preprocessing image embeddings...")
                 model = get_resnet_model()
                 transforms = get_image_transforms()
-                image_embedding_dict = extract_image_features('downloaded_images', model, transforms)
+                image_embedding_dict = extract_image_features(config.downloaded_images_file, model, transforms)
                 with open(image_embedding_file, 'wb') as f:
                     pickle.dump(image_embedding_dict, f)
                 print("Image embeddings preprocessed and saved.")

@@ -68,6 +68,8 @@ class Config:
         parser.add_argument('--DATASET_ROOT', type=str, default='ebnerd_demo', help='Default dataset name, can be ebnerd_demo, ebnerd_small, ebnerd_large, MIND-small, or MIND-large')
         parser.add_argument('--dataset_name', type=str, default='ebnerd', help='Name of the dataset to be used, MIND, ebnerd')
         parser.add_argument('--dataset_size', type=str, default='demo', help='Dataset variant, can be small, large, or demo, if submit the predictions submission')
+        parser.add_argument('--images_path', type=str, default='downloaded_images',
+                            help='downloaded_images for demo or small')
 
         parser.add_argument('--dev_model_path', type=str,
                             default='/home/wanro238/NewsRecTorch/cache/best_models/small/NRMS/#1/NRMS',
@@ -86,6 +88,7 @@ class Config:
         self.test_output_file = ''
         self.seed = args.seed
         self.config_file = ''
+        self.downloaded_images_file = args.images_path
 
         self.root = "."
         self.data_path = "cache/"
