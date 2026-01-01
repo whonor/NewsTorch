@@ -10,9 +10,12 @@ import math
 import pickle
 import numpy as np
 
-class CNRCLNewsEncoder(nn.Module):
+from models.modules.newsEncoders import NewsEncoder
+
+
+class CNRCLNewsEncoder(NewsEncoder):
     def __init__(self, config: Config):
-        super(CNRCLNewsEncoder, self).__init__()
+        super(CNRCLNewsEncoder, self).__init__(config)
         self.max_title_length = config.max_title_length
         self.max_content_length = config.max_abstract_length
         self.word_embedding_dim = config.word_embedding_dim
@@ -24,15 +27,20 @@ class CNRCLNewsEncoder(nn.Module):
         self.subCategory_embedding_dim = config.subCategory_embedding_dim
 
         self.word_embedding = nn.Embedding(num_embeddings=config.vocabulary_size, embedding_dim=self.word_embedding_dim)
-        # Load word embeddings if available (usually loaded in Corpus and passed or saved to file)
-        # Here we assume standard initialization or load from file if consistent with NewsTorch
-        # NewsTorch seems to load embeddings in Corpus. 
-        # For minimal change, we'll stick to random init or rely on Trainer/Corpus to load weights if needed.
-        # But CNRCL loads from pickle. We'll skip that specific file loading to be safe and let training handle it 
-        # or load if file exists.
-        
-        self.category_embedding = nn.Embedding(num_embeddings=config.category_num, embedding_dim=config.category_embedding_dim)
-        self.subCategory_embedding = nn.Embedding(num_embeddings=config.subCategory_num, embedding_dim=config.subCategory_embedding_dim)
+        # Load pre-trained word embeddings
+        if config.dataset_name == 'MIND':
+            with open('cache/word_embedding-' + str(config.word_threshold) + '-' + str(
+                    config.word_embedding_dim) + '-' + config.tokenizer + '-' + str(
+                config.max_title_length) + '-' + str(
+                config.max_abstract_length) + '-' + config.dataset_size + '.pkl',
+                      'rb') as word_embedding_f:
+                self.word_embedding.weight.data.copy_(pickle.load(word_embedding_f))
+        elif config.dataset_name == 'ebnerd':
+            with open('cache/%s/word_embedding-' % config.dataset_name + str(config.word_threshold) + '-' + str(
+                    config.word_embedding_dim) + '-' + config.tokenizer + '-' + str(
+                    config.max_title_length) + '-' + str(config.max_abstract_length) + '-' + config.dataset_size + '.pkl',
+                      'rb') as word_embedding_f:
+                self.word_embedding.weight.data.copy_(pickle.load(word_embedding_f))
         
         # selective LSTM encoder
         self.title_lstm = nn.LSTM(self.word_embedding_dim, self.hidden_dim, batch_first=True, bidirectional=True)

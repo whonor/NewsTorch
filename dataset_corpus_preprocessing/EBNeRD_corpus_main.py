@@ -364,7 +364,7 @@ class EBNeRD_Corpus:
 
 
             # build graph
-            if config.dataset_size != 'large' and config.model == 'CNE-SUE':
+            if config.dataset_size != 'large' and config.model in ['CNE-SUE', 'CNRCL']:
                 category_num = len(category_dict)
                 graph_size = config.max_history_num + category_num  # |V_n| + |V_p|
                 prefix_mode = ['train', 'dev', 'test']
@@ -500,7 +500,7 @@ class EBNeRD_Corpus:
         with open('cache/ebnerd/image_embedding-%s.pkl' % config.dataset_size, 'rb') as f:
             image_embedding_dict = pickle.load(f)
 
-            if config.dataset_size != 'large' and config.model == 'CNE-SUE':
+            if config.dataset_size != 'large' and config.model in ['CNE-SUE', 'CNRCL']:
 
                 with open('cache/ebnerd/user_history_graph-' + str(config.max_history_num) + ('' if config.no_self_connection else '-self') + ('' if config.no_adjacent_normalization else '-normalize-' + config.gcn_normalization_type) + '-' + config.dataset_size + '.pkl', 'rb') as user_history_graph_f:
 
@@ -869,7 +869,7 @@ class Ebnerd_Train_Dataset(data.Dataset):
 
         behavior_index = train_behavior[5]
 
-        if self.config.model == 'CNE-SUE':
+        if self.config.model in ['CNE-SUE', 'CNRCL']:
             user_history_graph = self.user_history_graph[behavior_index]
             user_history_category_mask = self.user_history_category_mask[behavior_index]
             user_history_category_indices = self.user_history_category_indices[behavior_index]
@@ -938,7 +938,7 @@ class Ebnerd_DevTest_Dataset(data.Dataset):
 
         behavior_index = behavior[4]
 
-        if self.config.model == 'CNE-SUE':
+        if self.config.model in ['CNE-SUE', 'CNRCL']:
             user_history_graph = self.user_history_graph[behavior_index]
             user_history_category_mask = self.user_history_category_mask[behavior_index]
             user_history_category_indices = self.user_history_category_indices[behavior_index]
