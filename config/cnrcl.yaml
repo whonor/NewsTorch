@@ -1,0 +1,22 @@
+
+# Model
+word_embedding_dim: 1024
+hidden_dim: 200
+attention_dim: 200
+category_embedding_dim: 50
+subCategory_embedding_dim: 50
+gcn_layer_num: 3
+similarity_num: 3
+click_predictor: dot_product
+no_self_connection: false
+no_adjacent_normalization: false
+no_gcn_residual: false # Careful with double negative logic in UserEncoder. CNRCL logic was residual=not config.no_gcn_residual.
+# In my implementation: residual=not config.no_self_connection (Wait, I might have messed up the residual flag mapping in UserEncoder).
+
+# Dataset
+negative_sample_num: 4
+max_history_num: 50
+max_title_length: 30
+max_abstract_length: 80
+word_threshold: 3
+tokenizer: MIND
