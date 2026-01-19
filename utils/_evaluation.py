@@ -264,7 +264,10 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
             news_title_mask = data_batch[16]
             news_content_text = data_batch[18]
             news_content_mask = data_batch[19]
-            candidate_news_index = data_batch[25]
+            if config.dataset_name == 'MIND':
+                candidate_news_index = data_batch[22]
+            else:
+                candidate_news_index = data_batch[25]
 
             batch_size = user_ID.size(0)
             news_category = news_category.unsqueeze(dim=1)
@@ -281,7 +284,10 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
             data_batch[16] = news_title_mask
             data_batch[18] = news_content_text
             data_batch[19] = news_content_mask
-            data_batch[25] = candidate_news_index
+            if config.dataset_name == 'MIND':
+                data_batch[22] = candidate_news_index
+            else:
+                data_batch[25] = candidate_news_index
 
             if config.model == "TANR":
                 score, _ = model(*data_batch[:21])
