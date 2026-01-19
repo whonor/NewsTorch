@@ -146,9 +146,9 @@ class MIND_Corpus:
 
             # 4. Glove word embedding
             if config.word_embedding_dim == 300:
-                glove = GloVe(name='840B', dim=300, cache='../glove', max_vectors=10000000000)
+                glove = GloVe(name='840B', dim=300, cache='./glove', max_vectors=10000000000)
             else:
-                glove = GloVe(name='6B', dim=config.word_embedding_dim, cache='../glove', max_vectors=10000000000)
+                glove = GloVe(name='6B', dim=config.word_embedding_dim, cache='./glove', max_vectors=10000000000)
             glove_stoi = glove.stoi
             glove_vectors = glove.vectors
             glove_mean_vector = torch.mean(glove_vectors, dim=0, keepdim=False)

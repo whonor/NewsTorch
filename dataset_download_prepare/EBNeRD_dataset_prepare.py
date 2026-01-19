@@ -130,8 +130,8 @@ def main():
     print("Prepare ebnerd_small...")
     preprocess_ebnerd_demo(size="ebnerd_small")
 
-    print("Prepare ebnerd_large...")
-    preprocess_ebnerd_demo(size="ebnerd_large")
+    # print("Prepare ebnerd_large...")
+    # preprocess_ebnerd_demo(size="ebnerd_large")
 
     print("All datasets are finished。")
 

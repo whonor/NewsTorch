@@ -40,7 +40,7 @@ def extract_zip(zip_path: Path, extract_to: Path):
         z.extractall(extract_to)
     print(f"extract complete: {extract_to}")
 
-def process_dataset(base_dir: Path, splits: dict, include_wikidata: bool = False):
+def process_dataset(base_dir: Path, splits: dict, include_wikidata: bool = True):
     download_dir = base_dir / 'download'
     for split, url in splits.items():
         filename = Path(url).name
@@ -49,14 +49,12 @@ def process_dataset(base_dir: Path, splits: dict, include_wikidata: bool = False
         extract_zip(zip_path, download_dir / split)
 
     if include_wikidata:
-        wikidata_url = 'https://mind201910.blob.core.windows.net/knowledge-graph/wikidata-graph.zip'
+        wikidata_url = 'https://huggingface.co/datasets/HonorKing/Wikidata-graph/resolve/main/wikidata-graph.zip'
         wikidata_filename = Path(wikidata_url).name
         wikidata_zip = download_dir / wikidata_filename
-        # download_file(wikidata_url, wikidata_zip)
+        download_file(wikidata_url, wikidata_zip)
         if wikidata_zip.exists():
             extract_zip(wikidata_zip, download_dir / 'wikidata-graph')
-
-
 
 def main():
     datasets = {
@@ -65,14 +63,14 @@ def main():
         #     'dev':   'https://recodatasets.z20.web.core.windows.net/newsrec/MINDlarge_dev.zip',
         # },
         'MIND-small': {
-            'train': 'https://recodatasets.z20.web.core.windows.net/newsrec/MINDsmall_train.zip',
-            'dev':   'https://recodatasets.z20.web.core.windows.net/newsrec/MINDsmall_dev.zip',
+            'train': 'https://huggingface.co/datasets/yjw1029/MIND/resolve/main/MINDsmall_train.zip',
+            'dev':   'https://huggingface.co/datasets/yjw1029/MIND/resolve/main/MINDsmall_dev.zip',
         },
         'MIND-large': {
-            'train': 'https://recodatasets.z20.web.core.windows.net/newsrec/MINDlarge_train.zip',
-            'dev':   'https://recodatasets.z20.web.core.windows.net/newsrec/MINDlarge_dev.zip',
+            'train': 'https://huggingface.co/datasets/yjw1029/MIND/resolve/main/MINDlarge_train.zip',
+            'dev':   'https://huggingface.co/datasets/yjw1029/MIND/resolve/main/MINDlarge_dev.zip',
         #     'test':  'https://recodatasets.z20.web.core.windows.net/newsrec/MINDlarge_test.zip',
-        },
+        }
     }
 
     root = Path(__file__).resolve().parent.parent

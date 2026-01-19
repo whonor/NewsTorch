@@ -60,7 +60,7 @@ class Config:
 
     def __init__(self):
         parser = argparse.ArgumentParser()
-        parser.add_argument('--model', type=str, default='MMRec', help='Model name: NRMS, LSTUR, TANR, DKN, NAML, NPA, FIM, MINS, CenNewsRec, IPNR, CNE-SUE, LKPNR, SentiDebias, SentiRec, MMRec')
+        parser.add_argument('--model', type=str, default='MMRec', help='Model name: NRMS, LSTUR, TANR, DKN, NAML, NPA, FIM, MINS, CENNEWSREC, IPNR, CNE-SUE, LKPNR, SentiDebias, SentiRec, MMRec, CNRCL')
         parser.add_argument('--batch_size', type=int, default='64', help='Batch size for training')
         parser.add_argument('--seed', type=int, default=0, help='Seed')
         parser.add_argument('--epoch', type=int, default=10, help='Epoch for training')
@@ -112,7 +112,7 @@ class Config:
         self.dev_criterion = 'avg'
         self.early_stopping_epoch = 5
 
-        self.word_embedding_dim = 1024
+        self.word_embedding_dim = 300
         self.category_embedding_dim = 50
         self.subCategory_embedding_dim = 50
         self.entity_embedding_dim = 100

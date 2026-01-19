@@ -7,7 +7,7 @@ attention_dim: 200
 batch_size: 2
 
 # MMRec specific parameters
-from_pretrained: "bert-base-uncased"
+from_pretrained: "xlm-roberta-base"
 fusion_method: "mul"
 dropout_prob: 0.1
 bi_hidden_size: 1024

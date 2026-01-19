@@ -10,7 +10,7 @@ import collections
 random.seed(0)
 np.random.seed(0)
 
-root = "./"
+root = "../"
 # root
 MIND_small_dataset_root = root + 'MIND-small'
 MIND_large_dataset_root = root + 'MIND-large'
@@ -23,9 +23,9 @@ def confirm_overwrite(path: str) -> bool:
     return True
 
 
-def split_training_behaviors(dataset_root):
+def split_training_behaviors(dataset_root, size):
     MIND_small_train_ratio = 0.9
-    behavior_file = os.path.join(dataset_root, 'download', 'train', 'behaviors.tsv')
+    behavior_file = os.path.join(dataset_root, 'download', 'train', 'MIND'+size+'_train', 'behaviors.tsv')
     if not os.path.exists(behavior_file):
         raise FileNotFoundError(f"behavior file does not exist: {behavior_file}")
 
@@ -51,7 +51,7 @@ def split_training_behaviors(dataset_root):
 
 
 def preprocess_MIND_small():
-    train_behavior_lines, dev_behavior_lines = split_training_behaviors(dataset_root=MIND_small_dataset_root)
+    train_behavior_lines, dev_behavior_lines = split_training_behaviors(dataset_root=MIND_small_dataset_root, size='small')
 
     # train/dev sets
     for mode, lines, src_news_split in [
@@ -71,7 +71,7 @@ def preprocess_MIND_small():
             f.writelines(lines)
 
         # 拷贝 news
-        src_news = os.path.join(MIND_small_dataset_root, 'download', src_news_split, 'news.tsv')
+        src_news = os.path.join(MIND_small_dataset_root, 'download', src_news_split, 'MINDsmall_'+src_news_split, 'news.tsv')
         dst_news = os.path.join(out_dir, 'news.tsv')
         if confirm_overwrite(dst_news):
             if not os.path.exists(src_news):
@@ -88,7 +88,7 @@ def preprocess_MIND_small():
     os.makedirs(test_dir)
 
     for fname in ('behaviors.tsv', 'news.tsv'):
-        src = os.path.join(MIND_small_dataset_root, 'download', 'dev', fname)
+        src = os.path.join(MIND_small_dataset_root, 'download', 'dev', 'MINDsmall_dev',  fname)
         dst = os.path.join(test_dir, fname)
         if confirm_overwrite(dst):
             if not os.path.exists(src):
@@ -97,7 +97,7 @@ def preprocess_MIND_small():
 
 
 def preprocess_MIND_large():
-    train_behavior_lines, dev_behavior_lines = split_training_behaviors(dataset_root=MIND_large_dataset_root)
+    train_behavior_lines, dev_behavior_lines = split_training_behaviors(dataset_root=MIND_large_dataset_root, size='large')
 
     # train/dev sets
     for mode, lines, src_news_split in [
@@ -117,7 +117,7 @@ def preprocess_MIND_large():
             f.writelines(lines)
 
         # 拷贝 news
-        src_news = os.path.join(MIND_large_dataset_root, 'download', src_news_split, 'news.tsv')
+        src_news = os.path.join(MIND_large_dataset_root, 'download', src_news_split, 'MINDlarge_'+src_news_split, 'news.tsv')
         dst_news = os.path.join(out_dir, 'news.tsv')
         if confirm_overwrite(dst_news):
             if not os.path.exists(src_news):
@@ -134,7 +134,7 @@ def preprocess_MIND_large():
     os.makedirs(test_dir)
 
     for fname in ('behaviors.tsv', 'news.tsv'):
-        src = os.path.join(MIND_large_dataset_root, 'download', 'dev', fname)
+        src = os.path.join(MIND_large_dataset_root, 'download', 'dev', 'MINDlarge_dev', fname)
         dst = os.path.join(test_dir, fname)
         if confirm_overwrite(dst):
             if not os.path.exists(src):
@@ -186,7 +186,7 @@ def sampling_MIND_dataset(sample_num=200000):
                 news_ids.update(hist.split())
                 news_ids.update([imp[:-2] for imp in imps.split()])
 
-        src_news = os.path.join(MIND_200k_dataset_root, 'download', 'train' if mode=='train' else 'dev', 'news.tsv')
+        src_news = os.path.join(MIND_200k_dataset_root, 'download', 'train' if mode=='train' else 'dev', 'MINDsmall_'+mode if mode=='train' else 'dev', 'news.tsv')
         dst_news = os.path.join(MIND_200k_dataset_root, mode, 'news.tsv')
         if confirm_overwrite(dst_news):
             with open(src_news, 'r', encoding='utf-8') as f_in, open(dst_news, 'w', encoding='utf-8') as f_out:
@@ -199,12 +199,12 @@ def sampling_MIND_dataset(sample_num=200000):
 def generate_knowledge_entity_embedding(data_mode):
     assert data_mode in ['200k', 'small', 'large']
     # 1. copy entity embedding file
-    shutil.copyfile(root + '/MIND-%s/download/train/entity_embedding.vec' % data_mode,
+    shutil.copyfile(root + '/MIND-%s/download/train/MIND%s_train/entity_embedding.vec' % (data_mode, data_mode),
                     root + '/MIND-%s/train/entity_embedding.vec' % data_mode)
-    shutil.copyfile(root + '/MIND-%s/download/dev/entity_embedding.vec' % data_mode,
+    shutil.copyfile(root + '/MIND-%s/download/dev/MIND%s_dev/entity_embedding.vec' % (data_mode, data_mode),
                     root + '/MIND-%s/dev/entity_embedding.vec' % data_mode)
     if data_mode in ['200k', 'small', 'large']:
-        shutil.copyfile(root + '/MIND-%s/download/dev/entity_embedding.vec' % data_mode,
+        shutil.copyfile(root + '/MIND-%s/download/dev/MIND%s_dev/entity_embedding.vec' % (data_mode, data_mode),
                         root + '/MIND-%s/test/entity_embedding.vec' % data_mode)
     # else:
     #     shutil.copyfile(root + '/MIND-large/download/test/entity_embedding.vec', root + '/MIND-large/test/entity_embedding.vec')
@@ -270,8 +270,11 @@ def prepare_MIND_200k():
 
 def main():
     print("Prepare MIND-small...")
+    prepare_MIND_small()
+
     # print("Prepare MIND-200k...")
     # prepare_MIND_200k()
+
     print("Prepare MIND-large...")
     prepare_MIND_large()
     print("All datasets are finished.")
