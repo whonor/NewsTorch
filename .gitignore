@@ -179,3 +179,4 @@ dataset_corpus_preprocessing/__pycache__/MIND_corpus_IPNR.cpython-39.pyc
 dataset_corpus_preprocessing/__pycache__/MIND_corpus_main.cpython-39.pyc
 _SentiRec_4241792_0.out
 NewsTorch_SentiRec_seeds.sh
+NewsTorch_CNRCL_seeds.sh
