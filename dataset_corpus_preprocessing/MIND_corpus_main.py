@@ -256,6 +256,7 @@ class MIND_Corpus:
                     pickle.dump(user_history_graph_data, user_history_graph_f)
 
     def __init__(self, config: Config):
+        self.model = config.model
         # preprocess cache
         MIND_Corpus.preprocess(config)
         with open('cache/user_ID-%s.json' % config.dataset_size, 'r', encoding='utf-8') as user_ID_f:
@@ -480,6 +481,7 @@ from numpy.random import randint
 
 class MIND_Train_Dataset(data.Dataset):
     def __init__(self, corpus: MIND_Corpus):
+        self.model = corpus.model
         self.negative_sample_num = corpus.negative_sample_num
         self.news_category = corpus.news_category
         self.news_subCategory = corpus.news_subCategory
@@ -524,7 +526,7 @@ class MIND_Train_Dataset(data.Dataset):
         sample_index = torch.tensor(self.train_samples[index])
         behavior_index = train_behavior[5]
 
-        if config.model == 'CNE-SUE' or 'CNRCL':
+        if self.model == 'CNE-SUE' or 'CNRCL':
             return train_behavior[0], self.news_category[history_index], self.news_subCategory[history_index], self.news_title_text[history_index], self.news_title_mask[history_index], self.news_title_entity[history_index], self.news_abstract_text[history_index], self.news_abstract_mask[history_index], self.news_abstract_entity[history_index], train_behavior[2], self.user_history_graph[behavior_index], self.user_history_category_mask[behavior_index], self.user_history_category_indices[behavior_index], \
                self.news_category[sample_index], self.news_subCategory[sample_index], self.news_title_text[sample_index], self.news_title_mask[sample_index], self.news_title_entity[sample_index], self.news_abstract_text[sample_index], self.news_abstract_mask[sample_index], self.news_abstract_entity[sample_index], history_index, sample_index
         else:
@@ -537,6 +539,7 @@ class MIND_Train_Dataset(data.Dataset):
 class MIND_DevTest_Dataset(data.Dataset):
     def __init__(self, corpus: MIND_Corpus, mode: str):
         assert mode in ['dev', 'test'], 'mode must be chosen from \'dev\' or \'test\''
+        self.model = corpus.model
         self.news_category = corpus.news_category
         self.news_subCategory = corpus.news_subCategory
         self.news_title_text =  corpus.news_title_text
@@ -556,7 +559,7 @@ class MIND_DevTest_Dataset(data.Dataset):
         history_index = torch.tensor(behavior[1])
         candidate_news_index = torch.tensor(behavior[3])
         behavior_index = behavior[4]
-        if config.model == 'CNE-SUE' or 'CNRCL':
+        if self.model == 'CNE-SUE' or 'CNRCL':
             return behavior[0], self.news_category[history_index], self.news_subCategory[history_index], self.news_title_text[history_index], self.news_title_mask[history_index], self.news_title_entity[history_index], self.news_abstract_text[history_index], self.news_abstract_mask[history_index], self.news_abstract_entity[history_index], behavior[2], self.user_history_graph[behavior_index], self.user_history_category_mask[behavior_index], self.user_history_category_indices[behavior_index], \
                self.news_category[candidate_news_index], self.news_subCategory[candidate_news_index], self.news_title_text[candidate_news_index], self.news_title_mask[candidate_news_index], self.news_title_entity[candidate_news_index], self.news_abstract_text[candidate_news_index], self.news_abstract_mask[candidate_news_index], self.news_abstract_entity[candidate_news_index], history_index, candidate_news_index
         else:
