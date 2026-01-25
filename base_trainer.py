@@ -98,6 +98,8 @@ class Trainer:
                     loss = self.loss(logits)
                 else:
                     logits = self.model(*data_batch[:21])  # For other models like NRMS, NPA, etc.
+                    if isinstance(logits, tuple):
+                        logits = logits[0]
                     loss = self.loss(logits)
 
                 epoch_loss += float(loss) * data_batch[0].size(0)
