@@ -26,7 +26,7 @@ from models.modules.mmrec.trainer import TrainerMMRec
 from models.modules.senti_debias.trainer import TrainerSentiDebias
 from models.modules.sentirec.trainer import TrainerSentiRec
 
-from utils._evaluation import get_run_index, compute_scores_IPNR, compute_scores_mmrec
+from utils._evaluation import get_run_index, compute_scores_IPNR, compute_scores_mmrec, compute_complexity, compute_inference_time
 from datetime import datetime
 import wandb
 from config import Config
@@ -38,6 +38,9 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
+from dataset_corpus_preprocessing.EBNeRD_corpus_main import Ebnerd_DevTest_Dataset
+from dataset_corpus_preprocessing.MIND_corpus_IPNR import MIND_DevTest_Dataset_IPNR
+from dataset_corpus_preprocessing.MIND_corpus_main import MIND_DevTest_Dataset
 
 
 from base_trainer import Trainer
@@ -219,6 +222,25 @@ def test(config: Config, corpus):
                                                      'test',
                                                      test_res_dir + '/' + config.model + '.txt', config.dataset_size)
 
+    # Compute complexity and inference time
+    if config.dataset_name == 'ebnerd':
+        dataset = Ebnerd_DevTest_Dataset(corpus, 'test')
+    elif config.dataset_name == 'MIND':
+        if config.model == 'IPNR':
+            dataset = MIND_DevTest_Dataset_IPNR(corpus, 'test')
+        else:
+            dataset = MIND_DevTest_Dataset(corpus, 'test')
+    
+    dataloader = DataLoader(dataset, batch_size=config.batch_size, shuffle=False, num_workers=0, pin_memory=True)
+    try:
+        data_batch = next(iter(dataloader))
+        flops, params = compute_complexity(model, config, data_batch)
+        inference_time = compute_inference_time(model, config, data_batch)
+        print(f"FLOPs: {flops}, Params: {params}, Inference Time: {inference_time:.6f} s/batch")
+    except Exception as e:
+        print(f"Error computing complexity/inference time: {e}")
+        flops, params, inference_time = 0, 0, 0
+
     if config.dataset_size != 'submission':
         print('AUC : %.4f\nMRR : %.4f\nnDCG@5 : %.4f\nnDCG@10 : %.4f\nMAE : %.4f\nRMSE : %.4f\nrecall@5 : %.4f'
           '\nrecall@10 : %.4f\nhit@5 : %.4f\nhit@10 : %.4f\nprecision@5 : %.4f\nprecision@10 : %.4f' % (auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10))
@@ -235,7 +257,10 @@ def test(config: Config, corpus):
                 'Hit@5': hit5,
                 'Hit@10': hit10,
                 'Precision@5': precision5,
-                'Precision@10': precision10
+                'Precision@10': precision10,
+                'FLOPs': flops,
+                'Params': params,
+                'Inference Time': inference_time
             }
             csv_path = os.path.join(config.result_dir, 'metrics_results.csv')
             file_exists = os.path.isfile(csv_path)

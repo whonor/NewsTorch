@@ -14,6 +14,184 @@ import sys, os, os.path
 import numpy as np
 import json
 from sklearn.metrics import roc_auc_score
+import time
+
+def _get_model_inputs(config, data_batch):
+    data_batch = [item.cuda(non_blocking=True) if isinstance(item, torch.Tensor) else item for item in data_batch]
+    
+    if config.model == 'MMRec':
+        (user_ID, _, _, user_title_text, user_title_mask, _, _, _, _, user_history_mask, _, _, _,
+         _, _, news_title_text, news_title_mask, _, _, _, _, _, _, _, _,
+         history_image_embedding, candidate_image_embedding) = data_batch
+
+        news_feature = {
+            "input_ids": news_title_text,
+            "attention_mask": news_title_mask,
+            "input_imgs": candidate_image_embedding.unsqueeze(1),
+            "image_loc": torch.zeros(news_title_text.shape[0], 1, 5).cuda(non_blocking=True),
+        }
+        history_feature = {
+            "input_ids": user_title_text,
+            "attention_mask": user_title_mask,
+            "input_imgs": history_image_embedding.unsqueeze(2),
+            "image_loc": torch.zeros(user_title_text.shape[0], user_title_text.shape[1], 1, 5).cuda(non_blocking=True),
+        }
+        # MMRec forward signature: forward(self, news_feature, history_feature, user_history_mask, label=None, compute_loss=True)
+        # compute_scores_mmrec calls: model(news_feature, history_feature, user_history_mask, None, compute_loss=False)
+        return (news_feature, history_feature, user_history_mask, None, False)
+    
+    elif config.model == 'IPNR':
+        return data_batch
+        
+    else:
+        user_ID = data_batch[0]
+        news_category = data_batch[13]
+        news_subCategory = data_batch[14]
+        news_title_text = data_batch[15]
+        news_title_mask = data_batch[16]
+        news_title_entity = data_batch[17]
+        news_content_text = data_batch[18]
+        news_content_mask = data_batch[19]
+        news_content_entity = data_batch[20]
+        if config.dataset_name == 'MIND':
+            candidate_news_index = data_batch[22]
+        else:
+            candidate_news_index = data_batch[25]
+
+        news_category = news_category.unsqueeze(dim=1)
+        news_subCategory = news_subCategory.unsqueeze(dim=1)
+        news_title_text = news_title_text.unsqueeze(dim=1)
+        news_title_mask = news_title_mask.unsqueeze(dim=1)
+        news_title_entity = news_title_entity.unsqueeze(dim=1)
+        news_content_text = news_content_text.unsqueeze(dim=1)
+        news_content_mask = news_content_mask.unsqueeze(dim=1)
+        news_content_entity = news_content_entity.unsqueeze(dim=1)
+        candidate_news_index = candidate_news_index.unsqueeze(dim=1)
+
+        data_batch[13] = news_category
+        data_batch[14] = news_subCategory
+        data_batch[15] = news_title_text
+        data_batch[16] = news_title_mask
+        data_batch[17] = news_title_entity
+        data_batch[18] = news_content_text
+        data_batch[19] = news_content_mask
+        data_batch[20] = news_content_entity
+        if config.dataset_name == 'MIND':
+            data_batch[22] = candidate_news_index
+        else:
+            data_batch[25] = candidate_news_index
+
+        if config.model == "TANR":
+             return data_batch[:21]
+        elif config.model == "CNE-SUE" or config.model == "DKN" or config.model == "FIM":
+             return data_batch[:21]
+        elif config.model == "LKPNR":
+            if config.dataset_name == 'ebnerd':
+                return data_batch[:21] + data_batch[23:26]
+            else:
+                return data_batch
+        elif config.model == "SentiDebias":
+            return data_batch[:23]
+        else:
+            return data_batch[:21]
+
+def compute_complexity(model, config, data_batch):
+    try:
+        from thop import profile
+    except ImportError:
+        print("thop is not installed. Please install it to compute complexity.")
+        model.eval()
+    print(f"DEBUG: model type: {type(model)}")
+    print(f"DEBUG: total parameters: {sum(p.numel() for p in model.parameters())}")
+    inputs = _get_model_inputs(config, data_batch)
+    
+    # thop requires tuple inputs
+    if not isinstance(inputs, tuple) and not isinstance(inputs, list):
+         inputs = (inputs,)
+
+    # 1. Clean up attributes to allow thop to register its buffers
+    for m in model.modules():
+        if hasattr(m, "total_ops"): del m.total_ops
+        if hasattr(m, "total_params"): del m.total_params
+
+    def count_zero_ops(m, x, y):
+        m.total_ops = torch.DoubleTensor([0])
+
+    custom_ops = {
+        nn.Dropout: count_zero_ops,
+        nn.Dropout2d: count_zero_ops,
+        nn.Dropout3d: count_zero_ops,
+        nn.Identity: count_zero_ops,
+    }
+
+    flops, params = 0, 0
+    try:
+        # 2. Run profile. Use return values if successful for best accuracy.
+        flops, params = profile(model, inputs=inputs, custom_ops=custom_ops, verbose=False)
+    except Exception as e:
+        print(f"DEBUG: thop.profile crashed: {e}")
+        # import traceback
+        # traceback.print_exc()
+        # 3. Fallback: manual summation if profile crashes during its internal summation
+        for m in model.modules():
+            if len(list(m.children())) == 0: # Sum only leaf modules to avoid double counting
+                if hasattr(m, "total_ops"):
+                    val = m.total_ops.item() if isinstance(m.total_ops, torch.Tensor) else m.total_ops
+                    flops += val
+    finally:
+        # 4. Ensure all hooks are removed even if profile crashes
+        for m in model.modules():
+            if hasattr(m, "_forward_hooks"):
+                m._forward_hooks.clear()
+            if hasattr(m, "_forward_pre_hooks"):
+                m._forward_pre_hooks.clear()
+
+    # Always use a reliable parameter count
+    param_list = list(model.parameters())
+    if not param_list:
+        print("DEBUG: model.parameters() is EMPTY!")
+        # Try to find parameters in submodules manually if top-level list is empty for some reason
+        total_p = 0
+        for m in model.modules():
+            total_p += sum(p.numel() for p in m.parameters(recurse=False))
+        params = total_p
+    else:
+        params = sum(p.numel() for p in param_list)
+    
+    print(f"DEBUG: Calculated params: {params}")
+            
+    return flops, params
+
+def compute_inference_time(model, config, data_batch, repetitions=100):
+    model.eval()
+    inputs = _get_model_inputs(config, data_batch)
+    
+    # Check if inputs is a sequence to unpack
+    is_sequence = isinstance(inputs, (tuple, list))
+    
+    # Warmup
+    with torch.no_grad():
+        if is_sequence:
+            model(*inputs)
+        else:
+            model(inputs)
+    
+    if torch.cuda.is_available():
+        torch.cuda.synchronize()
+        
+    start_time = time.time()
+    with torch.no_grad():
+        for _ in range(repetitions):
+            if is_sequence:
+                model(*inputs)
+            else:
+                model(inputs)
+                
+    if torch.cuda.is_available():
+        torch.cuda.synchronize()
+    end_time = time.time()
+    
+    return (end_time - start_time) / repetitions
 
 
 def MAE_score(y_true: np.ndarray, y_score: np.ndarray) -> float:
@@ -344,7 +522,7 @@ def compute_scores_mmrec(config: Config, model: nn.Module, corpus, batch_size: i
         for data_batch in tqdm(dataloader):
             data_batch = [item.cuda(non_blocking=True) if isinstance(item, torch.Tensor) else item for item in data_batch]
             (user_ID, _, _, user_title_text, user_title_mask, _, _, _, _, user_history_mask, _, _, _,
-             _, _, news_title_text, news_title_mask, _, _, _, _, _, _, _, _, _,
+             _, _, news_title_text, news_title_mask, _, _, _, _, _, _, _, _,
              history_image_embedding, candidate_image_embedding) = data_batch
 
             news_feature = {

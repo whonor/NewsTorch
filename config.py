@@ -202,11 +202,11 @@ class Config:
         model_name = self.model
         data_path = self.data_path
         mkdirs = lambda x: os.makedirs(x) if not os.path.exists(x) else None
-        self.model_dir = data_path + 'models/' + self.dataset_size + '/' + model_name
-        self.dev_res_dir = data_path + 'dev/res/' + self.dataset_size + '/' + model_name
-        self.result_dir = data_path + 'results/' + self.dataset_size + '/' + model_name
-        self.best_model_dir = data_path + 'best_models/' + self.dataset_size + '/' + model_name
-        self.test_res_dir = data_path + 'test/res/' + self.dataset_size + '/' + model_name
+        self.model_dir = data_path + 'models/' + self.DATASET_ROOT + '/' + model_name
+        self.dev_res_dir = data_path + 'dev/res/' + self.DATASET_ROOT + '/' + model_name
+        self.result_dir = data_path + 'results/' + self.DATASET_ROOT + '/' + model_name
+        self.best_model_dir = data_path + 'best_models/' + self.DATASET_ROOT + '/' + model_name
+        self.test_res_dir = data_path + 'test/res/' + self.DATASET_ROOT + '/' + model_name
         mkdirs(self.model_dir)
         mkdirs(data_path + 'dev/ref')
         mkdirs(self.dev_res_dir)
