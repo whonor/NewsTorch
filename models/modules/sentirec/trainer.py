@@ -18,9 +18,7 @@ class TrainerSentiRec(Trainer):
             model = nn.DataParallel(model)
 
         for e in tqdm(range(1, self.epoch + 1)):
-            if self.config.dataset_name == 'MIND':
-                 self.train_dataset.negative_sampling() # SentiRec uses ebnerd which doesn't need this
-            
+            self.train_dataset.negative_sampling()
             train_dataloader = DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.batch_size // 16, pin_memory=True)
             model.train()
             epoch_loss = 0
@@ -29,7 +27,7 @@ class TrainerSentiRec(Trainer):
                 # 1. Unpack data based on dataset
                 if self.config.dataset_name == 'ebnerd':
                     (user_ID, user_category, user_subCategory, user_title_text, user_title_mask, user_title_entity, user_content_text, user_content_mask, user_content_entity, user_history_mask, user_history_graph, user_history_category_mask, user_history_category_indices,
-                     news_category, news_subCategory, news_title_text, news_title_mask, news_title_entity, news_content_text, news_content_mask, news_content_entity, history_sentiment, candidate_sentiment, history_index, sample_index) = data_tuple
+                     news_category, news_subCategory, news_title_text, news_title_mask, news_title_entity, news_content_text, news_content_mask, news_content_entity, history_sentiment, candidate_sentiment, history_index, sample_index, _, _) = data_tuple
                 else:
                     raise ValueError("SentiRec model is only supported for ebnerd dataset.")
 

@@ -114,7 +114,7 @@ class SentiRec(nn.Module):
         s_u = s_u.expand(-1, cand_num)
 
         s_c = candidate_sentiment
-        y_hat = click_logits
+        y_hat = torch.sigmoid(click_logits)
         p = F.relu(s_u * s_c * y_hat)
         l_div = p.mean()
 

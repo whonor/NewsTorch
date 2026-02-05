@@ -13,6 +13,7 @@ cache/
 /*.pkl
 /*.zip
 /*.pyc
+/*.out
 /downloaded_images_ebnerd_small.zip
 /downloaded_images_ebnerd_demo
 /downloaded_images_ebnerd_small

@@ -40,6 +40,10 @@ def _get_model_inputs(config, data_batch):
         # compute_scores_mmrec calls: model(news_feature, history_feature, user_history_mask, None, compute_loss=False)
         return (news_feature, history_feature, user_history_mask, None, False)
     
+    elif config.model == 'SentiRec':
+        # SentiRec inputs: 21 standard + history_index(23) + sample_index(24) + history_sentiment(21) + candidate_sentiment(22)
+        return tuple(data_batch[:21] + [data_batch[23], data_batch[24], data_batch[21], data_batch[22]])
+    
     elif config.model == 'IPNR':
         return data_batch
         
@@ -56,7 +60,7 @@ def _get_model_inputs(config, data_batch):
         if config.dataset_name == 'MIND':
             candidate_news_index = data_batch[22]
         else:
-            candidate_news_index = data_batch[25]
+            candidate_news_index = data_batch[24]
 
         news_category = news_category.unsqueeze(dim=1)
         news_subCategory = news_subCategory.unsqueeze(dim=1)
@@ -79,7 +83,7 @@ def _get_model_inputs(config, data_batch):
         if config.dataset_name == 'MIND':
             data_batch[22] = candidate_news_index
         else:
-            data_batch[25] = candidate_news_index
+            data_batch[24] = candidate_news_index
 
         if config.model == "TANR":
              return data_batch[:21]
@@ -445,7 +449,7 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
             if config.dataset_name == 'MIND':
                 candidate_news_index = data_batch[22]
             else:
-                candidate_news_index = data_batch[25]
+                candidate_news_index = data_batch[24]
 
             batch_size = user_ID.size(0)
             news_category = news_category.unsqueeze(dim=1)
@@ -465,7 +469,7 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
             if config.dataset_name == 'MIND':
                 data_batch[22] = candidate_news_index
             else:
-                data_batch[25] = candidate_news_index
+                data_batch[24] = candidate_news_index
 
             if config.model == "TANR":
                 score, _ = model(*data_batch[:21])
@@ -480,6 +484,13 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
                     scores[index: index + batch_size] = model(*data_batch).squeeze(dim=1)
             elif config.model == "SentiDebias":
                 scores[index: index + batch_size] = model(*data_batch[:23])[0]
+            elif config.model == "SentiRec":
+                args = data_batch[:21] + [data_batch[23], data_batch[24]]
+                kwargs = {
+                    'history_sentiment': data_batch[21],
+                    'candidate_sentiment': data_batch[22]
+                }
+                scores[index: index + batch_size] = model(*args, **kwargs)[0]
 
             else:
                 scores[index: index + batch_size] = model(*data_batch[:21])
