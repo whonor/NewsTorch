@@ -1,3 +1,4 @@
+import os
 import torch
 from config import Config
 import torch.nn as nn
@@ -44,7 +45,12 @@ class MMRec(torch.nn.Module):
             with_coattention=self.config.with_coattention,
             image_embedding_dim=self.config.image_embedding_dim
         )
-        self.news_encoder = NewsEncoder(config=bert_config)
+        
+        if hasattr(self.config, 'from_pretrained') and self.config.from_pretrained:
+            print(f"Loading pre-trained BERT weights from: {self.config.from_pretrained}")
+            self.news_encoder = NewsEncoder.from_pretrained(self.config.from_pretrained, config=bert_config)
+        else:
+            self.news_encoder = NewsEncoder(config=bert_config)
         self.user_encoder = UserEncoder()
         self.criterion = torch.nn.CrossEntropyLoss()
         self.use_user_embedding = None

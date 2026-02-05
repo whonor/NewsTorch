@@ -1,4 +1,4 @@
-
+word_embedding_dim: 1024 # ebnerd: 1024; glove: 300
 category_embedding_dim: 50
 subCategory_embedding_dim: 50
 head_num: 20
@@ -7,7 +7,7 @@ attention_dim: 200
 batch_size: 2
 
 # MMRec specific parameters
-from_pretrained: "xlm-roberta-base"
+from_pretrained: "./mmrec/pytorch_model_8.bin" # need to download ViLBert manually
 fusion_method: "mul"
 dropout_prob: 0.1
 bi_hidden_size: 1024
@@ -26,10 +26,11 @@ type_vocab_size: 2
 initializer_range: 0.02
 v_feature_size: 2048
 v_target_size: 1601
-v_hidden_size: 768
-v_num_hidden_layers: 3
-v_num_attention_heads: 12
-v_intermediate_size: 3072
+v_hidden_size: 1024
+v_num_hidden_layers: 6
+v_num_attention_heads: 16
+v_intermediate_size: 1024
+bi_hidden_size: 1024
 bi_num_attention_heads: 16
 v_attention_probs_dropout_prob: 0.1
 v_hidden_act: "gelu"

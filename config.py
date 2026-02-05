@@ -68,7 +68,7 @@ class Config:
         parser.add_argument('--DATASET_ROOT', type=str, default='ebnerd_demo', help='Default dataset name, can be ebnerd_demo, ebnerd_small, ebnerd_large, MIND-small, or MIND-large')
         parser.add_argument('--dataset_name', type=str, default='ebnerd', help='Name of the dataset to be used, MIND, ebnerd')
         parser.add_argument('--dataset_size', type=str, default='demo', help='Dataset variant, can be small, large, or demo, if submit the predictions submission')
-        parser.add_argument('--images_path', type=str, default='downloaded_images',
+        parser.add_argument('--images_path', type=str, default='downloaded_images_ebnerd_small',
                             help='downloaded_images for demo or small')
 
         parser.add_argument('--dev_model_path', type=str,
@@ -112,7 +112,6 @@ class Config:
         self.dev_criterion = 'avg'
         self.early_stopping_epoch = 5
 
-        self.word_embedding_dim = 300
         self.category_embedding_dim = 50
         self.subCategory_embedding_dim = 50
         self.entity_embedding_dim = 100
