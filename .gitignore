@@ -11,6 +11,18 @@ cache/
 /general_recommendation_methods/test
 /*.json
 /*.pkl
+/*.zip
+/*.pyc
+/downloaded_images_ebnerd_small.zip
+/downloaded_images_ebnerd_demo
+/downloaded_images_ebnerd_small
+/MIND-small
+/ebnerd_demo
+/ebnerd_small
+/ebnerd_large
+/mmrec
+/glove
+/MIND-large
 /logs
 /best_model
 /dev
@@ -196,3 +208,18 @@ _NRMS_4372237_2.out
 _NRMS_4372237_3.out
 _NRMS_4372237_4.out
 NewsTorch_NRMS_seeds.sh
+22SIGER MMRec.pdf
+downloaded_images.zip
+MMRec.sh
+NewsTorch_CenNewsRec_seeds.sh
+NewsTorch_CNESUE_seeds.sh
+NewsTorch_CRNCL_seeds.sh
+NewsTorch_FIM_seeds.sh
+NewsTorch_LSTUR_seeds.sh
+NewsTorch_MINS_seeds.sh
+NewsTorch_MMRec_seeds.sh
+NewsTorch_MMRec.sh
+NewsTorch_NAML_seeds.sh
+NewsTorch_NPA_seeds.sh
+NewsTorch_TANR_seeds.sh
+models/modules/mmrec/__pycache__/bert_modules.cpython-39.pyc
