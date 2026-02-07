@@ -6,11 +6,14 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from base_trainer import Trainer
 from utils._evaluation import compute_scores, AvgMetric
+from dataset_corpus_preprocessing.MIND_corpus_SentiRec import MIND_Train_Dataset_SentiRec
 
 
 class TrainerSentiRec(Trainer):
     def __init__(self, model: nn.Module, config, corpus, wandb, run_index: int):
         super().__init__(model, config, corpus, wandb, run_index)
+        if config.dataset_name == 'MIND':
+            self.train_dataset = MIND_Train_Dataset_SentiRec(corpus)
 
     def train(self):
         model = self.model
@@ -19,7 +22,8 @@ class TrainerSentiRec(Trainer):
 
         for e in tqdm(range(1, self.epoch + 1)):
             self.train_dataset.negative_sampling()
-            train_dataloader = DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.batch_size // 16, pin_memory=True)
+            
+            train_dataloader = DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.batch_size // 16 if self.batch_size > 16 else 0, pin_memory=True)
             model.train()
             epoch_loss = 0
 
@@ -28,8 +32,15 @@ class TrainerSentiRec(Trainer):
                 if self.config.dataset_name == 'ebnerd':
                     (user_ID, user_category, user_subCategory, user_title_text, user_title_mask, user_title_entity, user_content_text, user_content_mask, user_content_entity, user_history_mask, user_history_graph, user_history_category_mask, user_history_category_indices,
                      news_category, news_subCategory, news_title_text, news_title_mask, news_title_entity, news_content_text, news_content_mask, news_content_entity, history_sentiment, candidate_sentiment, history_index, sample_index, _, _) = data_tuple
+                elif self.config.dataset_name == 'MIND':
+                    (user_ID, user_category, user_subCategory, user_title_text, user_title_mask, user_title_entity, user_content_text, user_content_mask, user_content_entity, user_history_mask,
+                     news_category, news_subCategory, news_title_text, news_title_mask, news_title_entity, news_content_text, news_content_mask, news_content_entity, history_sentiment, candidate_sentiment, history_index, sample_index, _, _) = data_tuple
+                    
+                    user_history_graph = None
+                    user_history_category_mask = None
+                    user_history_category_indices = None
                 else:
-                    raise ValueError("SentiRec model is only supported for ebnerd dataset.")
+                    raise ValueError("SentiRec model is only supported for ebnerd and MIND datasets.")
 
                 # 2. Move tensors to CUDA
                 user_ID = user_ID.cuda(non_blocking=True)
@@ -42,9 +53,12 @@ class TrainerSentiRec(Trainer):
                 user_content_mask = user_content_mask.cuda(non_blocking=True)
                 user_content_entity = user_content_entity.cuda(non_blocking=True)
                 user_history_mask = user_history_mask.cuda(non_blocking=True)
-                user_history_graph = user_history_graph.cuda(non_blocking=True)
-                user_history_category_mask = user_history_category_mask.cuda(non_blocking=True)
-                user_history_category_indices = user_history_category_indices.cuda(non_blocking=True)
+                if user_history_graph is not None:
+                    user_history_graph = user_history_graph.cuda(non_blocking=True)
+                if user_history_category_mask is not None:
+                    user_history_category_mask = user_history_category_mask.cuda(non_blocking=True)
+                if user_history_category_indices is not None:
+                    user_history_category_indices = user_history_category_indices.cuda(non_blocking=True)
                 news_category = news_category.cuda(non_blocking=True)
                 news_subCategory = news_subCategory.cuda(non_blocking=True)
                 news_title_text = news_title_text.cuda(non_blocking=True)

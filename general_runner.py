@@ -4,6 +4,7 @@ import shutil
 
 from dataset_corpus_preprocessing.EBNeRD_corpus_main import EBNeRD_Corpus, Ebnerd_Train_Dataset
 from dataset_corpus_preprocessing.MIND_corpus_IPNR import MIND_Corpus_IPNR
+from dataset_corpus_preprocessing.MIND_corpus_SentiRec import MIND_Corpus_SentiRec, MIND_Train_Dataset_SentiRec, MIND_DevTest_Dataset_SentiRec
 from models.MMRec import MMRec
 from models.CNE_SUE import CNE_SUE
 from models.DKN import DKN
@@ -87,6 +88,9 @@ def train(config: Config, corpus, wandb):
     if config.dataset_name == 'MIND':
         if config.model == 'IPNR':
             trainer = TrainerIPNR(model, config, corpus, wandb, run_index)
+            trainer.train()
+        elif config.model == 'SentiRec':
+            trainer = TrainerSentiRec(model, config, corpus, wandb, run_index)
             trainer.train()
         else:
             trainer = Trainer(model, config, corpus, wandb, run_index)
@@ -228,6 +232,8 @@ def test(config: Config, corpus):
     elif config.dataset_name == 'MIND':
         if config.model == 'IPNR':
             dataset = MIND_DevTest_Dataset_IPNR(corpus, 'test')
+        elif config.model == 'SentiRec':
+            dataset = MIND_DevTest_Dataset_SentiRec(corpus, 'test')
         else:
             dataset = MIND_DevTest_Dataset(corpus, 'test')
     
@@ -301,6 +307,8 @@ if __name__ == '__main__':
     if config.dataset_name == 'MIND':
         if config.model == 'IPNR':
             corpus = MIND_Corpus_IPNR(config)
+        elif config.model == 'SentiRec':
+            corpus = MIND_Corpus_SentiRec(config)
         else:
             corpus = MIND_Corpus(config)
 

@@ -176,7 +176,7 @@ class MultiHeadAttention(nn.Module):
         V = V.permute(0, 2, 1, 3).contiguous().view([batch_size * self.h, self.len_k, self.d_v])                   # [batch_size * h, len_k, d_v]
         A = torch.bmm(Q, K.permute(0, 2, 1).contiguous()) / self.attention_scalar                                  # [batch_size * h, len_q, len_k]
         if mask != None:
-            _mask = mask.repeat([1, self.h]).view([batch_size * self.h, 1, self.len_k]).repeat([1, self.len_q, 1]) # [batch_size * h, len_q, len_k]
+            _mask = mask.repeat(1, self.h).view([batch_size * self.h, 1, self.len_k]).repeat(1, self.len_q, 1) # [batch_size * h, len_q, len_k]
             alpha = F.softmax(A.masked_fill(_mask == 0, -1e9), dim=2)                                              # [batch_size * h, len_q, len_k]
         else:
             alpha = F.softmax(A, dim=2)                                                                            # [batch_size * h, len_q, len_k]

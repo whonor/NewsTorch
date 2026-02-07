@@ -75,6 +75,9 @@ class SentiRec(nn.Module):
         # Encode candidate news: [B, N_c, D]
         cand_news_repr = self.news_encoder(news_title_text, news_title_mask, news_title_entity, news_content_text, news_content_mask, news_content_entity, news_category, news_subCategory, None)
 
+        if cand_news_repr.dim() == 2:
+            cand_news_repr = cand_news_repr.unsqueeze(1)
+
         # Encode user based on history. Our custom user encoder returns both user and history representations.
         # user_repr: [B, D], hist_news_repr: [B, N_h, D]
         user_repr, hist_news_repr = self.user_encoder(user_title_text, user_title_mask, user_title_entity, user_content_text, user_content_mask, user_content_entity, user_category, user_subCategory,

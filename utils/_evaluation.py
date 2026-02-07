@@ -7,6 +7,7 @@ from tqdm import tqdm
 from dataset_corpus_preprocessing.EBNeRD_corpus_main import EBNeRD_Corpus, Ebnerd_DevTest_Dataset
 from dataset_corpus_preprocessing.MIND_corpus_IPNR import MIND_DevTest_Dataset_IPNR
 from dataset_corpus_preprocessing.MIND_corpus_main import MIND_Corpus, MIND_DevTest_Dataset
+from dataset_corpus_preprocessing.MIND_corpus_SentiRec import MIND_Corpus_SentiRec, MIND_DevTest_Dataset_SentiRec
 from torch.utils.data import DataLoader
 
 from config import Config
@@ -41,8 +42,13 @@ def _get_model_inputs(config, data_batch):
         return (news_feature, history_feature, user_history_mask, None, False)
     
     elif config.model == 'SentiRec':
-        # SentiRec inputs: 21 standard + history_index(23) + sample_index(24) + history_sentiment(21) + candidate_sentiment(22)
-        return tuple(data_batch[:21] + [data_batch[23], data_batch[24], data_batch[21], data_batch[22]])
+        if config.dataset_name == 'MIND':
+             # 0-9: user features, 10-17: news features, 18-19: sentiment, 20-21: indices
+             # We need to insert 3 Nones for graph args at index 10
+             args = list(data_batch[:10]) + [None, None, None] + list(data_batch[10:18]) + [data_batch[20], data_batch[21], data_batch[18], data_batch[19]]
+             return tuple(args)
+        else:
+             return tuple(data_batch[:21] + [data_batch[23], data_batch[24], data_batch[21], data_batch[22]])
     
     elif config.model == 'IPNR':
         return data_batch
@@ -427,8 +433,12 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
         corpus = EBNeRD_Corpus(config)
         dataset = Ebnerd_DevTest_Dataset(corpus, mode)
     elif config.dataset_name == 'MIND':
-        corpus = MIND_Corpus(config)
-        dataset = MIND_DevTest_Dataset(corpus, mode)
+        if config.model == 'SentiRec':
+            corpus = MIND_Corpus_SentiRec(config)
+            dataset = MIND_DevTest_Dataset_SentiRec(corpus, mode)
+        else:
+            corpus = MIND_Corpus(config)
+            dataset = MIND_DevTest_Dataset(corpus, mode)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False,
                             num_workers=batch_size // 16, pin_memory=True)
     indices = (corpus.dev_indices if mode == 'dev' else corpus.test_indices)
@@ -440,6 +450,19 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
         for data_batch in tqdm(dataloader):
             data_batch = [item.cuda(non_blocking=True) if isinstance(item, torch.Tensor) else item for item in data_batch]
             user_ID = data_batch[0]
+            batch_size = user_ID.size(0)
+
+            if config.model == "SentiRec" and config.dataset_name == 'MIND':
+                # Custom handling for SentiRec on MIND to avoid incorrect unsqueezing
+                args = list(data_batch[:10]) + [None, None, None] + list(data_batch[10:18]) + [data_batch[20], data_batch[21]]
+                kwargs = {
+                    'history_sentiment': data_batch[18],
+                    'candidate_sentiment': data_batch[19]
+                }
+                scores[index: index + batch_size] = model(*args, **kwargs)[0]
+                index += batch_size
+                continue
+
             news_category = data_batch[13]
             news_subCategory = data_batch[14]
             news_title_text = data_batch[15]
@@ -485,11 +508,19 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
             elif config.model == "SentiDebias":
                 scores[index: index + batch_size] = model(*data_batch[:23])[0]
             elif config.model == "SentiRec":
-                args = data_batch[:21] + [data_batch[23], data_batch[24]]
-                kwargs = {
-                    'history_sentiment': data_batch[21],
-                    'candidate_sentiment': data_batch[22]
-                }
+                if config.dataset_name == 'MIND':
+                    # data_batch has 24 elements. 0-9: user, 10-17: news, 18-19: sent, 20-21: idx, 22-23: img
+                    args = list(data_batch[:10]) + [None, None, None] + list(data_batch[10:18]) + [data_batch[20], data_batch[21]]
+                    kwargs = {
+                        'history_sentiment': data_batch[18],
+                        'candidate_sentiment': data_batch[19]
+                    }
+                else:
+                    args = data_batch[:21] + [data_batch[23], data_batch[24]]
+                    kwargs = {
+                        'history_sentiment': data_batch[21],
+                        'candidate_sentiment': data_batch[22]
+                    }
                 scores[index: index + batch_size] = model(*args, **kwargs)[0]
 
             else:

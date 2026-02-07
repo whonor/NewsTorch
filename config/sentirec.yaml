@@ -1,4 +1,4 @@
-word_embedding_dim: 1024 # ebnerd: 1024; glove: 300
+word_embedding_dim: 300 # ebnerd: 1024; glove: 300
 category_embedding_dim: 50
 subCategory_embedding_dim: 50
 head_num: 20
@@ -7,6 +7,6 @@ attention_dim: 200
 
 # SentiRec specific parameters
 # Weight for the sentiment prediction loss (lambda in the paper)
-sent_pred_loss_coef: 0.4
+sent_pred_loss_coef: 0.1
 # Weight for the sentiment diversity regularization loss (mu in the paper)
-sent_div_loss_coef: 10
+sent_div_loss_coef: 0.1

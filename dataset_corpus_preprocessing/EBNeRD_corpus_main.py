@@ -171,6 +171,7 @@ class EBNeRD_Corpus:
         category_file = 'cache/ebnerd/category-%s.json' % config.dataset_size
         subCategory_file = 'cache/ebnerd/subCategory-%s.json' % config.dataset_size
         sentiment_file = 'cache/ebnerd/sentiment-%s.json' % config.dataset_size
+        sentiment_label_file = 'cache/ebnerd/sentiment_label-%s.json' % config.dataset_size
         vocabulary_file = 'cache/ebnerd/vocabulary-' + str(config.word_threshold) + '-' + config.tokenizer + '-' + str(config.max_title_length) + '-' + str(config.max_abstract_length) + '-' + config.dataset_size + '.json'
         word_embedding_file = 'cache/%s/word_embedding-' % config.dataset_name + str(config.word_threshold) + '-' + str(
             config.word_embedding_dim) + '-' + config.tokenizer + '-' + str(
@@ -180,7 +181,7 @@ class EBNeRD_Corpus:
         context_embedding_file = 'cache/ebnerd/context_embedding-%s.pkl' % config.dataset_size
         image_embedding_file = 'cache/ebnerd/image_embedding-%s.pkl' % config.dataset_size
         user_history_graph_file = 'cache/ebnerd/user_history_graph-' + str(config.max_history_num) + ('' if config.no_self_connection else '-self') + ('' if config.no_adjacent_normalization else '-normalize-' + config.gcn_normalization_type) + '-' + config.dataset_size + '.pkl'
-        preprocessed_data_files = [user_ID_file, news_ID_file, category_file, subCategory_file, vocabulary_file, word_embedding_file, entity_file, entity_embedding_file, context_embedding_file, user_history_graph_file, sentiment_file, image_embedding_file]
+        preprocessed_data_files = [user_ID_file, news_ID_file, category_file, subCategory_file, vocabulary_file, word_embedding_file, entity_file, entity_embedding_file, context_embedding_file, user_history_graph_file, sentiment_file, sentiment_label_file, image_embedding_file]
 
         if not all(list(map(os.path.exists, preprocessed_data_files))):
             user_ID_dict = {'<UNK>': 0}
@@ -261,6 +262,8 @@ class EBNeRD_Corpus:
                 json.dump(subCategory_dict, subCategory_f)
             with open(sentiment_file, 'w', encoding='utf-8') as sentiment_f:
                 json.dump(news_sentiment_dict, sentiment_f)
+            with open(sentiment_label_file, 'w', encoding='utf-8') as sentiment_label_f:
+                json.dump(sentiment_dict, sentiment_label_f)
             
             # ... (rest of the method)
         if not all(list(map(os.path.exists, preprocessed_data_files))):
@@ -489,7 +492,11 @@ class EBNeRD_Corpus:
 
             self.sentiment_dict = json.load(sentiment_f)
 
-            config.num_sent_classes = len(self.sentiment_dict)
+        with open('cache/ebnerd/sentiment_label-%s.json' % config.dataset_size, 'r', encoding='utf-8') as sentiment_label_f:
+
+            self.sentiment_label_dict = json.load(sentiment_label_f)
+
+            config.num_sent_classes = 3 # len(self.sentiment_label_dict)
 
         with open('cache/ebnerd/vocabulary-' + str(config.word_threshold) + '-' + config.tokenizer + '-' + str(config.max_title_length) + '-' + str(config.max_abstract_length) + '-' + config.dataset_size + '.json', 'r', encoding='utf-8') as vocabulary_f:
 
@@ -621,12 +628,20 @@ class EBNeRD_Corpus:
                     news_records.append(row)
                     news_ID_set.add(news_ID)
         assert self.news_num == len(news_ID_set), f'news num mismatch {self.news_num} v.s. {len(news_ID_set)}'
-        sentiment_label_map = {'Positive': 1.0, 'Neutral': 0.0, 'Negative': -1.0}
         for row in news_records:
             news_ID = str(row['nid']).strip()
             category = str(row['category']).strip()
             subCategory = str(row['subcategory']).strip()
             sentiment_label = str(row['sentiment_label']).strip()
+            sentiment_score = float(row['sentiment_score']) if 'sentiment_score' in row else 0.0
+
+            if sentiment_label == 'Positive':
+                final_score = sentiment_score
+            elif sentiment_label == 'Negative':
+                final_score = -sentiment_score
+            else:
+                final_score = 0.0
+
             title = str(row['title'])
             abstract = str(row['abstract'])
             index = self.news_ID_dict[news_ID]
@@ -634,7 +649,7 @@ class EBNeRD_Corpus:
                 self.news_image_embeddings[index] = image_embedding_dict[news_ID]
             self.news_category[index] = self.category_dict.get(category, 0)
             self.news_subCategory[index] = self.subCategory_dict.get(subCategory, 0)
-            self.news_sentiment[index] = sentiment_label_map.get(sentiment_label, 0.0) # Default to neutral
+            self.news_sentiment[index] = final_score
 
             words = pat.findall(title.lower()) if config.tokenizer == 'MIND' else word_tokenize(title.lower())
             offsets = [-1] * len(title)
