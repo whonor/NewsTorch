@@ -25,7 +25,7 @@ def confirm_overwrite(path: str) -> bool:
     return True
 
 
-def split_training_behaviors(size, train_ratio=0.9):
+def split_training_behaviors(size, train_ratio=0.8):
     if size == 'ebnerd_demo':
         behavior_file = os.path.join(ebnerd_demo_dataset_root, 'download', size, 'train', 'behaviors_.parquet')
     elif size == 'ebnerd_small':

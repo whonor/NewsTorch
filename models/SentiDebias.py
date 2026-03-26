@@ -52,8 +52,7 @@ class Generator(nn.Module):
         super(Generator, self).__init__()
         self.news_encoder = NewsEncoder(config)
         self.user_encoder = SentiDebiasUserEncoder(config)
-        # self.sentiment_encoder = nn.Embedding(config.num_sent_classes, config.word_embedding_dim) # Removed
-        self.sentiment_projector = nn.Linear(1, self.news_encoder.news_embedding_dim) # Changed input dim to 1
+        self.sentiment_encoder = nn.Embedding(config.num_sent_classes, self.news_encoder.news_embedding_dim)
         self.click_predictor_bias_free = DotProduct()
         self.click_predictor_bias_aware = DotProduct()
         self.config = config
@@ -69,8 +68,8 @@ class Generator(nn.Module):
         cand_news_vector = self.news_encoder(news_title_text, news_title_mask, news_title_entity, news_content_text, news_content_mask, news_content_entity, news_category, news_subCategory, None)
 
         # Project sentiment scores to vectors
-        hist_sentiment_vector = self.sentiment_projector(user_hist_sentiment.unsqueeze(-1).float())
-        cand_sentiment_vector = self.sentiment_projector(news_sentiment.unsqueeze(-1).float())
+        hist_sentiment_vector = self.sentiment_encoder(user_hist_sentiment)
+        cand_sentiment_vector = self.sentiment_encoder(news_sentiment)
 
         # User representations
         user_representation_bias_free = self.user_encoder(hist_news_vector, user_history_mask)
@@ -128,9 +127,7 @@ class SentiDebias(nn.Module):
     def initialize(self):
         self.generator.news_encoder.initialize()
         self.generator.user_encoder.initialize()
-        nn.init.xavier_uniform_(self.generator.sentiment_projector.weight)
-        if self.generator.sentiment_projector.bias is not None:
-            nn.init.zeros_(self.generator.sentiment_projector.bias)
+        nn.init.xavier_uniform_(self.generator.sentiment_encoder.weight)
 
     def forward(self, user_ID, user_category, user_subCategory, user_title_text, user_title_mask, user_title_entity, user_content_text, user_content_mask, user_content_entity, user_history_mask, user_history_graph, user_history_category_mask, user_history_category_indices, \
                 news_category, news_subCategory, news_title_text, news_title_mask, news_title_entity, news_content_text, news_content_mask, news_content_entity, \

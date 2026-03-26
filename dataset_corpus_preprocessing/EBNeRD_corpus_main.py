@@ -723,8 +723,8 @@ class EBNeRD_Corpus:
                     history_list = list(
                         map(lambda x: self.news_ID_dict[x], history.strip('[]').split(','))) if history.strip(
                         '[]') else []
-                elif isinstance(history, list):
-                    history_list = list(map(lambda x: self.news_ID_dict[x], history)) if history else []
+                elif isinstance(history, list) or isinstance(history, np.ndarray):
+                    history_list = list(map(lambda x: self.news_ID_dict[str(x).strip()], history)) if len(history) > 0 else []
                 else:
                     history_list = []
 

@@ -101,7 +101,18 @@ def _get_model_inputs(config, data_batch):
             else:
                 return data_batch
         elif config.model == "SentiDebias":
-            return data_batch[:23]
+            def discretize(scores):
+                labels = torch.ones_like(scores, dtype=torch.long)
+                labels[scores < -0.05] = 0
+                labels[scores > 0.05] = 2
+                return labels
+
+            if config.dataset_name == 'MIND':
+                # 0-9: user, 10-17: news, 18: sent_hist, 19: sent_cand
+                return tuple(list(data_batch[:10]) + [None, None, None] + list(data_batch[10:18]) + [discretize(data_batch[18]), discretize(data_batch[19])])
+            elif config.dataset_name == 'ebnerd':
+                # Ebnerd: 0-9 user, 10-12 graph, 13-20 news, 21 hist_sent, 22 cand_sent
+                return tuple(list(data_batch[:10]) + [None, None, None] + list(data_batch[13:21]) + [discretize(data_batch[21]), discretize(data_batch[22])])
         else:
             return data_batch[:21]
 
@@ -436,6 +447,9 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
         if config.model == 'SentiRec':
             corpus = MIND_Corpus_SentiRec(config)
             dataset = MIND_DevTest_Dataset_SentiRec(corpus, mode)
+        elif config.model == 'SentiDebias':
+            corpus = MIND_Corpus_SentiDebias(config)
+            dataset = MIND_DevTest_Dataset_SentiDebias(corpus, mode)
         else:
             corpus = MIND_Corpus(config)
             dataset = MIND_DevTest_Dataset(corpus, mode)
@@ -460,6 +474,24 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
                     'candidate_sentiment': data_batch[19]
                 }
                 scores[index: index + batch_size] = model(*args, **kwargs)[0]
+                index += batch_size
+                continue
+            
+            if config.model == "SentiDebias":
+                def discretize(scores):
+                    labels = torch.ones_like(scores, dtype=torch.long)
+                    labels[scores < -0.05] = 0
+                    labels[scores > 0.05] = 2
+                    return labels
+
+                if config.dataset_name == 'MIND':
+                     # 0-9: user, 10-17: news, 18: sent_hist, 19: sent_cand
+                     args = list(data_batch[:10]) + [None, None, None] + list(data_batch[10:18]) + [discretize(data_batch[18]), discretize(data_batch[19])]
+                     scores[index: index + batch_size] = model(*args)[1]
+                elif config.dataset_name == 'ebnerd':
+                     # Ebnerd: 0-9 user, 10-12 graph, 13-20 news, 21 hist_sent, 22 cand_sent
+                     args = list(data_batch[:10]) + [None, None, None] + list(data_batch[13:21]) + [discretize(data_batch[21]), discretize(data_batch[22])]
+                     scores[index: index + batch_size] = model(*args)[1]
                 index += batch_size
                 continue
 
@@ -505,8 +537,6 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
                     scores[index: index + batch_size] = model(*model_args).squeeze(dim=1)
                 else:
                     scores[index: index + batch_size] = model(*data_batch).squeeze(dim=1)
-            elif config.model == "SentiDebias":
-                scores[index: index + batch_size] = model(*data_batch[:23])[0]
             elif config.model == "SentiRec":
                 if config.dataset_name == 'MIND':
                     # data_batch has 24 elements. 0-9: user, 10-17: news, 18-19: sent, 20-21: idx, 22-23: img

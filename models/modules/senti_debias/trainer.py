@@ -7,6 +7,7 @@ from datetime import datetime
 import wandb
 from config import Config
 from dataset_corpus_preprocessing.MIND_corpus_main import MIND_Corpus, MIND_Train_Dataset
+from dataset_corpus_preprocessing.MIND_corpus_SentiDebias import MIND_Corpus_SentiDebias, MIND_Train_Dataset_SentiDebias
 from utils._evaluation import AvgMetric
 from utils._evaluation import compute_scores
 from tqdm import tqdm
@@ -32,8 +33,8 @@ class TrainerSentiDebias:
         self._dataset = config.dataset_name
         self._corpus = _corpus
         if config.dataset_name == 'MIND':
-            _corpus = MIND_Corpus(config)
-            self.train_dataset = MIND_Train_Dataset(_corpus)
+            _corpus = MIND_Corpus_SentiDebias(config)
+            self.train_dataset = MIND_Train_Dataset_SentiDebias(_corpus)
         elif config.dataset_name == 'ebnerd':
             _corpus = EBNeRD_Corpus(config)
             self.train_dataset = Ebnerd_Train_Dataset(_corpus)
@@ -72,6 +73,15 @@ class TrainerSentiDebias:
         loss = (-torch.log_softmax(logits, dim=1).select(dim=1, index=0)).mean()
         return loss
 
+    def discretize_sentiment(self, sentiment_scores):
+        # Discretize VADER compound scores (-1 to 1) into 3 classes:
+        # 0: Negative (<-0.05), 1: Neutral (-0.05 to 0.05), 2: Positive (>0.05)
+        # Input shape: [batch_size] or [batch_size, num_items]
+        labels = torch.ones_like(sentiment_scores, dtype=torch.long) # Default to Neutral (1)
+        labels[sentiment_scores < -0.05] = 0
+        labels[sentiment_scores > 0.05] = 2
+        return labels
+
     def train(self):
         model = self.model
         if torch.cuda.device_count() > 1:
@@ -84,9 +94,48 @@ class TrainerSentiDebias:
             model.train()
             epoch_g_loss = 0
             epoch_d_loss = 0
-            for (user_ID, user_category, user_subCategory, user_title_text, user_title_mask, user_title_entity, user_content_text, user_content_mask, user_content_entity, user_history_mask, user_history_graph, user_history_category_mask, user_history_category_indices, \
-                news_category, news_subCategory, news_title_text, news_title_mask, news_title_entity, news_content_text, news_content_mask, news_content_entity, \
-                user_hist_sentiment, news_sentiment, history_index, sample_index) in tqdm(train_dataloader):
+            for batch in tqdm(train_dataloader):
+                user_ID = batch[0]
+                user_category = batch[1]
+                user_subCategory = batch[2]
+                user_title_text = batch[3]
+                user_title_mask = batch[4]
+                user_title_entity = batch[5]
+                user_content_text = batch[6]
+                user_content_mask = batch[7]
+                user_content_entity = batch[8]
+                user_history_mask = batch[9]
+                
+                if self.config.dataset_name == 'ebnerd':
+                    # Indices 10, 11, 12 are graph-related
+                    # user_history_graph = batch[10]
+                    # user_history_category_mask = batch[11]
+                    # user_history_category_indices = batch[12]
+                    
+                    news_category = batch[13]
+                    news_subCategory = batch[14]
+                    news_title_text = batch[15]
+                    news_title_mask = batch[16]
+                    news_title_entity = batch[17]
+                    news_content_text = batch[18]
+                    news_content_mask = batch[19]
+                    news_content_entity = batch[20]
+                    
+                    user_hist_sentiment = batch[21]
+                    news_sentiment = batch[22]
+                else:
+                    # MIND (SentiDebias custom)
+                    news_category = batch[10]
+                    news_subCategory = batch[11]
+                    news_title_text = batch[12]
+                    news_title_mask = batch[13]
+                    news_title_entity = batch[14]
+                    news_content_text = batch[15]
+                    news_content_mask = batch[16]
+                    news_content_entity = batch[17]
+                    
+                    user_hist_sentiment = batch[18]
+                    news_sentiment = batch[19]
 
                 user_ID = user_ID.cuda(non_blocking=True)
                 user_category = user_category.cuda(non_blocking=True)
@@ -98,9 +147,7 @@ class TrainerSentiDebias:
                 user_content_mask = user_content_mask.cuda(non_blocking=True)
                 user_content_entity = user_content_entity.cuda(non_blocking=True)
                 user_history_mask = user_history_mask.cuda(non_blocking=True)
-                user_history_graph = user_history_graph.cuda(non_blocking=True)
-                user_history_category_mask = user_history_category_mask.cuda(non_blocking=True)
-                user_history_category_indices = user_history_category_indices.cuda(non_blocking=True)
+                
                 news_category = news_category.cuda(non_blocking=True)
                 news_subCategory = news_subCategory.cuda(non_blocking=True)
                 news_title_text = news_title_text.cuda(non_blocking=True)
@@ -112,18 +159,22 @@ class TrainerSentiDebias:
                 user_hist_sentiment = user_hist_sentiment.cuda(non_blocking=True)
                 news_sentiment = news_sentiment.cuda(non_blocking=True)
 
+                # Prepare discrete sentiment labels for discriminator loss
+                user_hist_sent_labels = self.discretize_sentiment(user_hist_sentiment)
+                news_sent_labels = self.discretize_sentiment(news_sentiment)
+
                 # Train Generator
                 self.optimizer_g.zero_grad()
-                combined_scores, bias_free_scores, loss_orth, hist_news_vector, cand_news_vector = model(user_ID, user_category, user_subCategory, user_title_text, user_title_mask, user_title_entity, user_content_text, user_content_mask, user_content_entity, user_history_mask, user_history_graph, user_history_category_mask, user_history_category_indices, \
+                combined_scores, bias_free_scores, loss_orth, hist_news_vector, cand_news_vector = model(user_ID, user_category, user_subCategory, user_title_text, user_title_mask, user_title_entity, user_content_text, user_content_mask, user_content_entity, user_history_mask, None, None, None, \
                 news_category, news_subCategory, news_title_text, news_title_mask, news_title_entity, news_content_text, news_content_mask, news_content_entity, \
-                user_hist_sentiment, news_sentiment)
-                
-                pred_hist_sent, pred_cand_sent = model.discriminator(hist_news_vector.detach(), cand_news_vector.detach())
+                user_hist_sent_labels, news_sent_labels)
+
+                pred_hist_sent, pred_cand_sent = model.discriminator(hist_news_vector, cand_news_vector)
                 
                 rec_loss = self.rec_loss(combined_scores)
                 
-                adv_loss_g = self.adv_loss(pred_hist_sent.view(-1, self.config.num_sent_classes), user_hist_sentiment.long().view(-1)) \
-                           + self.adv_loss(pred_cand_sent.view(-1, self.config.num_sent_classes), news_sentiment.long().view(-1))
+                adv_loss_g = self.adv_loss(pred_hist_sent.view(-1, self.config.num_sent_classes), user_hist_sent_labels.view(-1)) \
+                           + self.adv_loss(pred_cand_sent.view(-1, self.config.num_sent_classes), news_sent_labels.view(-1))
 
                 g_loss = rec_loss + self.config.beta_coefficient * loss_orth - self.config.alpha_coefficient * adv_loss_g
                 
@@ -135,13 +186,13 @@ class TrainerSentiDebias:
 
                 # Train Discriminator
                 self.optimizer_d.zero_grad()
-                _, _, _, hist_news_vector, cand_news_vector = model(user_ID, user_category, user_subCategory, user_title_text, user_title_mask, user_title_entity, user_content_text, user_content_mask, user_content_entity, user_history_mask, user_history_graph, user_history_category_mask, user_history_category_indices, \
+                _, _, _, hist_news_vector, cand_news_vector = model(user_ID, user_category, user_subCategory, user_title_text, user_title_mask, user_title_entity, user_content_text, user_content_mask, user_content_entity, user_history_mask, None, None, None, \
                 news_category, news_subCategory, news_title_text, news_title_mask, news_title_entity, news_content_text, news_content_mask, news_content_entity, \
-                user_hist_sentiment, news_sentiment)
+                user_hist_sent_labels, news_sent_labels)
                 
                 pred_hist_sent, pred_cand_sent = model.discriminator(hist_news_vector.detach(), cand_news_vector.detach())
 
-                d_loss = self.adv_loss(pred_hist_sent.view(-1, self.config.num_sent_classes), user_hist_sentiment.view(-1).long()) + self.adv_loss(pred_cand_sent.view(-1, self.config.num_sent_classes), news_sentiment.view(-1).long())
+                d_loss = self.adv_loss(pred_hist_sent.view(-1, self.config.num_sent_classes), user_hist_sent_labels.view(-1)) + self.adv_loss(pred_cand_sent.view(-1, self.config.num_sent_classes), news_sent_labels.view(-1))
                 
                 epoch_d_loss += d_loss.mean().item()
                 d_loss.mean().backward()
@@ -155,9 +206,7 @@ class TrainerSentiDebias:
             self.wandb.log({'train epoch': e, 'g_loss': epoch_g_loss / len(self.train_dataset), 'd_loss': epoch_d_loss / len(self.train_dataset)})
 
             # validation
-            # The validation step should use the bias_free_scores for evaluation
-            # I will need to modify compute_scores to handle this.
-            # For now, I will just use the combined scores.
+            # The validation step uses the bias_free_scores for evaluation (updated in compute_scores)
             auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = compute_scores(self.config, model, self._corpus, self.batch_size,
                                                      'dev', self.dev_res_dir + '/' + self.config.model + '-' + str(
                     e) + '.txt', self._dataset)
