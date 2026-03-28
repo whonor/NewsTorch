@@ -27,10 +27,14 @@ class Trainer:
         self._dataset = config.dataset_name
         self._corpus = _corpus
         if config.dataset_name == 'MIND':
-            _corpus = MIND_Corpus(config)
+            if _corpus is None:
+                _corpus = MIND_Corpus(config)
+                self._corpus = _corpus
             self.train_dataset = MIND_Train_Dataset(_corpus)
         elif config.dataset_name == 'ebnerd':
-            _corpus = EBNeRD_Corpus(config)
+            if _corpus is None:
+                _corpus = EBNeRD_Corpus(config)
+                self._corpus = _corpus
             self.train_dataset = Ebnerd_Train_Dataset(_corpus)
 
         self.run_index = run_index

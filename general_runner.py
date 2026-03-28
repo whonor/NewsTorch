@@ -115,6 +115,7 @@ def train(config: Config, corpus, wandb):
             trainer = Trainer(model, config, corpus, wandb, run_index)
             trainer.train()
     config.run_index = run_index
+    return trainer.best_dev_avg
 
 
 def dev(config: Config, corpus):
