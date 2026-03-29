@@ -30,12 +30,14 @@ class Trainer:
             if _corpus is None:
                 _corpus = MIND_Corpus(config)
                 self._corpus = _corpus
-            self.train_dataset = MIND_Train_Dataset(_corpus)
+            if type(_corpus).__name__ == 'MIND_Corpus':
+                self.train_dataset = MIND_Train_Dataset(_corpus)
         elif config.dataset_name == 'ebnerd':
             if _corpus is None:
                 _corpus = EBNeRD_Corpus(config)
                 self._corpus = _corpus
-            self.train_dataset = Ebnerd_Train_Dataset(_corpus)
+            if type(_corpus).__name__ == 'EBNeRD_Corpus':
+                self.train_dataset = Ebnerd_Train_Dataset(_corpus)
 
         self.run_index = run_index
         self.model_dir = config.model_dir + '/#' + str(self.run_index)

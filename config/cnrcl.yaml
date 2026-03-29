@@ -1,6 +1,4 @@
 
-# Model
-word_embedding_dim: 300
 hidden_dim: 200
 attention_dim: 200
 category_embedding_dim: 50
