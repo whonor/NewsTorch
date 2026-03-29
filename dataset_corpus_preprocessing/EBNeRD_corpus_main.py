@@ -8,20 +8,11 @@ from random import randint
 
 import pandas as pd
 from nltk.tokenize import word_tokenize
-from torchtext.vocab import GloVe
 from tqdm import tqdm
 
 from config import Config
 import torch
 import numpy as np
-# from transformers import AutoTokenizer, AutoModel # Moved inside function
-
-# Imports for image processing
-# from PIL import Image
-# import torchvision.models as models
-# import torchvision.transforms as transforms
-# from torch.autograd import Variable
-
 
 def is_number(s):
     try:
@@ -31,10 +22,6 @@ def is_number(s):
         return False
 
 pat = re.compile(r"[\w]+|[.,!?;|]")
-
-import urllib.request
-import gzip
-import shutil
 
 # --- Image Encoding Functions ---
 
@@ -93,14 +80,6 @@ def extract_image_features(image_dir, model, transforms):
     print(f"✅ Extracted features for {len(image_embedding_dict)} images.")
     return image_embedding_dict
 
-
-# Step 1: Auto-download and extract FastText Danish vector (Deprecated)
-def download_fasttext_vec_if_needed(vec_file_path):
-    pass
-
-# Step 2: Load FastText .vec file into dictionary (Deprecated)
-def load_fasttext_vec(filepath):
-    pass
 
 # Step 3: Build embedding matrix from word_dict using XLM-Roberta-large
 def build_pretrain_word_embedding(word_dict, embedding_dim, output_pkl_path):
@@ -181,7 +160,10 @@ class EBNeRD_Corpus:
         context_embedding_file = 'cache/ebnerd/context_embedding-%s.pkl' % config.dataset_size
         image_embedding_file = 'cache/ebnerd/image_embedding-%s.pkl' % config.dataset_size
         user_history_graph_file = 'cache/ebnerd/user_history_graph-' + str(config.max_history_num) + ('' if config.no_self_connection else '-self') + ('' if config.no_adjacent_normalization else '-normalize-' + config.gcn_normalization_type) + '-' + config.dataset_size + '.pkl'
-        preprocessed_data_files = [user_ID_file, news_ID_file, category_file, subCategory_file, vocabulary_file, word_embedding_file, entity_file, entity_embedding_file, context_embedding_file, user_history_graph_file, sentiment_file, sentiment_label_file, image_embedding_file]
+        
+        preprocessed_data_files = [user_ID_file, news_ID_file, category_file, subCategory_file, vocabulary_file, word_embedding_file, entity_file, entity_embedding_file, context_embedding_file, user_history_graph_file, sentiment_file, sentiment_label_file]
+        if config.model.lower() == 'mmrec':
+            preprocessed_data_files.append(image_embedding_file)
 
         if not all(list(map(os.path.exists, preprocessed_data_files))):
             user_ID_dict = {'<UNK>': 0}
@@ -195,7 +177,7 @@ class EBNeRD_Corpus:
             entity_dict = {'<PAD>': 0, '<UNK>': 1}
             news_category_dict = {}
 
-            # 1. user ID dictionay
+            # 1. user ID dictionary
             behaviors_df = pd.read_parquet(os.path.join(config.train_root, 'behaviors.parquet'))
 
             for user_id in behaviors_df['uid'].unique():
@@ -205,13 +187,13 @@ class EBNeRD_Corpus:
             with open(user_ID_file, 'w', encoding='utf-8') as user_ID_f:
                 json.dump(user_ID_dict, user_ID_f)
 
-            # 2. news ID dictionay & news category dictionay & news subCategory dictionay
+            # 2. news ID dictionary & news category dictionary & news subCategory dictionary & sentiment dictionary
             for i, prefix in enumerate([config.train_root, config.dev_root, config.test_root]):
                 news_parquet_file = os.path.join(prefix, 'news.parquet')
                 df_news = pd.read_parquet(news_parquet_file)
 
                 for _, row in df_news.iterrows():
-                    news_ID = str(row['nid']).strip()  # adapt column name if different
+                    news_ID = str(row['nid']).strip()
                     category = str(row['category']).strip()
                     subCategory = str(row['subcategory']).strip()
                     title = str(row['title']).lower()
@@ -264,81 +246,8 @@ class EBNeRD_Corpus:
                 json.dump(news_sentiment_dict, sentiment_f)
             with open(sentiment_label_file, 'w', encoding='utf-8') as sentiment_label_f:
                 json.dump(sentiment_dict, sentiment_label_f)
-            
-            # ... (rest of the method)
-        if not all(list(map(os.path.exists, preprocessed_data_files))):
-            user_ID_dict = {'<UNK>': 0}
-            news_ID_dict = {'<PAD>': 0}
-            category_dict = {}
-            subCategory_dict = {}
-            word_dict = {'<PAD>': 0, '<UNK>': 1}
-            word_counter = collections.Counter()
-            entity_dict = {'<PAD>': 0, '<UNK>': 1}
-            news_category_dict = {}
 
-            # 1. user ID dictionay
-            behaviors_df = pd.read_parquet(os.path.join(config.train_root, 'behaviors.parquet'))
-
-            for user_id in behaviors_df['uid'].unique():
-                user_id = str(user_id)
-                if user_id not in user_ID_dict:
-                    user_ID_dict[user_id] = len(user_ID_dict)
-            with open(user_ID_file, 'w', encoding='utf-8') as user_ID_f:
-                json.dump(user_ID_dict, user_ID_f)
-
-            # 2. news ID dictionay & news category dictionay & news subCategory dictionay
-            for i, prefix in enumerate([config.train_root, config.dev_root, config.test_root]):
-                news_parquet_file = os.path.join(prefix, 'news.parquet')
-                df_news = pd.read_parquet(news_parquet_file)
-
-                for _, row in df_news.iterrows():
-                    news_ID = str(row['nid']).strip()  # adapt column name if different
-                    category = str(row['category']).strip()
-                    subCategory = str(row['subcategory']).strip()
-                    title = str(row['title']).lower()
-                    abstract = str(row['abstract']).lower() if 'abstract' in row else ''
-
-                    if news_ID not in news_ID_dict:
-                        news_ID_dict[news_ID] = len(news_ID_dict)
-                        if category not in category_dict:
-                            category_dict[category] = len(category_dict)
-                        if subCategory not in subCategory_dict:
-                            subCategory_dict[subCategory] = len(subCategory_dict)
-
-                        words = pat.findall(title) if config.tokenizer == 'MIND' else word_tokenize(title)
-                        for word in words:
-                            if is_number(word):
-                                word_counter['<NUM>'] += 1
-                            else:
-                                if i == 0:  # training set
-                                    word_counter[word] += 1
-                                else:
-                                    if word in word_counter:
-                                        word_counter[word] += 1
-
-                        if abstract:
-                            words = pat.findall(abstract) if config.tokenizer == 'MIND' else word_tokenize(abstract)
-                            for word in words:
-                                if is_number(word):
-                                    word_counter['<NUM>'] += 1
-                                else:
-                                    if i == 0:  # training set
-                                        word_counter[word] += 1
-                                    else:
-                                        if word in word_counter:
-                                            word_counter[word] += 1
-
-                    news_category_dict[news_ID] = category_dict[category]
-
-            # Save dictionaries
-            with open(news_ID_file, 'w', encoding='utf-8') as news_ID_f:
-                json.dump(news_ID_dict, news_ID_f)
-            with open(category_file, 'w', encoding='utf-8') as category_f:
-                json.dump(category_dict, category_f)
-            with open(subCategory_file, 'w', encoding='utf-8') as subCategory_f:
-                json.dump(subCategory_dict, subCategory_f)
-
-            # 3. word dictionay
+            # 3. word dictionary
             word_counter_list = [[word, word_counter[word]] for word in word_counter]
             word_counter_list.sort(key=lambda x: x[1], reverse=True) # sort by word frequency
             filtered_word_counter_list = list(filter(lambda x: x[1] >= config.word_threshold, word_counter_list))
@@ -356,15 +265,15 @@ class EBNeRD_Corpus:
                 )
             
             # 5. Image embeddings
-            if not os.path.exists(image_embedding_file):
-                print("Preprocessing image embeddings...")
-                model = get_resnet_model()
-                transforms = get_image_transforms()
-                image_embedding_dict = extract_image_features(config.downloaded_images_file, model, transforms)
-                with open(image_embedding_file, 'wb') as f:
-                    pickle.dump(image_embedding_dict, f)
-                print("Image embeddings preprocessed and saved.")
-
+            if config.model.lower() == 'mmrec':
+                if not os.path.exists(image_embedding_file):
+                    print("Preprocessing image embeddings...")
+                    model = get_resnet_model()
+                    transforms = get_image_transforms()
+                    image_embedding_dict = extract_image_features(config.downloaded_images_file, model, transforms)
+                    with open(image_embedding_file, 'wb') as f:
+                        pickle.dump(image_embedding_dict, f)
+                    print("Image embeddings preprocessed and saved.")
 
             # build graph
             if config.dataset_size != 'large' and config.model in ['CNE-SUE', 'CNRCL']:
@@ -461,164 +370,104 @@ class EBNeRD_Corpus:
         self.config = config
 
         # preprocess cache
-
         EBNeRD_Corpus.preprocess(config)
 
         with open('cache/ebnerd/user_ID-%s.json' % config.dataset_size, 'r', encoding='utf-8') as user_ID_f:
-
             self.user_ID_dict = json.load(user_ID_f)
-
             config.user_num = len(self.user_ID_dict)
 
         with open('cache/ebnerd/news_ID-%s.json' % config.dataset_size, 'r', encoding='utf-8') as news_ID_f:
-
             self.news_ID_dict = json.load(news_ID_f)
-
             self.news_num = len(self.news_ID_dict)
 
         with open('cache/ebnerd/category-%s.json' % config.dataset_size, 'r', encoding='utf-8') as category_f:
-
             self.category_dict = json.load(category_f)
-
             config.category_num = len(self.category_dict)
 
         with open('cache/ebnerd/subCategory-%s.json' % config.dataset_size, 'r', encoding='utf-8') as subCategory_f:
-
             self.subCategory_dict = json.load(subCategory_f)
-
             config.subCategory_num = len(self.subCategory_dict)
 
         with open('cache/ebnerd/sentiment-%s.json' % config.dataset_size, 'r', encoding='utf-8') as sentiment_f:
-
             self.sentiment_dict = json.load(sentiment_f)
 
         with open('cache/ebnerd/sentiment_label-%s.json' % config.dataset_size, 'r', encoding='utf-8') as sentiment_label_f:
-
             self.sentiment_label_dict = json.load(sentiment_label_f)
-
-            config.num_sent_classes = 3 # len(self.sentiment_label_dict)
+            config.num_sent_classes = 3 
 
         with open('cache/ebnerd/vocabulary-' + str(config.word_threshold) + '-' + config.tokenizer + '-' + str(config.max_title_length) + '-' + str(config.max_abstract_length) + '-' + config.dataset_size + '.json', 'r', encoding='utf-8') as vocabulary_f:
-
             self.word_dict = json.load(vocabulary_f)
-
             config.vocabulary_size = len(self.word_dict)
 
-        with open('cache/ebnerd/image_embedding-%s.pkl' % config.dataset_size, 'rb') as f:
-            image_embedding_dict = pickle.load(f)
+        image_embedding_dict = {}
+        if config.model.lower() == 'mmrec':
+            with open('cache/ebnerd/image_embedding-%s.pkl' % config.dataset_size, 'rb') as f:
+                image_embedding_dict = pickle.load(f)
 
-            if config.dataset_size != 'large' and config.model in ['CNE-SUE', 'CNRCL']:
+        if config.dataset_size != 'large' and config.model in ['CNE-SUE', 'CNRCL']:
+            with open('cache/ebnerd/user_history_graph-' + str(config.max_history_num) + ('' if config.no_self_connection else '-self') + ('' if config.no_adjacent_normalization else '-normalize-' + config.gcn_normalization_type) + '-' + config.dataset_size + '.pkl', 'rb') as user_history_graph_f:
+                user_history_data = pickle.load(user_history_graph_f)
+                graph_size = config.max_history_num + config.category_num
 
-                with open('cache/ebnerd/user_history_graph-' + str(config.max_history_num) + ('' if config.no_self_connection else '-self') + ('' if config.no_adjacent_normalization else '-normalize-' + config.gcn_normalization_type) + '-' + config.dataset_size + '.pkl', 'rb') as user_history_graph_f:
+                train_user_history_num = len(pd.read_parquet(os.path.join(config.train_root, 'behaviors.parquet')))
+                train_graph_shape = (train_user_history_num, graph_size, graph_size)
+                self.train_user_history_graph = np.memmap(user_history_data['train_user_history_graph_path'], dtype=np.float32, mode='r', shape=train_graph_shape)
+                self.train_user_history_category_mask = user_history_data['train_user_history_category_mask']
+                self.train_user_history_category_indices = user_history_data['train_user_history_category_indices']
 
-                    user_history_data = pickle.load(user_history_graph_f)
+                dev_user_history_num = len(pd.read_parquet(os.path.join(config.dev_root, 'behaviors.parquet')))
+                dev_graph_shape = (dev_user_history_num, graph_size, graph_size)
+                self.dev_user_history_graph = np.memmap(user_history_data['dev_user_history_graph_path'], dtype=np.float32, mode='r', shape=dev_graph_shape)
+                self.dev_user_history_category_mask = user_history_data['dev_user_history_category_mask']
+                self.dev_user_history_category_indices = user_history_data['dev_user_history_category_indices']
 
-                    graph_size = config.max_history_num + config.category_num
-
-
-
-                    train_user_history_num = len(pd.read_parquet(os.path.join(config.train_root, 'behaviors.parquet')))
-
-                    train_graph_shape = (train_user_history_num, graph_size, graph_size)
-
-                    self.train_user_history_graph = np.memmap(user_history_data['train_user_history_graph_path'], dtype=np.float32, mode='r', shape=train_graph_shape)
-
-                    self.train_user_history_category_mask = user_history_data['train_user_history_category_mask']
-
-                    self.train_user_history_category_indices = user_history_data['train_user_history_category_indices']
-
-
-
-                    dev_user_history_num = len(pd.read_parquet(os.path.join(config.dev_root, 'behaviors.parquet')))
-
-                    dev_graph_shape = (dev_user_history_num, graph_size, graph_size)
-
-                    self.dev_user_history_graph = np.memmap(user_history_data['dev_user_history_graph_path'], dtype=np.float32, mode='r', shape=dev_graph_shape)
-
-                    self.dev_user_history_category_mask = user_history_data['dev_user_history_category_mask']
-
-                    self.dev_user_history_category_indices = user_history_data['dev_user_history_category_indices']
-
-
-
-                    test_user_history_num = len(pd.read_parquet(os.path.join(config.test_root, 'behaviors.parquet')))
-
-                    test_graph_shape = (test_user_history_num, graph_size, graph_size)
-
-                    self.test_user_history_graph = np.memmap(user_history_data['test_user_history_graph_path'], dtype=np.float32, mode='r', shape=test_graph_shape)
-
-                    self.test_user_history_category_mask = user_history_data['test_user_history_category_mask']
-
-                    self.test_user_history_category_indices = user_history_data['test_user_history_category_indices']
-
-            else:
-
-                self.train_user_history_graph = None
-
-                self.train_user_history_category_mask = None
-
-                self.train_user_history_category_indices = None
-
-                self.dev_user_history_graph = None
-
-                self.dev_user_history_category_mask = None
-
-                self.dev_user_history_category_indices = None
-
-                self.test_user_history_graph = None
-
-                self.test_user_history_category_mask = None
-
-                self.test_user_history_category_indices = None
+                test_user_history_num = len(pd.read_parquet(os.path.join(config.test_root, 'behaviors.parquet')))
+                test_graph_shape = (test_user_history_num, graph_size, graph_size)
+                self.test_user_history_graph = np.memmap(user_history_data['test_user_history_graph_path'], dtype=np.float32, mode='r', shape=test_graph_shape)
+                self.test_user_history_category_mask = user_history_data['test_user_history_category_mask']
+                self.test_user_history_category_indices = user_history_data['test_user_history_category_indices']
+        else:
+            self.train_user_history_graph = None
+            self.train_user_history_category_mask = None
+            self.train_user_history_category_indices = None
+            self.dev_user_history_graph = None
+            self.dev_user_history_category_mask = None
+            self.dev_user_history_category_indices = None
+            self.test_user_history_graph = None
+            self.test_user_history_category_mask = None
+            self.test_user_history_category_indices = None
 
         # meta cache
-
-        self.negative_sample_num = config.negative_sample_num                                          # negative sample number for training
-
-        self.max_history_num = config.max_history_num                                                   # max history number for each training user
-
-        self.max_title_length = config.max_title_length                                                 # max title length for each news text
-
-        self.max_abstract_length = config.max_abstract_length                                           # max abstract length for each news text
-
-        self.news_category = np.zeros([self.news_num], dtype=np.int32)                                  # [news_num]
-
-        self.news_subCategory = np.zeros([self.news_num], dtype=np.int32)                               # [news_num]
-
+        self.negative_sample_num = config.negative_sample_num                                          
+        self.max_history_num = config.max_history_num                                                   
+        self.max_title_length = config.max_title_length                                                 
+        self.max_abstract_length = config.max_abstract_length                                           
+        self.news_category = np.zeros([self.news_num], dtype=np.int32)                                  
+        self.news_subCategory = np.zeros([self.news_num], dtype=np.int32)                               
         self.news_sentiment = np.zeros([self.news_num], dtype=np.float32)
         
-        self.news_image_embeddings = np.zeros([self.news_num, 2048], dtype=np.float32)
+        if config.model.lower() == 'mmrec':
+            self.news_image_embeddings = np.zeros([self.news_num, 2048], dtype=np.float32)
+        else:
+            self.news_image_embeddings = None
 
-        self.news_title_text = np.zeros([self.news_num, self.max_title_length], dtype=np.int32)         # [news_num, max_title_length]
+        self.news_title_text = np.zeros([self.news_num, self.max_title_length], dtype=np.int32)         
+        self.news_title_mask = np.zeros([self.news_num, self.max_title_length], dtype=np.float32)       
+        self.news_title_entity = np.zeros([self.news_num, self.max_title_length], dtype=np.int32)       
+        self.news_abstract_text = np.zeros([self.news_num, self.max_abstract_length], dtype=np.int32)   
+        self.news_abstract_mask = np.zeros([self.news_num, self.max_abstract_length], dtype=np.float32) 
+        self.news_abstract_entity = np.zeros([self.news_num, self.max_abstract_length], dtype=np.int32) 
 
-        self.news_title_mask = np.zeros([self.news_num, self.max_title_length], dtype=np.float32)       # [news_num, max_title_length]
-
-        self.news_title_entity = np.zeros([self.news_num, self.max_title_length], dtype=np.int32)       # [news_num, max_title_length]
-
-        self.news_abstract_text = np.zeros([self.news_num, self.max_abstract_length], dtype=np.int32)   # [news_num, max_abstract_length]
-
-        self.news_abstract_mask = np.zeros([self.news_num, self.max_abstract_length], dtype=np.float32) # [news_num, max_abstract_length]
-
-        self.news_abstract_entity = np.zeros([self.news_num, self.max_abstract_length], dtype=np.int32) # [news_num, max_abstract_length]
-
-        self.train_behaviors = []                                                                       # [user_ID, [history], [history_mask], click impression, [non-click impressions], behavior_index]
-
-        self.dev_behaviors = []                                                                         # [user_ID, [history], [history_mask], candidate_news_ID, behavior_index]
-
-        self.dev_indices = []                                                                           # index for dev
-
-        self.test_behaviors = []                                                                        # [user_ID, [history], [history_mask], candidate_news_ID, behavior_index]
-
-        self.test_indices = []                                                                          # index for test
-
+        self.train_behaviors = []                                                                       
+        self.dev_behaviors = []                                                                         
+        self.dev_indices = []                                                                           
+        self.test_behaviors = []                                                                        
+        self.test_indices = []                                                                          
         self.title_word_num = 0
-
         self.abstract_word_num = 0
 
         news_ID_set = set(['<PAD>'])
-
         news_records = []
-
         for prefix in [config.train_root, config.dev_root, config.test_root]:
             news_parquet = os.path.join(prefix, 'news.parquet')
             df_news = pd.read_parquet(news_parquet)
@@ -627,7 +476,9 @@ class EBNeRD_Corpus:
                 if news_ID not in news_ID_set:
                     news_records.append(row)
                     news_ID_set.add(news_ID)
+        
         assert self.news_num == len(news_ID_set), f'news num mismatch {self.news_num} v.s. {len(news_ID_set)}'
+        
         for row in news_records:
             news_ID = str(row['nid']).strip()
             category = str(row['category']).strip()
@@ -645,14 +496,15 @@ class EBNeRD_Corpus:
             title = str(row['title'])
             abstract = str(row['abstract'])
             index = self.news_ID_dict[news_ID]
-            if news_ID in image_embedding_dict:
+            
+            if config.model.lower() == 'mmrec' and news_ID in image_embedding_dict:
                 self.news_image_embeddings[index] = image_embedding_dict[news_ID]
+            
             self.news_category[index] = self.category_dict.get(category, 0)
             self.news_subCategory[index] = self.subCategory_dict.get(subCategory, 0)
             self.news_sentiment[index] = final_score
 
             words = pat.findall(title.lower()) if config.tokenizer == 'MIND' else word_tokenize(title.lower())
-            offsets = [-1] * len(title)
             offset_index = 0
             for i, word in enumerate(words):
                 if i == self.max_title_length:
@@ -662,17 +514,9 @@ class EBNeRD_Corpus:
                 else:
                     self.news_title_text[index][i] = self.word_dict.get(word, 1)
                 self.news_title_mask[index][i] = 1
-                while offset_index < len(title) and title[offset_index] in [' ', '\t']:
-                    offset_index += 1
-                for _ in range(len(word)):
-                    if offset_index < len(offsets):
-                        offsets[offset_index] = i
-                        offset_index += 1
             self.title_word_num += len(words)
 
             words = pat.findall(abstract.lower()) if config.tokenizer == 'MIND' else word_tokenize(abstract.lower())
-            offsets = [-1] * len(abstract)
-            offset_index = 0
             for i, word in enumerate(words):
                 if i == self.max_abstract_length:
                     break
@@ -681,29 +525,18 @@ class EBNeRD_Corpus:
                 else:
                     self.news_abstract_text[index][i] = self.word_dict.get(word, 1)
                 self.news_abstract_mask[index][i] = 1
-                while offset_index < len(abstract) and abstract[offset_index] in [' ', '\t']:
-                    offset_index += 1
-                for _ in range(len(word)):
-                    if offset_index < len(offsets):
-                        offsets[offset_index] = i
-                        offset_index += 1
             self.abstract_word_num += len(words)
 
-        self.news_title_mask[0][0] = 1  # for <PAD> news
-        self.news_abstract_mask[0][0] = 1  # for <PAD> news
-
-
-    # generate behavior meta cache
+        self.news_title_mask[0][0] = 1  
+        self.news_abstract_mask[0][0] = 1  
 
         def process_behavior_df(df, mode='train'):
             for behavior_index, row in df.iterrows():
-                user_ID = str(row['uid'])  # or your actual user ID col name
-                history = row['history']  # assumed list or string like '[id1,id2,...]'
-                labels = row.get('labels', None)  # might be None for dev/test
-                impressions = row['candidates']  # string/list of impression IDs
-                # print(type(row['candidates']), row['candidates'])
-                # print(type(row['history']), row['history'])
-                # Parse impressions & labels for train (labels required to split clicks/non-clicks)
+                user_ID = str(row['uid'])
+                history = row['history']
+                labels = row.get('labels', None)
+                impressions = row['candidates']
+                
                 click_impressions = []
                 non_click_impressions = []
                 if mode == 'train' and labels is not None:
@@ -716,9 +549,8 @@ class EBNeRD_Corpus:
                         else:
                             click_impressions.append(imp_id)
                 else:
-                    # For dev/test, impressions are processed differently
                     impressions_list = [str(x).strip() for x in impressions]
-                # Process user history
+                
                 if isinstance(history, str):
                     history_list = list(
                         map(lambda x: self.news_ID_dict[x], history.strip('[]').split(','))) if history.strip(
@@ -767,8 +599,6 @@ class EBNeRD_Corpus:
                             behavior_index
                         ])
 
-        # Load parquet files and process
-
         train_path = os.path.join(config.train_root, 'behaviors.parquet')
         dev_path = os.path.join(config.dev_root, 'behaviors.parquet')
         test_path = os.path.join(config.test_root, 'behaviors.parquet')
@@ -781,107 +611,62 @@ class EBNeRD_Corpus:
         process_behavior_df(dev_df, 'dev')
         process_behavior_df(test_df, 'test')
 
-    
-
 import time
 from numpy.random import randint
 import torch.utils.data as data
 
-
 class Ebnerd_Train_Dataset(data.Dataset):
-
     def __init__(self, corpus: EBNeRD_Corpus):
-
         self.config = corpus.config
-
         self.negative_sample_num = self.config.negative_sample_num
-
         self.news_category = corpus.news_category
-
         self.news_subCategory = corpus.news_subCategory
-
         self.news_sentiment = corpus.news_sentiment
         
-        self.news_image_embeddings = corpus.news_image_embeddings
+        if self.config.model.lower() == 'mmrec':
+            self.news_image_embeddings = corpus.news_image_embeddings
+        else:
+            self.news_image_embeddings = None
 
         self.news_title_text =  corpus.news_title_text
-
         self.news_title_mask = corpus.news_title_mask
-
         self.news_title_entity = corpus.news_title_entity
-
         self.news_abstract_text =  corpus.news_abstract_text
-
         self.news_abstract_mask = corpus.news_abstract_mask
-
         self.news_abstract_entity = corpus.news_abstract_entity
-
         self.user_history_graph = corpus.train_user_history_graph
-
         self.user_history_category_mask = corpus.train_user_history_category_mask
-
         self.user_history_category_indices = corpus.train_user_history_category_indices
-
         self.train_behaviors = corpus.train_behaviors
-
         self.train_samples = [[0 for _ in range(1 + self.negative_sample_num)] for __ in range(len(self.train_behaviors))]
-
         self.num = len(self.train_behaviors)
 
-
-
     def negative_sampling(self, rank=None):
-
         print('\n%sBegin negative sampling, training sample num : %d' % ('' if rank is None else ('rank ' + str(rank) + ' : '), self.num))
-
         start_time = time.time()
-
         for i, train_behavior in enumerate(self.train_behaviors):
-
             self.train_samples[i][0] = train_behavior[3]
-
             negative_samples = train_behavior[4]
-
             news_num = len(negative_samples)
-
             if news_num <= self.negative_sample_num:
-
                 for j in range(self.negative_sample_num):
-
                     self.train_samples[i][j + 1] = negative_samples[j % news_num]
-
             else:
-
                 used_negative_samples = set()
-
                 for j in range(self.negative_sample_num):
-
                     while True:
-
                         k = randint(0, news_num)
-
                         if k not in used_negative_samples:
-
                             self.train_samples[i][j + 1] = negative_samples[k]
-
                             used_negative_samples.add(k)
-
                             break
-
         end_time = time.time()
-
         print('%sEnd negative sampling, used time : %.3fs' % ('' if rank is None else ('rank ' + str(rank) + ' : '), end_time - start_time))
 
-
-
     def __getitem__(self, index):
-
         train_behavior = self.train_behaviors[index]
-
         history_index = train_behavior[1]
-
         sample_index = self.train_samples[index]
-
         behavior_index = train_behavior[5]
 
         if self.config.model in ['CNE-SUE', 'CNRCL']:
@@ -894,63 +679,47 @@ class Ebnerd_Train_Dataset(data.Dataset):
             user_history_category_mask = np.zeros(self.config.category_num + 1, dtype=np.float32)
             user_history_category_indices = np.zeros(self.config.max_history_num, dtype=np.int64)
 
-        return (train_behavior[0], self.news_category[history_index], self.news_subCategory[history_index], self.news_title_text[history_index], self.news_title_mask[history_index], self.news_title_entity[history_index], self.news_abstract_text[history_index], self.news_abstract_mask[history_index], self.news_abstract_entity[history_index], train_behavior[2], user_history_graph, user_history_category_mask, user_history_category_indices,
-                self.news_category[sample_index], self.news_subCategory[sample_index], self.news_title_text[sample_index], self.news_title_mask[sample_index], self.news_title_entity[sample_index], self.news_abstract_text[sample_index], self.news_abstract_mask[sample_index], self.news_abstract_entity[sample_index], self.news_sentiment[history_index], self.news_sentiment[sample_index], history_index, sample_index,
-                self.news_image_embeddings[history_index], self.news_image_embeddings[sample_index])
+        if self.config.model.lower() == 'mmrec':
+            return (train_behavior[0], self.news_category[history_index], self.news_subCategory[history_index], self.news_title_text[history_index], self.news_title_mask[history_index], self.news_title_entity[history_index], self.news_abstract_text[history_index], self.news_abstract_mask[history_index], self.news_abstract_entity[history_index], train_behavior[2], user_history_graph, user_history_category_mask, user_history_category_indices,
+                    self.news_category[sample_index], self.news_subCategory[sample_index], self.news_title_text[sample_index], self.news_title_mask[sample_index], self.news_title_entity[sample_index], self.news_abstract_text[sample_index], self.news_abstract_mask[sample_index], self.news_abstract_entity[sample_index], self.news_sentiment[history_index], self.news_sentiment[sample_index], history_index, sample_index,
+                    self.news_image_embeddings[history_index], self.news_image_embeddings[sample_index])
+        else:
+            return (train_behavior[0], self.news_category[history_index], self.news_subCategory[history_index], self.news_title_text[history_index], self.news_title_mask[history_index], self.news_title_entity[history_index], self.news_abstract_text[history_index], self.news_abstract_mask[history_index], self.news_abstract_entity[history_index], train_behavior[2], user_history_graph, user_history_category_mask, user_history_category_indices,
+                    self.news_category[sample_index], self.news_subCategory[sample_index], self.news_title_text[sample_index], self.news_title_mask[sample_index], self.news_title_entity[sample_index], self.news_abstract_text[sample_index], self.news_abstract_mask[sample_index], self.news_abstract_entity[sample_index], self.news_sentiment[history_index], self.news_sentiment[sample_index], history_index, sample_index,
+                    np.zeros((len(history_index), 2048), dtype=np.float32), np.zeros((len(sample_index), 2048), dtype=np.float32))
 
     def __len__(self):
         return self.num
 
-    
-
-    
-
 class Ebnerd_DevTest_Dataset(data.Dataset):
-
     def __init__(self, corpus: EBNeRD_Corpus, mode: str):
         self.config = corpus.config
         assert mode in ['dev', 'test'], 'mode must be chosen from \'dev\' or \'test\''
-
         self.news_category = corpus.news_category
-
         self.news_subCategory = corpus.news_subCategory
-
         self.news_sentiment = corpus.news_sentiment
         
-        self.news_image_embeddings = corpus.news_image_embeddings
+        if self.config.model.lower() == 'mmrec':
+            self.news_image_embeddings = corpus.news_image_embeddings
+        else:
+            self.news_image_embeddings = None
 
         self.news_title_text =  corpus.news_title_text
-
         self.news_title_mask = corpus.news_title_mask
-
         self.news_title_entity = corpus.news_title_entity
-
         self.news_abstract_text =  corpus.news_abstract_text
-
         self.news_abstract_mask = corpus.news_abstract_mask
-
         self.news_abstract_entity = corpus.news_abstract_entity
-
         self.user_history_graph = corpus.dev_user_history_graph if mode == 'dev' else corpus.test_user_history_graph
-
         self.user_history_category_mask = corpus.dev_user_history_category_mask if mode == 'dev' else corpus.test_user_history_category_mask
-
         self.user_history_category_indices = corpus.dev_user_history_category_indices if mode == 'dev' else corpus.test_user_history_category_indices
-
         self.behaviors = corpus.dev_behaviors if mode == 'dev' else corpus.test_behaviors
-
         self.num = len(self.behaviors)
 
-
-
     def __getitem__(self, index):
-
         behavior = self.behaviors[index]
-
         history_index = behavior[1]
-
         candidate_news_index = behavior[3]
-
         behavior_index = behavior[4]
 
         if self.config.model in ['CNE-SUE', 'CNRCL']:
@@ -963,9 +732,14 @@ class Ebnerd_DevTest_Dataset(data.Dataset):
             user_history_category_mask = np.zeros(self.config.category_num + 1, dtype=np.float32)
             user_history_category_indices = np.zeros(self.config.max_history_num, dtype=np.int64)
 
-        return (behavior[0], self.news_category[history_index], self.news_subCategory[history_index], self.news_title_text[history_index], self.news_title_mask[history_index], self.news_title_entity[history_index], self.news_abstract_text[history_index], self.news_abstract_mask[history_index], self.news_abstract_entity[history_index], behavior[2], user_history_graph, user_history_category_mask, user_history_category_indices,
-                self.news_category[candidate_news_index], self.news_subCategory[candidate_news_index], self.news_title_text[candidate_news_index], self.news_title_mask[candidate_news_index], self.news_title_entity[candidate_news_index], self.news_abstract_text[candidate_news_index], self.news_abstract_mask[candidate_news_index], self.news_abstract_entity[candidate_news_index], self.news_sentiment[history_index], self.news_sentiment[candidate_news_index], history_index, candidate_news_index,
-                self.news_image_embeddings[history_index], self.news_image_embeddings[candidate_news_index])
+        if self.config.model.lower() == 'mmrec':
+            return (behavior[0], self.news_category[history_index], self.news_subCategory[history_index], self.news_title_text[history_index], self.news_title_mask[history_index], self.news_title_entity[history_index], self.news_abstract_text[history_index], self.news_abstract_mask[history_index], self.news_abstract_entity[history_index], behavior[2], user_history_graph, user_history_category_mask, user_history_category_indices,
+                    self.news_category[candidate_news_index], self.news_subCategory[candidate_news_index], self.news_title_text[candidate_news_index], self.news_title_mask[candidate_news_index], self.news_title_entity[candidate_news_index], self.news_abstract_text[candidate_news_index], self.news_abstract_mask[candidate_news_index], self.news_abstract_entity[candidate_news_index], self.news_sentiment[history_index], self.news_sentiment[candidate_news_index], history_index, candidate_news_index,
+                    self.news_image_embeddings[history_index], self.news_image_embeddings[candidate_news_index])
+        else:
+            return (behavior[0], self.news_category[history_index], self.news_subCategory[history_index], self.news_title_text[history_index], self.news_title_mask[history_index], self.news_title_entity[history_index], self.news_abstract_text[history_index], self.news_abstract_mask[history_index], self.news_abstract_entity[history_index], behavior[2], user_history_graph, user_history_category_mask, user_history_category_indices,
+                    self.news_category[candidate_news_index], self.news_subCategory[candidate_news_index], self.news_title_text[candidate_news_index], self.news_title_mask[candidate_news_index], self.news_title_entity[candidate_news_index], self.news_abstract_text[candidate_news_index], self.news_abstract_mask[candidate_news_index], self.news_abstract_entity[candidate_news_index], self.news_sentiment[history_index], self.news_sentiment[candidate_news_index], history_index, candidate_news_index,
+                    np.zeros((len(history_index), 2048), dtype=np.float32), np.zeros(2048, dtype=np.float32))
 
     def __len__(self):
         return self.num
