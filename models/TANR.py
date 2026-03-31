@@ -14,7 +14,7 @@ class TANR(nn.Module):
         self.user_encoder = userEncoders.TANR(self.news_encoder, config)
         self.click_predictor = DotProduct()
         self.topic_predictor = nn.Linear(
-            in_features=config.cnn_kernel_num, out_features=config.num_categ_classes
+            in_features=config.cnn_kernel_num, out_features=config.category_num + 1
         )
         self.use_user_embedding = False
         self.model_name = config.model
@@ -47,16 +47,16 @@ class TANR(nn.Module):
         # [batch, 5]
         logits = self.click_predictor(user_representation.unsqueeze(dim=1), news_representation.permute(0, 2, 1)).squeeze(dim=1)
 
-        # [batch, 55, 400]
-        mixed_vector = torch.cat((news_representation, user_representation.unsqueeze(dim=1).expand(-1, 50, -1)), dim=1)
-        # [batch*55, 18]
-        topic_scores = self.topic_predictor(mixed_vector).view(-1, self.config.num_categ_classes).cuda()
-        # [batch*55]
-        topic_mixed_vector = torch.cat((news_category, user_category), dim=1).flatten().cuda()
-        class_weight = torch.ones(self.config.num_categ_classes).cuda()
+        # [batch, 1 + negative_sample_num + max_history_num, 400]
+        mixed_vector = torch.cat((news_representation, user_representation.unsqueeze(dim=1).expand(-1, self.config.max_history_num, -1)), dim=1)
+        # [batch * (1 + negative_sample_num + max_history_num), category_num + 1]
+        topic_scores = self.topic_predictor(mixed_vector).cuda()
+        # [batch * (1 + negative_sample_num + max_history_num)]
+        topic_mixed_vector = torch.cat((news_category, user_category), dim=1).cuda()
+        class_weight = torch.ones(self.config.category_num + 1).cuda()
         class_weight[0] = 0
         criterion = CrossEntropyLoss(weight=class_weight)
-        topic_pred_loss = criterion(topic_scores, topic_mixed_vector.long())
+        topic_pred_loss = criterion(topic_scores.view(-1, self.config.category_num + 1), topic_mixed_vector.flatten().long())
 
 
         return logits, topic_pred_loss

@@ -357,7 +357,7 @@ class MINS_UE(UserEncoder):
     def __init__(self, news_encoder: NewsEncoder, config: Config):
         # torch.backends.cudnn.enabled = False
         super(MINS_UE, self).__init__(news_encoder, config)
-        assert config.num_filters % config.layers == 0
+        assert config.word_embedding_dim % config.layers == 0
         self.config = config
         self.news_encoder = news_encoder
         self.multihead_self_attention = MultiHeadSelfAttention(
@@ -365,8 +365,8 @@ class MINS_UE(UserEncoder):
         self.additive_attention = AdditiveAttention(config.query_vector_dim,
                                                     config.word_embedding_dim)
         self.gru = nn.GRU(
-            int(config.num_filters / config.layers),
-            int(config.num_filters / config.layers))
+            int(config.word_embedding_dim / config.layers),
+            int(config.word_embedding_dim / config.layers))
         self.multi_channel_gru = nn.ModuleList([self.gru for _ in range(self.config.layers)])
 
     def forward(self, user_title_text, user_title_mask, user_title_entity, user_content_text, user_content_mask, user_content_entity, user_category, user_subCategory, \
@@ -391,7 +391,7 @@ class MINS_UE(UserEncoder):
                 batch_first=True,
                 enforce_sorted=False)
             _, last_hidden = g(packed_clicked_news_vector)
-            # 1,batch,config.num_filters / config.layers
+            # 1,batch,config.word_embedding_dim / config.layers
             channels.append(last_hidden)
         # batch, 1, word_embedding_dim
         multi_channel_vector = torch.cat(channels, dim=2).transpose(0, 1)

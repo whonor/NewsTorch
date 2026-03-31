@@ -14,11 +14,11 @@ class MINS(torch.nn.Module):
         self.news_encoder = MINS_NE(config)
         self.user_encoder = MINS_UE(self.news_encoder, config)
         self.click_predictor = DotProduct()
-        assert int(config.num_filters % config.layers) == 0
+        assert int(config.word_embedding_dim % config.layers) == 0
         self.use_user_embedding = False
         self.user_embedding = nn.Embedding(
             config.user_num,
-            int(config.num_filters / config.layers),
+            int(config.word_embedding_dim / config.layers),
             padding_idx=0)
         self.dropout = nn.Dropout(p=config.dropout_rate)
 
