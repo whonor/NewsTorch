@@ -1,0 +1,6 @@
+category_embedding_dim: 50
+subCategory_embedding_dim: 50
+head_num: 20
+head_dim: 20
+attention_dim: 200
+word_embedding_dim: 1024

@@ -16,6 +16,7 @@ from models.MINS import MINS
 from models.NAML import NAML
 from models.NPA import NPA
 from models.NRMS import NRMS
+from models.TCCM import TCCM
 from models.SentiRec import SentiRec
 from models.TANR import TANR
 from models.CenNewsRec import CenNewsRec
@@ -77,7 +78,8 @@ def train(config: Config, corpus, wandb):
         'SentiRec': SentiRec,
         'MMRec': MMRec,
         'CNRCL': CNRCL,
-        'CPRS': CPRS
+        'CPRS': CPRS,
+        'TCCM': TCCM
     }
 
     if config.model not in model_classes:
@@ -138,7 +140,8 @@ def dev(config: Config, corpus):
         'SentiRec': SentiRec,
         'MMRec': MMRec,
         'CNRCL': CNRCL,
-        'CPRS': CPRS
+        'CPRS': CPRS,
+        'TCCM': TCCM
     }
 
     if config.model not in model_classes:
@@ -190,7 +193,8 @@ def test(config: Config, corpus):
         'SentiRec': SentiRec,
         'MMRec': MMRec,
         'CNRCL': CNRCL,
-        'CPRS': CPRS
+        'CPRS': CPRS,
+        'TCCM': TCCM
     }
 
     if config.model not in model_classes:

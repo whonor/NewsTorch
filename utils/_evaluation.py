@@ -555,6 +555,11 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
 
             elif config.model == "CPRS":
                 scores[index: index + batch_size] = model(*data_batch)[0]
+            elif config.model == "TCCM":
+                out = model(*data_batch)
+                if isinstance(out, tuple):
+                    out = out[0]
+                scores[index: index + batch_size] = out
             else:
                 scores[index: index + batch_size] = model(*data_batch[:21])
             index += batch_size

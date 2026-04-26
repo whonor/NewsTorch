@@ -108,6 +108,11 @@ class Trainer:
                     sat_loss = torch.abs(s_i - sat_preds).mean()
                     lambda_coef = getattr(self.config, 'cprs_lambda', 0.3)
                     loss = click_loss + lambda_coef * sat_loss
+                elif self.config.model == "TCCM":
+                    logits = self.model(*data_batch)
+                    if isinstance(logits, tuple):
+                        logits = logits[0]
+                    loss = self.loss(logits)
                 else:
                     logits = self.model(*data_batch[:21])  # For other models like NRMS, NPA, etc.
                     if isinstance(logits, tuple):

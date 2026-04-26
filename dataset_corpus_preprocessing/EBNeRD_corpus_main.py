@@ -457,6 +457,8 @@ class EBNeRD_Corpus:
         self.news_abstract_text = np.zeros([self.news_num, self.max_abstract_length], dtype=np.int32)   
         self.news_abstract_mask = np.zeros([self.news_num, self.max_abstract_length], dtype=np.float32) 
         self.news_abstract_entity = np.zeros([self.news_num, self.max_abstract_length], dtype=np.int32) 
+        self.news_title_word_pop = np.zeros([self.news_num, self.max_title_length], dtype=np.int32)
+        self.news_title_entity_pop = np.zeros([self.news_num, self.max_title_length], dtype=np.int32)
 
         self.train_behaviors = []                                                                       
         self.dev_behaviors = []                                                                         
@@ -623,6 +625,50 @@ class EBNeRD_Corpus:
         process_behavior_df(train_df, 'train')
         process_behavior_df(dev_df, 'dev')
         process_behavior_df(test_df, 'test')
+        
+        # Compute word and entity popularity (CTR) for TCCM
+        word_clicks = collections.defaultdict(float)
+        word_displays = collections.defaultdict(float)
+        entity_clicks = collections.defaultdict(float)
+        entity_displays = collections.defaultdict(float)
+
+        for behavior in self.train_behaviors:
+            click_imp = behavior[3]
+            non_clicks = behavior[4]
+            
+            for w in self.news_title_text[click_imp]:
+                if w != 0:
+                    word_clicks[w] += 1
+                    word_displays[w] += 1
+            for e in self.news_title_entity[click_imp]:
+                if e != 0:
+                    entity_clicks[e] += 1
+                    entity_displays[e] += 1
+                    
+            for nc in non_clicks:
+                for w in self.news_title_text[nc]:
+                    if w != 0:
+                        word_displays[w] += 1
+                for e in self.news_title_entity[nc]:
+                    if e != 0:
+                        entity_displays[e] += 1
+        
+        word_pop_map = {}
+        for w in word_displays:
+            ctr = word_clicks[w] / (word_displays[w] + 0.01)
+            word_pop_map[w] = int(ctr * 200)
+            
+        entity_pop_map = {}
+        for e in entity_displays:
+            ctr = entity_clicks[e] / (entity_displays[e] + 0.01)
+            entity_pop_map[e] = int(ctr * 200)
+            
+        for i in range(self.news_num):
+            for j, w in enumerate(self.news_title_text[i]):
+                self.news_title_word_pop[i][j] = word_pop_map.get(w, 0)
+            for j, e in enumerate(self.news_title_entity[i]):
+                self.news_title_entity_pop[i][j] = entity_pop_map.get(e, 0)
+
 
 import time
 from numpy.random import randint
@@ -644,6 +690,8 @@ class Ebnerd_Train_Dataset(data.Dataset):
         self.news_title_text =  corpus.news_title_text
         self.news_title_mask = corpus.news_title_mask
         self.news_title_entity = corpus.news_title_entity
+        self.news_title_word_pop = corpus.news_title_word_pop
+        self.news_title_entity_pop = corpus.news_title_entity_pop
         self.news_abstract_text =  corpus.news_abstract_text
         self.news_abstract_mask = corpus.news_abstract_mask
         self.news_abstract_entity = corpus.news_abstract_entity
@@ -699,7 +747,8 @@ class Ebnerd_Train_Dataset(data.Dataset):
         else:
             return (train_behavior[0], self.news_category[history_index], self.news_subCategory[history_index], self.news_title_text[history_index], self.news_title_mask[history_index], self.news_title_entity[history_index], self.news_abstract_text[history_index], self.news_abstract_mask[history_index], self.news_abstract_entity[history_index], train_behavior[2], user_history_graph, user_history_category_mask, user_history_category_indices,
                     self.news_category[sample_index], self.news_subCategory[sample_index], self.news_title_text[sample_index], self.news_title_mask[sample_index], self.news_title_entity[sample_index], self.news_abstract_text[sample_index], self.news_abstract_mask[sample_index], self.news_abstract_entity[sample_index], self.news_sentiment[history_index], self.news_sentiment[sample_index], history_index, sample_index,
-                    np.zeros((len(history_index), 2048), dtype=np.float32), np.zeros((len(sample_index), 2048), dtype=np.float32), np.array(train_behavior[6], dtype=np.float32), np.array(train_behavior[7], dtype=np.float32))
+                    np.zeros((len(history_index), 2048), dtype=np.float32), np.zeros((len(sample_index), 2048), dtype=np.float32), np.array(train_behavior[6], dtype=np.float32), np.array(train_behavior[7], dtype=np.float32),
+                    self.news_title_word_pop[history_index], self.news_title_entity_pop[history_index], self.news_title_word_pop[sample_index], self.news_title_entity_pop[sample_index])
 
     def __len__(self):
         return self.num
@@ -720,6 +769,8 @@ class Ebnerd_DevTest_Dataset(data.Dataset):
         self.news_title_text =  corpus.news_title_text
         self.news_title_mask = corpus.news_title_mask
         self.news_title_entity = corpus.news_title_entity
+        self.news_title_word_pop = corpus.news_title_word_pop
+        self.news_title_entity_pop = corpus.news_title_entity_pop
         self.news_abstract_text =  corpus.news_abstract_text
         self.news_abstract_mask = corpus.news_abstract_mask
         self.news_abstract_entity = corpus.news_abstract_entity
@@ -752,7 +803,8 @@ class Ebnerd_DevTest_Dataset(data.Dataset):
         else:
             return (behavior[0], self.news_category[history_index], self.news_subCategory[history_index], self.news_title_text[history_index], self.news_title_mask[history_index], self.news_title_entity[history_index], self.news_abstract_text[history_index], self.news_abstract_mask[history_index], self.news_abstract_entity[history_index], behavior[2], user_history_graph, user_history_category_mask, user_history_category_indices,
                     self.news_category[candidate_news_index], self.news_subCategory[candidate_news_index], self.news_title_text[candidate_news_index], self.news_title_mask[candidate_news_index], self.news_title_entity[candidate_news_index], self.news_abstract_text[candidate_news_index], self.news_abstract_mask[candidate_news_index], self.news_abstract_entity[candidate_news_index], self.news_sentiment[history_index], self.news_sentiment[candidate_news_index], history_index, candidate_news_index,
-                    np.zeros((len(history_index), 2048), dtype=np.float32), np.zeros(2048, dtype=np.float32), np.array(behavior[5], dtype=np.float32), np.array(behavior[6], dtype=np.float32))
+                    np.zeros((len(history_index), 2048), dtype=np.float32), np.zeros(2048, dtype=np.float32), np.array(behavior[5], dtype=np.float32), np.array(behavior[6], dtype=np.float32),
+                    self.news_title_word_pop[history_index], self.news_title_entity_pop[history_index], self.news_title_word_pop[candidate_news_index], self.news_title_entity_pop[candidate_news_index])
 
     def __len__(self):
         return self.num
