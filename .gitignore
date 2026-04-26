@@ -235,3 +235,7 @@ NewsTorch_MINS.sh
 NewsTorch_NAML.sh
 NewsTorch_NPA.sh
 NewsTorch_TANR.sh
+CPRS.pdf
+cprs_text.txt
+patch_runner.py
+models/__pycache__/CPRS.cpython-39.pyc

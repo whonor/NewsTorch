@@ -21,6 +21,7 @@ from models.TANR import TANR
 from models.CenNewsRec import CenNewsRec
 from models.SentiDebias import SentiDebias
 from models.CNRCL import CNRCL
+from models.CPRS import CPRS
 from models.modules.cnrcl.trainer import TrainerCNRCL
 from models.modules.ipnr.trainer import TrainerIPNR
 from models.modules.mmrec.trainer import TrainerMMRec
@@ -75,7 +76,8 @@ def train(config: Config, corpus, wandb):
         'SentiDebias': SentiDebias,
         'SentiRec': SentiRec,
         'MMRec': MMRec,
-        'CNRCL': CNRCL
+        'CNRCL': CNRCL,
+        'CPRS': CPRS
     }
 
     if config.model not in model_classes:
@@ -135,7 +137,8 @@ def dev(config: Config, corpus):
         'SentiDebias': SentiDebias,
         'SentiRec': SentiRec,
         'MMRec': MMRec,
-        'CNRCL': CNRCL
+        'CNRCL': CNRCL,
+        'CPRS': CPRS
     }
 
     if config.model not in model_classes:
@@ -186,7 +189,8 @@ def test(config: Config, corpus):
         'SentiDebias': SentiDebias,
         'SentiRec': SentiRec,
         'MMRec': MMRec,
-        'CNRCL': CNRCL
+        'CNRCL': CNRCL,
+        'CPRS': CPRS
     }
 
     if config.model not in model_classes:

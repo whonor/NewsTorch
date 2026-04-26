@@ -553,6 +553,8 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
                     }
                 scores[index: index + batch_size] = model(*args, **kwargs)[0]
 
+            elif config.model == "CPRS":
+                scores[index: index + batch_size] = model(*data_batch)[0]
             else:
                 scores[index: index + batch_size] = model(*data_batch[:21])
             index += batch_size

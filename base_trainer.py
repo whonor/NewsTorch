@@ -102,6 +102,12 @@ class Trainer:
                     else:
                         logits = self.model(*data_batch)
                     loss = self.loss(logits)
+                elif self.config.model == "CPRS":
+                    logits, sat_preds, s_i = self.model(*data_batch)
+                    click_loss = self.loss(logits)
+                    sat_loss = torch.abs(s_i - sat_preds).mean()
+                    lambda_coef = getattr(self.config, 'cprs_lambda', 0.3)
+                    loss = click_loss + lambda_coef * sat_loss
                 else:
                     logits = self.model(*data_batch[:21])  # For other models like NRMS, NPA, etc.
                     if isinstance(logits, tuple):

@@ -139,10 +139,12 @@ def _load_behaviors(source_file_path, dst_dir, split="train"):
         .select([
             "impression_time",
             "article_id_fixed",
+            "read_time_fixed",
             "article_ids_inview",
             "article_ids_clicked",
             "impression_id",
-            "user_id"
+            "user_id",
+            "next_read_time"
         ])
         # .pipe(
         #     sampling_strategy_wu2019,
@@ -164,11 +166,12 @@ def _load_behaviors(source_file_path, dst_dir, split="train"):
     '''
     # column_names = ["impression_id", "user_id", "impression_time", "article_id_fixed", "article_ids_inview",
     #                 "article_ids_clicked", "labels"]
-    new_names = ["impid", "uid", "time", "history", "impressions", "labels"]
+    new_names = ["impid", "uid", "time", "history", "history_read_time", "impressions", "labels", "next_read_time"]
     behaviors = df_behaviors.rename({"impression_id": "impid",
                                           "user_id": "uid",
                                           "impression_time": "time",
                                           "article_id_fixed": "history",
+                                          "read_time_fixed": "history_read_time",
                                           "article_ids_inview": "impressions"})
     behaviors = behaviors[new_names]
 

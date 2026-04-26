@@ -534,9 +534,11 @@ class EBNeRD_Corpus:
             for behavior_index, row in df.iterrows():
                 user_ID = str(row['uid'])
                 history = row['history']
+                history_read_time = row.get('history_read_time', [])
+                next_read_time = row.get('next_read_time', 0.0)
                 labels = row.get('labels', None)
                 impressions = row['candidates']
-                
+
                 click_impressions = []
                 non_click_impressions = []
                 if mode == 'train' and labels is not None:
@@ -550,7 +552,7 @@ class EBNeRD_Corpus:
                             click_impressions.append(imp_id)
                 else:
                     impressions_list = [str(x).strip() for x in impressions]
-                
+
                 if isinstance(history, str):
                     history_list = list(
                         map(lambda x: self.news_ID_dict[x], history.strip('[]').split(','))) if history.strip(
@@ -565,6 +567,12 @@ class EBNeRD_Corpus:
                 user_history_mask = np.zeros(self.max_history_num, dtype=np.float32)
                 user_history_mask[:min(len(history_list), self.max_history_num)] = 1.0
 
+                if isinstance(history_read_time, np.ndarray) or isinstance(history_read_time, list):
+                    history_read_time_list = list(history_read_time)
+                else:
+                    history_read_time_list = []
+                user_history_read_time = history_read_time_list[-self.max_history_num:] + [0.0] * padding_num
+
                 if mode == 'train':
                     for click_imp in click_impressions:
                         if len(non_click_impressions) > 0:
@@ -574,7 +582,9 @@ class EBNeRD_Corpus:
                                 user_history_mask,
                                 click_imp,
                                 non_click_impressions,
-                                behavior_index
+                                behavior_index,
+                                user_history_read_time,
+                                next_read_time
                             ])
                 elif mode == 'dev':
                     for impression in impressions_list:
@@ -585,7 +595,9 @@ class EBNeRD_Corpus:
                             user_history,
                             user_history_mask,
                             imp_id,
-                            behavior_index
+                            behavior_index,
+                            user_history_read_time,
+                            next_read_time
                         ])
                 elif mode == 'test':
                     for impression in impressions_list:
@@ -596,9 +608,10 @@ class EBNeRD_Corpus:
                             user_history,
                             user_history_mask,
                             imp_id,
-                            behavior_index
+                            behavior_index,
+                            user_history_read_time,
+                            next_read_time
                         ])
-
         train_path = os.path.join(config.train_root, 'behaviors.parquet')
         dev_path = os.path.join(config.dev_root, 'behaviors.parquet')
         test_path = os.path.join(config.test_root, 'behaviors.parquet')
@@ -686,7 +699,7 @@ class Ebnerd_Train_Dataset(data.Dataset):
         else:
             return (train_behavior[0], self.news_category[history_index], self.news_subCategory[history_index], self.news_title_text[history_index], self.news_title_mask[history_index], self.news_title_entity[history_index], self.news_abstract_text[history_index], self.news_abstract_mask[history_index], self.news_abstract_entity[history_index], train_behavior[2], user_history_graph, user_history_category_mask, user_history_category_indices,
                     self.news_category[sample_index], self.news_subCategory[sample_index], self.news_title_text[sample_index], self.news_title_mask[sample_index], self.news_title_entity[sample_index], self.news_abstract_text[sample_index], self.news_abstract_mask[sample_index], self.news_abstract_entity[sample_index], self.news_sentiment[history_index], self.news_sentiment[sample_index], history_index, sample_index,
-                    np.zeros((len(history_index), 2048), dtype=np.float32), np.zeros((len(sample_index), 2048), dtype=np.float32))
+                    np.zeros((len(history_index), 2048), dtype=np.float32), np.zeros((len(sample_index), 2048), dtype=np.float32), np.array(train_behavior[6], dtype=np.float32), np.array(train_behavior[7], dtype=np.float32))
 
     def __len__(self):
         return self.num
@@ -735,11 +748,12 @@ class Ebnerd_DevTest_Dataset(data.Dataset):
         if self.config.model.lower() == 'mmrec':
             return (behavior[0], self.news_category[history_index], self.news_subCategory[history_index], self.news_title_text[history_index], self.news_title_mask[history_index], self.news_title_entity[history_index], self.news_abstract_text[history_index], self.news_abstract_mask[history_index], self.news_abstract_entity[history_index], behavior[2], user_history_graph, user_history_category_mask, user_history_category_indices,
                     self.news_category[candidate_news_index], self.news_subCategory[candidate_news_index], self.news_title_text[candidate_news_index], self.news_title_mask[candidate_news_index], self.news_title_entity[candidate_news_index], self.news_abstract_text[candidate_news_index], self.news_abstract_mask[candidate_news_index], self.news_abstract_entity[candidate_news_index], self.news_sentiment[history_index], self.news_sentiment[candidate_news_index], history_index, candidate_news_index,
-                    self.news_image_embeddings[history_index], self.news_image_embeddings[candidate_news_index])
+                    self.news_image_embeddings[history_index], self.news_image_embeddings[candidate_news_index], np.array(behavior[5], dtype=np.float32), np.array(behavior[6], dtype=np.float32))
         else:
             return (behavior[0], self.news_category[history_index], self.news_subCategory[history_index], self.news_title_text[history_index], self.news_title_mask[history_index], self.news_title_entity[history_index], self.news_abstract_text[history_index], self.news_abstract_mask[history_index], self.news_abstract_entity[history_index], behavior[2], user_history_graph, user_history_category_mask, user_history_category_indices,
                     self.news_category[candidate_news_index], self.news_subCategory[candidate_news_index], self.news_title_text[candidate_news_index], self.news_title_mask[candidate_news_index], self.news_title_entity[candidate_news_index], self.news_abstract_text[candidate_news_index], self.news_abstract_mask[candidate_news_index], self.news_abstract_entity[candidate_news_index], self.news_sentiment[history_index], self.news_sentiment[candidate_news_index], history_index, candidate_news_index,
-                    np.zeros((len(history_index), 2048), dtype=np.float32), np.zeros(2048, dtype=np.float32))
+                    np.zeros((len(history_index), 2048), dtype=np.float32), np.zeros(2048, dtype=np.float32), np.array(behavior[5], dtype=np.float32), np.array(behavior[6], dtype=np.float32))
 
     def __len__(self):
+        return self.num
         return self.num

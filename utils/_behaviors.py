@@ -169,10 +169,17 @@ def ebnerd_from_path(
     """
     df_history = (
         pl.scan_parquet(path.joinpath("history.parquet"))
-        .select(user_col, history_aids_col)
+        .select(user_col, history_aids_col, "read_time_fixed")
         .pipe(
             truncate_history,
             column=history_aids_col,
+            history_size=history_size,
+            padding_value=None,
+            enable_warning=False,
+        )
+        .pipe(
+            truncate_history,
+            column="read_time_fixed",
             history_size=history_size,
             padding_value=None,
             enable_warning=False,
