@@ -2,7 +2,9 @@ import csv
 import os
 import shutil
 
-from dataset_corpus_preprocessing.EBNeRD_corpus_main import EBNeRD_Corpus, Ebnerd_Train_Dataset
+from dataset_corpus_preprocessing.EBNeRD_corpus_main import EBNeRD_Corpus, Ebnerd_Train_Dataset, Ebnerd_DevTest_Dataset
+from dataset_corpus_preprocessing.EBNeRD_corpus_CPRS import EBNeRD_Corpus as EBNeRD_Corpus_CPRS
+from dataset_corpus_preprocessing.EBNeRD_corpus_TCCM import EBNeRD_Corpus as EBNeRD_Corpus_TCCM
 from dataset_corpus_preprocessing.MIND_corpus_IPNR import MIND_Corpus_IPNR
 from dataset_corpus_preprocessing.MIND_corpus_SentiRec import MIND_Corpus_SentiRec, MIND_Train_Dataset_SentiRec, MIND_DevTest_Dataset_SentiRec
 from models.MMRec import MMRec
@@ -322,7 +324,12 @@ if __name__ == '__main__':
             corpus = MIND_Corpus(config)
 
     elif config.dataset_name == 'ebnerd':
-        corpus = EBNeRD_Corpus(config)
+        if config.model == 'CPRS':
+            corpus = EBNeRD_Corpus_CPRS(config)
+        elif config.model == 'TCCM':
+            corpus = EBNeRD_Corpus_TCCM(config)
+        else:
+            corpus = EBNeRD_Corpus(config)
 
     if config.mode == 'train':
         print("Start training at: ", datetime.now())

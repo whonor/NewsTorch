@@ -11,4 +11,4 @@
 source ~/miniforge3/bin/activate
 conda activate /nesi/project/uoo04379/envs/NewsTorch
 
-python general_runner.py --seed=${SLURM_ARRAY_TASK_ID} --DATASET_ROOT=ebnerd_small --dataset_size=small --dataset_name=ebnerd --model=CPRS --epoch=10 --word_embedding_dim=1024
+python general_runner.py --seed=${SLURM_ARRAY_TASK_ID} --DATASET_ROOT=ebnerd_demo --dataset_size=demo --dataset_name=ebnerd --model=CPRS --epoch=10 --word_embedding_dim=1024

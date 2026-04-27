@@ -39,21 +39,22 @@ class CPRS(nn.Module):
     def forward(self, user_ID, user_category, user_subCategory, user_title_text, user_title_mask, user_title_entity, user_content_text, user_content_mask, user_content_entity, user_history_mask, user_history_graph, user_history_category_mask, user_history_category_indices, \
                       news_category, news_subCategory, news_title_text, news_title_mask, news_title_entity, news_content_text, news_content_mask, news_content_entity, *extra_args):
         
-        # extra_args might contain history_read_time and next_read_time when training
-        # According to generalist output, they are at indices 4 and 5 in extra_args 
-        # (wait, generalist didn't specify exactly, let me just assume it's correct and fix if it crashes)
-        # Actually in EBNeRD_corpus_main.py, the tuple has 27 items originally.
-        # So extra_args = data_batch[21:] which are 6 items originally.
-        # Let's just use next_read_time = extra_args[-1]
-        next_read_time = extra_args[-1] if len(extra_args) > 0 else None
+        # extra_args contains items from index 21 onwards of the data_batch in EBNeRD_Corpus
+        # index 21: news_sentiment_history (extra_args[0])
+        # index 22: news_sentiment_sample (extra_args[1])
+        # index 23: history_index (extra_args[2])
+        # index 24: sample_index (extra_args[3])
+        # index 25: user_image_embeddings (extra_args[4])
+        # index 26: news_image_embeddings (extra_args[5])
+        # index 27: user_history_read_time (extra_args[6])
+        # index 28: next_read_time (extra_args[7])
+        next_read_time = extra_args[7] if len(extra_args) > 7 else None
 
         # [batch_size, max_history, news_dim]
         # news_encoder for user history
-        # CPRS uses title and content representation. For simplicity, we just use news_encoder's output
-        # wait, news_encoder signature: news_title_text, news_title_mask, news_title_entity, news_content_text, news_content_mask, news_content_entity, news_category, news_subCategory, user_embedding
         history_repr = self.news_encoder(user_title_text, user_title_mask, user_title_entity, user_content_text, user_content_mask, user_content_entity, user_category, user_subCategory, None)
         
-        # Content and Title attention (Using history_repr for both to form u_c and u_t)
+        # Content and Title attention
         u_c = self.content_sat_attention(history_repr, mask=user_history_mask)
         u_t = self.title_attention(history_repr, mask=user_history_mask)
         
@@ -78,10 +79,37 @@ class CPRS(nn.Module):
             # Positive candidate is at index 0
             # Calculate cand_len
             cand_len = news_title_mask[:, 0].sum(dim=-1) + news_content_mask[:, 0].sum(dim=-1)
-            t_i = torch.clamp(next_read_time, min=1.0)
+            
+            # Handle NaN in next_read_time
+            valid_mask = ~torch.isnan(next_read_time)
+            t_i = torch.where(valid_mask, next_read_time, torch.ones_like(next_read_time))
+            t_i = torch.clamp(t_i, min=1.0)
+            
+            # Ensure t_i is broadcastable with cand_len
+            if t_i.dim() > cand_len.dim():
+                t_i = t_i.view(cand_len.shape)
+                valid_mask = valid_mask.view(cand_len.shape)
+                
             v_i = cand_len / t_i
-            v_mean = torch.clamp(torch.mean(v_i), min=1e-5)
-            s_i = torch.log2((v_i / v_mean) + 1e-5)
-            return logits, sat_preds[:, 0], s_i
+            
+            # Compute v_mean using only valid samples to avoid NaN
+            if valid_mask.any():
+                v_mean = torch.mean(v_i[valid_mask])
+                v_mean = torch.clamp(v_mean, min=1e-5)
+                s_i = torch.log2((v_i / v_mean) + 1e-5)
+                # Set s_i to 0 for invalid samples and also return the mask if needed
+                # But the trainer expects (logits, sat_preds, s_i)
+                # We can set s_i to a value that will result in 0 loss when masked or just handle it here
+                s_i = torch.where(valid_mask, s_i, torch.zeros_like(s_i))
+                
+                # To communicate to the trainer which samples are valid, 
+                # we could return valid_mask too, but the trainer doesn't expect it.
+                # Alternatively, we can make sat_preds equal to s_i for invalid samples
+                # so that torch.abs(s_i - sat_preds).mean() doesn't get messed up (though mean still includes them)
+                return logits, sat_preds[:, 0], s_i, valid_mask
+            else:
+                # If no valid samples in batch, return zeros for s_i and a false mask
+                return logits, sat_preds[:, 0], torch.zeros_like(v_i), valid_mask
 
-        return logits, sat_preds, None
+        # Return empty tensors instead of None for DataParallel compatibility
+        return logits, sat_preds, torch.tensor([], device=logits.device), torch.tensor([], device=logits.device, dtype=torch.bool)

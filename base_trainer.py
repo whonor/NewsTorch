@@ -34,9 +34,23 @@ class Trainer:
                 self.train_dataset = MIND_Train_Dataset(_corpus)
         elif config.dataset_name == 'ebnerd':
             if _corpus is None:
-                _corpus = EBNeRD_Corpus(config)
+                if config.model == 'CPRS':
+                    from dataset_corpus_preprocessing.EBNeRD_corpus_CPRS import EBNeRD_Corpus as EBNeRD_Corpus_CPRS
+                    _corpus = EBNeRD_Corpus_CPRS(config)
+                elif config.model == 'TCCM':
+                    from dataset_corpus_preprocessing.EBNeRD_corpus_TCCM import EBNeRD_Corpus as EBNeRD_Corpus_TCCM
+                    _corpus = EBNeRD_Corpus_TCCM(config)
+                else:
+                    _corpus = EBNeRD_Corpus(config)
                 self._corpus = _corpus
-            if type(_corpus).__name__ == 'EBNeRD_Corpus':
+            
+            if config.model == 'CPRS':
+                from dataset_corpus_preprocessing.EBNeRD_corpus_CPRS import Ebnerd_Train_Dataset as Ebnerd_Train_Dataset_CPRS
+                self.train_dataset = Ebnerd_Train_Dataset_CPRS(_corpus)
+            elif config.model == 'TCCM':
+                from dataset_corpus_preprocessing.EBNeRD_corpus_TCCM import Ebnerd_Train_Dataset as Ebnerd_Train_Dataset_TCCM
+                self.train_dataset = Ebnerd_Train_Dataset_TCCM(_corpus)
+            else:
                 self.train_dataset = Ebnerd_Train_Dataset(_corpus)
 
         self.run_index = run_index
@@ -103,9 +117,12 @@ class Trainer:
                         logits = self.model(*data_batch)
                     loss = self.loss(logits)
                 elif self.config.model == "CPRS":
-                    logits, sat_preds, s_i = self.model(*data_batch)
+                    logits, sat_preds, s_i, valid_mask = self.model(*data_batch)
                     click_loss = self.loss(logits)
-                    sat_loss = torch.abs(s_i - sat_preds).mean()
+                    if valid_mask is not None and valid_mask.numel() > 0 and valid_mask.any():
+                        sat_loss = torch.abs(s_i[valid_mask] - sat_preds[valid_mask]).mean()
+                    else:
+                        sat_loss = torch.tensor(0.0, device=logits.device)
                     lambda_coef = getattr(self.config, 'cprs_lambda', 0.3)
                     loss = click_loss + lambda_coef * sat_loss
                 elif self.config.model == "TCCM":

@@ -50,7 +50,7 @@ def _get_model_inputs(config, data_batch):
         else:
              return tuple(data_batch[:21] + [data_batch[23], data_batch[24], data_batch[21], data_batch[22]])
     
-    elif config.model == 'IPNR':
+    elif config.model == 'IPNR' or config.model == 'TCCM':
         return data_batch
         
     else:
@@ -78,6 +78,9 @@ def _get_model_inputs(config, data_batch):
         news_content_entity = news_content_entity.unsqueeze(dim=1)
         candidate_news_index = candidate_news_index.unsqueeze(dim=1)
 
+        # Create a copy or a new list to avoid in-place modification of data_batch
+        # if it's used elsewhere, though here it seems okay.
+        data_batch = list(data_batch)
         data_batch[13] = news_category
         data_batch[14] = news_subCategory
         data_batch[15] = news_title_text
@@ -117,6 +120,7 @@ def _get_model_inputs(config, data_batch):
             return data_batch[:21]
 
 def compute_complexity(model, config, data_batch):
+    profile = None
     try:
         from thop import profile
     except ImportError:
@@ -129,6 +133,8 @@ def compute_complexity(model, config, data_batch):
     # thop requires tuple inputs
     if not isinstance(inputs, tuple) and not isinstance(inputs, list):
          inputs = (inputs,)
+    else:
+         inputs = tuple(inputs)
 
     # 1. Clean up attributes to allow thop to register its buffers
     for m in model.modules():
@@ -146,26 +152,28 @@ def compute_complexity(model, config, data_batch):
     }
 
     flops, params = 0, 0
-    try:
-        # 2. Run profile. Use return values if successful for best accuracy.
-        flops, params = profile(model, inputs=inputs, custom_ops=custom_ops, verbose=False)
-    except Exception as e:
-        print(f"DEBUG: thop.profile crashed: {e}")
-        # import traceback
-        # traceback.print_exc()
-        # 3. Fallback: manual summation if profile crashes during its internal summation
+    if profile is not None:
+        try:
+            # 2. Run profile. Use return values if successful for best accuracy.
+            flops, params = profile(model, inputs=inputs, custom_ops=custom_ops, verbose=False)
+        except Exception as e:
+            print(f"DEBUG: thop.profile crashed: {e}")
+            # import traceback
+            # traceback.print_exc()
+    
+    # 3. Fallback/Manual summation if profile was not run or crashed
+    if flops == 0 or params == 0:
         for m in model.modules():
             if len(list(m.children())) == 0: # Sum only leaf modules to avoid double counting
                 if hasattr(m, "total_ops"):
                     val = m.total_ops.item() if isinstance(m.total_ops, torch.Tensor) else m.total_ops
                     flops += val
-    finally:
-        # 4. Ensure all hooks are removed even if profile crashes
-        for m in model.modules():
-            if hasattr(m, "_forward_hooks"):
-                m._forward_hooks.clear()
-            if hasattr(m, "_forward_pre_hooks"):
-                m._forward_pre_hooks.clear()
+    # 4. Ensure all hooks are removed even if profile crashes
+    for m in model.modules():
+        if hasattr(m, "_forward_hooks"):
+            m._forward_hooks.clear()
+        if hasattr(m, "_forward_pre_hooks"):
+            m._forward_pre_hooks.clear()
 
     # Always use a reliable parameter count
     param_list = list(model.parameters())
@@ -441,8 +449,25 @@ def compute_scores_IPNR(config: Config, model: nn.Module, mind_corpus: MIND_Corp
 def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mode: str, result_file: str, dataset: str):
     assert mode in ['dev', 'test'], 'mode must be chosen from \'dev\' or \'test\''
     if config.dataset_name == 'ebnerd':
-        corpus = EBNeRD_Corpus(config)
-        dataset = Ebnerd_DevTest_Dataset(corpus, mode)
+        if corpus is None:
+            if config.model == 'CPRS':
+                from dataset_corpus_preprocessing.EBNeRD_corpus_CPRS import EBNeRD_Corpus as EBNeRD_Corpus_CPRS
+                corpus = EBNeRD_Corpus_CPRS(config)
+            elif config.model == 'TCCM':
+                from dataset_corpus_preprocessing.EBNeRD_corpus_TCCM import EBNeRD_Corpus as EBNeRD_Corpus_TCCM
+                corpus = EBNeRD_Corpus_TCCM(config)
+            else:
+                corpus = EBNeRD_Corpus(config)
+        
+        if config.model == 'CPRS':
+            from dataset_corpus_preprocessing.EBNeRD_corpus_CPRS import Ebnerd_DevTest_Dataset as Ebnerd_DevTest_Dataset_CPRS
+            dataset = Ebnerd_DevTest_Dataset_CPRS(corpus, mode)
+        elif config.model == 'TCCM':
+            from dataset_corpus_preprocessing.EBNeRD_corpus_TCCM import Ebnerd_DevTest_Dataset as Ebnerd_DevTest_Dataset_TCCM
+            dataset = Ebnerd_DevTest_Dataset_TCCM(corpus, mode)
+        else:
+            from dataset_corpus_preprocessing.EBNeRD_corpus_main import Ebnerd_DevTest_Dataset
+            dataset = Ebnerd_DevTest_Dataset(corpus, mode)
     elif config.dataset_name == 'MIND':
         if config.model == 'SentiRec':
             corpus = MIND_Corpus_SentiRec(config)
