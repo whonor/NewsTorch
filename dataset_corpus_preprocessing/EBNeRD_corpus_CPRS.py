@@ -13,6 +13,11 @@ from tqdm import tqdm
 from config import Config
 import torch
 import numpy as np
+from dataset_corpus_preprocessing.ebnerd_behavior_utils import (
+    as_list,
+    candidate_read_time,
+    pad_history_read_time,
+)
 
 def is_number(s):
     try:
@@ -540,20 +545,18 @@ class EBNeRD_Corpus:
                 next_read_time = row.get('next_read_time', 0.0)
                 labels = row.get('labels', None)
                 impressions = row['candidates']
+                impressions_list = [str(x).strip() for x in as_list(impressions)]
 
                 click_impressions = []
                 non_click_impressions = []
                 if mode == 'train' and labels is not None:
                     labels_list = [int(l) for l in labels]
-                    impressions_list = [str(x).strip() for x in impressions]
-                    for impression, label in zip(impressions_list, labels_list):
+                    for impression_position, (impression, label) in enumerate(zip(impressions_list, labels_list)):
                         imp_id = self.news_ID_dict[impression.strip()]
                         if label == 0:
                             non_click_impressions.append(imp_id)
                         else:
-                            click_impressions.append(imp_id)
-                else:
-                    impressions_list = [str(x).strip() for x in impressions]
+                            click_impressions.append((imp_id, impression_position))
 
                 if isinstance(history, str):
                     history_list = list(
@@ -569,14 +572,10 @@ class EBNeRD_Corpus:
                 user_history_mask = np.zeros(self.max_history_num, dtype=np.float32)
                 user_history_mask[:min(len(history_list), self.max_history_num)] = 1.0
 
-                if isinstance(history_read_time, np.ndarray) or isinstance(history_read_time, list):
-                    history_read_time_list = list(history_read_time)
-                else:
-                    history_read_time_list = []
-                user_history_read_time = history_read_time_list[-self.max_history_num:] + [0.0] * padding_num
+                user_history_read_time = pad_history_read_time(history_read_time, self.max_history_num)
 
                 if mode == 'train':
-                    for click_imp in click_impressions:
+                    for click_imp, impression_position in click_impressions:
                         if len(non_click_impressions) > 0:
                             self.train_behaviors.append([
                                 self.user_ID_dict[user_ID],
@@ -586,10 +585,10 @@ class EBNeRD_Corpus:
                                 non_click_impressions,
                                 behavior_index,
                                 user_history_read_time,
-                                next_read_time
+                                candidate_read_time(next_read_time, impression_position)
                             ])
                 elif mode == 'dev':
-                    for impression in impressions_list:
+                    for impression_position, impression in enumerate(impressions_list):
                         imp_id = self.news_ID_dict[impression.strip()]
                         self.dev_indices.append(behavior_index)
                         self.dev_behaviors.append([
@@ -599,10 +598,10 @@ class EBNeRD_Corpus:
                             imp_id,
                             behavior_index,
                             user_history_read_time,
-                            next_read_time
+                            candidate_read_time(next_read_time, impression_position)
                         ])
                 elif mode == 'test':
-                    for impression in impressions_list:
+                    for impression_position, impression in enumerate(impressions_list):
                         imp_id = self.news_ID_dict.get(impression.strip(), 0)
                         self.test_indices.append(behavior_index)
                         self.test_behaviors.append([
@@ -612,7 +611,7 @@ class EBNeRD_Corpus:
                             imp_id,
                             behavior_index,
                             user_history_read_time,
-                            next_read_time
+                            candidate_read_time(next_read_time, impression_position)
                         ])
         train_path = os.path.join(config.train_root, 'behaviors.parquet')
         dev_path = os.path.join(config.dev_root, 'behaviors.parquet')

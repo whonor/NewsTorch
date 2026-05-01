@@ -10,6 +10,8 @@ class MMRec(torch.nn.Module):
     def __init__(self, config: Config):
         super(MMRec, self).__init__()
         self.config = config
+        self.model_name = config.model
+        self.batch_size = config.batch_size
         bert_config = BertConfig(
             vocab_size_or_config_json_file=self.config.vocab_size,
             hidden_size=self.config.hidden_size,
@@ -53,7 +55,7 @@ class MMRec(torch.nn.Module):
             self.news_encoder = NewsEncoder(config=bert_config)
         self.user_encoder = UserEncoder()
         self.criterion = torch.nn.CrossEntropyLoss()
-        self.use_user_embedding = None
+        self.use_user_embedding = False
 
     def initialize(self):
         # self.news_encoder.initialize()

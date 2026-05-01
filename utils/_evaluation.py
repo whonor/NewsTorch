@@ -21,9 +21,14 @@ def _get_model_inputs(config, data_batch):
     data_batch = [item.cuda(non_blocking=True) if isinstance(item, torch.Tensor) else item for item in data_batch]
     
     if config.model == 'MMRec':
-        (user_ID, _, _, user_title_text, user_title_mask, _, _, _, _, user_history_mask, _, _, _,
-         _, _, news_title_text, news_title_mask, _, _, _, _, _, _, _, _,
-         history_image_embedding, candidate_image_embedding) = data_batch
+        user_ID = data_batch[0]
+        user_title_text = data_batch[3]
+        user_title_mask = data_batch[4]
+        user_history_mask = data_batch[9]
+        news_title_text = data_batch[15]
+        news_title_mask = data_batch[16]
+        history_image_embedding = data_batch[25]
+        candidate_image_embedding = data_batch[26]
 
         news_feature = {
             "input_ids": news_title_text,
@@ -607,7 +612,7 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
         return None, None, None, None, None, None, None, None, None, None, None, None
 
 
-def compute_scores_mmrec(config: Config, model: nn.Module, corpus, batch_size: int, mode: str, result_file: str, dataset: str):
+def compute_scores_mmrec(config: Config, model: nn.Module, corpus, batch_size: int, mode: str, result_file: str, dataset_size: str):
     assert mode in ['dev', 'test'], 'mode must be chosen from \'dev\' or \'test\''
     if config.dataset_name == 'ebnerd':
         corpus = EBNeRD_Corpus(config)
@@ -625,9 +630,14 @@ def compute_scores_mmrec(config: Config, model: nn.Module, corpus, batch_size: i
     with torch.no_grad():
         for data_batch in tqdm(dataloader):
             data_batch = [item.cuda(non_blocking=True) if isinstance(item, torch.Tensor) else item for item in data_batch]
-            (user_ID, _, _, user_title_text, user_title_mask, _, _, _, _, user_history_mask, _, _, _,
-             _, _, news_title_text, news_title_mask, _, _, _, _, _, _, _, _,
-             history_image_embedding, candidate_image_embedding) = data_batch
+            user_ID = data_batch[0]
+            user_title_text = data_batch[3]
+            user_title_mask = data_batch[4]
+            user_history_mask = data_batch[9]
+            news_title_text = data_batch[15]
+            news_title_mask = data_batch[16]
+            history_image_embedding = data_batch[25]
+            candidate_image_embedding = data_batch[26]
 
             news_feature = {
                 "input_ids": news_title_text,
@@ -658,7 +668,7 @@ def compute_scores_mmrec(config: Config, model: nn.Module, corpus, batch_size: i
             for j in range(len(sub_score)):
                 result[sub_score[j][1]] = j + 1
             result_f.write(('' if i == 0 else '\n') + str(i + 1) + ' ' + str(result).replace(' ', ''))
-    if dataset != 'submission' or mode != 'test':
+    if dataset_size != 'submission' or mode != 'test':
         with open(config.data_path + '/' + mode + '/ref/truth-%s.txt' % config.DATASET_ROOT, 'r', encoding='utf-8') as truth_f, open(result_file, 'r', encoding='utf-8') as result_f:
             auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = scoring(truth_f, result_f)
         return auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10
