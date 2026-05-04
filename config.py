@@ -1,6 +1,7 @@
 import os
 import argparse
 import time
+import csv
 
 import pandas as pd
 import torch
@@ -60,13 +61,13 @@ class Config:
 
     def __init__(self):
         parser = argparse.ArgumentParser()
-        parser.add_argument('--model', type=str, default='SentiRec', help='Model name: NRMS, LSTUR, TANR, DKN, NAML, NPA, FIM, MINS, CENNEWSREC, IPNR, CNE-SUE, LKPNR, SentiDebias, SentiRec, MMRec, CNRCL')
+        parser.add_argument('--model', type=str, default='SentiRec', help='Model name: NRMS, LSTUR, TANR, DKN, NAML, NPA, FIM, MINS, CENNEWSREC, IPNR, CNE-SUE, LKPNR, SentiDebias, SentiRec, MMRec, CNRCL, CPRS, DREAM')
         parser.add_argument('--batch_size', type=int, default='64', help='Batch size for training')
         parser.add_argument('--seed', type=int, default=0, help='Seed')
         parser.add_argument('--epoch', type=int, default=10, help='Epoch for training')
         parser.add_argument('--mode', type=str, default='train', help='Mode')
         parser.add_argument('--DATASET_ROOT', type=str, default='ebnerd_demo', help='Default dataset name, can be ebnerd_demo, ebnerd_small, ebnerd_large, MIND-small, or MIND-large')
-        parser.add_argument('--dataset_name', type=str, default='ebnerd', help='Name of the dataset to be used, MIND, ebnerd')
+        parser.add_argument('--dataset_name', type=str, default='ebnerd', help='Name of the dataset to be used, MIND, ebnerd, gossipcop')
         parser.add_argument('--dataset_size', type=str, default='demo', help='Dataset variant, can be small, large, or demo, if submit the predictions submission')
         parser.add_argument('--images_path', type=str, default='downloaded_images_ebnerd_small',
                             help='downloaded_images for demo or small')
@@ -269,3 +270,15 @@ class Config:
                         label_str = str(labels).replace(' ', '')
                         truth_f.write(('' if test_ID == 0 else '\n') + str(test_ID + 1) + ' ' + label_str)
 
+        elif dataset_name == 'gossipcop':
+            split_files = {
+                dev_truth_path: os.path.join(self.root, self.DATASET_ROOT, 'val.csv'),
+                test_truth_path: os.path.join(self.root, self.DATASET_ROOT, 'test.csv'),
+            }
+            for truth_path, csv_path in split_files.items():
+                if not os.path.exists(truth_path):
+                    with open(csv_path, newline='', encoding='utf-8') as csv_f:
+                        with open(truth_path, 'w', encoding='utf-8') as truth_f:
+                            for row_ID, row in enumerate(csv.DictReader(csv_f)):
+                                labels = [int(label) for label in row['clicked'].split()]
+                                truth_f.write(('' if row_ID == 0 else '\n') + str(row_ID + 1) + ' ' + str(labels).replace(' ', ''))

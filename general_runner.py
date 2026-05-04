@@ -7,6 +7,7 @@ from dataset_corpus_preprocessing.EBNeRD_corpus_CPRS import EBNeRD_Corpus as EBN
 from dataset_corpus_preprocessing.EBNeRD_corpus_TCCM import EBNeRD_Corpus as EBNeRD_Corpus_TCCM
 from dataset_corpus_preprocessing.MIND_corpus_IPNR import MIND_Corpus_IPNR
 from dataset_corpus_preprocessing.MIND_corpus_SentiRec import MIND_Corpus_SentiRec, MIND_Train_Dataset_SentiRec, MIND_DevTest_Dataset_SentiRec
+from dataset_corpus_preprocessing.Fake_MIND_corpus import Fake_MIND_Corpus, MIND_DevTest_Dataset as Fake_MIND_DevTest_Dataset
 from models.MMRec import MMRec
 from models.CNE_SUE import CNE_SUE
 from models.DKN import DKN
@@ -51,18 +52,7 @@ from dataset_corpus_preprocessing.MIND_corpus_main import MIND_DevTest_Dataset
 from base_trainer import Trainer
 
 
-def negative_log_softmax(logits):
-    loss = (-torch.log_softmax(logits, dim=1).select(dim=1, index=0)).mean()
-    return loss
-
-def negative_log_sigmoid(logits):
-    positive_sigmoid = torch.clamp(torch.sigmoid(logits[:, 0]), min=1e-15, max=1)
-    negative_sigmoid = torch.clamp(torch.sigmoid(-logits[:, 1:]), min=1e-15, max=1)
-    loss = -(torch.log(positive_sigmoid).sum() + torch.log(negative_sigmoid).sum()) / logits.numel()
-    return loss
-
-
-def train(config: Config, corpus, wandb):
+def get_model_classes():
     model_classes = {
         'TANR': TANR,
         'NAML': NAML,
@@ -83,6 +73,22 @@ def train(config: Config, corpus, wandb):
         'CPRS': CPRS,
         'TCCM': TCCM
     }
+    return model_classes
+
+
+def negative_log_softmax(logits):
+    loss = (-torch.log_softmax(logits, dim=1).select(dim=1, index=0)).mean()
+    return loss
+
+def negative_log_sigmoid(logits):
+    positive_sigmoid = torch.clamp(torch.sigmoid(logits[:, 0]), min=1e-15, max=1)
+    negative_sigmoid = torch.clamp(torch.sigmoid(-logits[:, 1:]), min=1e-15, max=1)
+    loss = -(torch.log(positive_sigmoid).sum() + torch.log(negative_sigmoid).sum()) / logits.numel()
+    return loss
+
+
+def train(config: Config, corpus, wandb):
+    model_classes = get_model_classes()
 
     if config.model not in model_classes:
         raise ValueError(f"Unknown model: {config.model}")
@@ -91,7 +97,7 @@ def train(config: Config, corpus, wandb):
     model.initialize()
 
     run_index = get_run_index(config.result_dir)
-    if config.dataset_name == 'MIND':
+    if config.dataset_name in ['MIND', 'gossipcop']:
         if config.model == 'IPNR':
             trainer = TrainerIPNR(model, config, corpus, wandb, run_index)
             trainer.train()
@@ -125,26 +131,7 @@ def train(config: Config, corpus, wandb):
 
 
 def dev(config: Config, corpus):
-    model_classes = {
-        'TANR': TANR,
-        'NAML': NAML,
-        'DKN': DKN,
-        'NRMS': NRMS,
-        'LSTUR': LSTUR,
-        'NPA': NPA,
-        'FIM': FIM,
-        'MINS': MINS,
-        'CENNEWSREC': CenNewsRec,
-        'IPNR': IPNR,
-        'CNE-SUE': CNE_SUE,
-        'LKPNR': LKPNR,
-        'SentiDebias': SentiDebias,
-        'SentiRec': SentiRec,
-        'MMRec': MMRec,
-        'CNRCL': CNRCL,
-        'CPRS': CPRS,
-        'TCCM': TCCM
-    }
+    model_classes = get_model_classes()
 
     if config.model not in model_classes:
         raise ValueError(f"Unknown model: {config.model}")
@@ -157,7 +144,7 @@ def dev(config: Config, corpus):
     dev_res_dir = os.path.join(config.dev_res_dir, config.dev_model_path.replace('\\', '_').replace('/', '_'))
     if not os.path.exists(dev_res_dir):
         os.mkdir(dev_res_dir)
-    if config.dataset_name == 'MIND':
+    if config.dataset_name in ['MIND', 'gossipcop']:
         if config.model == 'IPNR':
             auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = compute_scores_IPNR(config, model, corpus, config.batch_size, 'dev',
                                                           dev_res_dir + '/' + config.model + '.txt', config.dataset_size)
@@ -178,26 +165,7 @@ def dev(config: Config, corpus):
 
 
 def test(config: Config, corpus):
-    model_classes = {
-        'TANR': TANR,
-        'NAML': NAML,
-        'DKN': DKN,
-        'NRMS': NRMS,
-        'LSTUR': LSTUR,
-        'NPA': NPA,
-        'FIM': FIM,
-        'MINS': MINS,
-        'CENNEWSREC': CenNewsRec,
-        'IPNR': IPNR,
-        'CNE-SUE': CNE_SUE,
-        'LKPNR': LKPNR,
-        'SentiDebias': SentiDebias,
-        'SentiRec': SentiRec,
-        'MMRec': MMRec,
-        'CNRCL': CNRCL,
-        'CPRS': CPRS,
-        'TCCM': TCCM
-    }
+    model_classes = get_model_classes()
 
     if config.model not in model_classes:
         raise ValueError(f"Unknown model: {config.model}")
@@ -217,7 +185,7 @@ def test(config: Config, corpus):
         os.mkdir(test_res_dir)
     print('test model path  : ' + config.test_model_path)
     print('test output file : ' + test_res_dir + '/' + config.model + '.txt')
-    if config.dataset_name == 'MIND':
+    if config.dataset_name in ['MIND', 'gossipcop']:
         if config.model == 'IPNR':
             auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = compute_scores_IPNR(config, model, corpus, config.batch_size, 'test',
                                                           test_res_dir + '/' + config.model + '.txt', config.dataset_size)
@@ -247,6 +215,8 @@ def test(config: Config, corpus):
             dataset = MIND_DevTest_Dataset_SentiRec(corpus, 'test')
         else:
             dataset = MIND_DevTest_Dataset(corpus, 'test')
+    elif config.dataset_name == 'gossipcop':
+        dataset = Fake_MIND_DevTest_Dataset(corpus, 'test')
     
     dataloader = DataLoader(dataset, batch_size=config.batch_size, shuffle=False, num_workers=0, pin_memory=True)
     try:
@@ -322,9 +292,11 @@ if __name__ == '__main__':
             corpus = MIND_Corpus_SentiRec(config)
         else:
             corpus = MIND_Corpus(config)
+    elif config.dataset_name == 'gossipcop':
+        corpus = Fake_MIND_Corpus(config)
 
     elif config.dataset_name == 'ebnerd':
-        if config.model == 'CPRS':
+        if config.model in ['CPRS', 'DREAM']:
             corpus = EBNeRD_Corpus_CPRS(config)
         elif config.model == 'TCCM':
             corpus = EBNeRD_Corpus_TCCM(config)
@@ -347,5 +319,3 @@ if __name__ == '__main__':
         print("Start testing at: ", datetime.now())
         test(config, corpus)
         print("Finish testing at: ", datetime.now())
-
-

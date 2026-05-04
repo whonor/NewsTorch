@@ -3,6 +3,7 @@ import shutil
 import wandb
 from config import Config
 from dataset_corpus_preprocessing.MIND_corpus_main import MIND_Corpus, MIND_Train_Dataset
+from dataset_corpus_preprocessing.Fake_MIND_corpus import Fake_MIND_Corpus, MIND_Train_Dataset as Fake_MIND_Train_Dataset
 from dataset_corpus_preprocessing.EBNeRD_corpus_main import EBNeRD_Corpus, Ebnerd_Train_Dataset
 from utils._evaluation import AvgMetric
 from utils._evaluation import compute_scores
@@ -32,9 +33,14 @@ class Trainer:
                 self._corpus = _corpus
             if type(_corpus).__name__ == 'MIND_Corpus':
                 self.train_dataset = MIND_Train_Dataset(_corpus)
+        elif config.dataset_name == 'gossipcop':
+            if _corpus is None:
+                _corpus = Fake_MIND_Corpus(config)
+                self._corpus = _corpus
+            self.train_dataset = Fake_MIND_Train_Dataset(_corpus)
         elif config.dataset_name == 'ebnerd':
             if _corpus is None:
-                if config.model == 'CPRS':
+                if config.model in ['CPRS', 'DREAM']:
                     from dataset_corpus_preprocessing.EBNeRD_corpus_CPRS import EBNeRD_Corpus as EBNeRD_Corpus_CPRS
                     _corpus = EBNeRD_Corpus_CPRS(config)
                 elif config.model == 'TCCM':
@@ -44,7 +50,7 @@ class Trainer:
                     _corpus = EBNeRD_Corpus(config)
                 self._corpus = _corpus
             
-            if config.model == 'CPRS':
+            if config.model in ['CPRS', 'DREAM']:
                 from dataset_corpus_preprocessing.EBNeRD_corpus_CPRS import Ebnerd_Train_Dataset as Ebnerd_Train_Dataset_CPRS
                 self.train_dataset = Ebnerd_Train_Dataset_CPRS(_corpus)
             elif config.model == 'TCCM':
@@ -116,15 +122,24 @@ class Trainer:
                     else:
                         logits = self.model(*data_batch)
                     loss = self.loss(logits)
-                elif self.config.model == "CPRS":
-                    logits, sat_preds, s_i, valid_mask = self.model(*data_batch)
+                elif self.config.model in ["CPRS", "DREAM"]:
+                    outputs = self.model(*data_batch)
+                    logits, sat_preds, s_i, valid_mask = outputs[:4]
                     click_loss = self.loss(logits)
                     if valid_mask is not None and valid_mask.numel() > 0 and valid_mask.any():
                         sat_loss = torch.abs(s_i[valid_mask] - sat_preds[valid_mask]).mean()
                     else:
                         sat_loss = torch.tensor(0.0, device=logits.device)
-                    lambda_coef = getattr(self.config, 'cprs_lambda', 0.3)
+                    lambda_coef = getattr(self.config, 'cprs_lambda', getattr(self.config, 'dream_sat_lambda', 0.3))
                     loss = click_loss + lambda_coef * sat_loss
+                    if self.config.model == "DREAM" and len(outputs) > 4:
+                        aux_losses = outputs[4]
+                        loss = (
+                            loss
+                            + getattr(self.config, 'dream_cb_lambda', 0.1) * aux_losses.get('cb', 0.0)
+                            + getattr(self.config, 'dream_orth_lambda', 0.01) * aux_losses.get('orth', 0.0)
+                            + getattr(self.config, 'dream_adv_lambda', 0.05) * aux_losses.get('adv', 0.0)
+                        )
                 elif self.config.model == "TCCM":
                     logits = self.model(*data_batch)
                     if isinstance(logits, tuple):

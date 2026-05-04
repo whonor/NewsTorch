@@ -8,6 +8,7 @@ from dataset_corpus_preprocessing.EBNeRD_corpus_main import EBNeRD_Corpus, Ebner
 from dataset_corpus_preprocessing.MIND_corpus_IPNR import MIND_DevTest_Dataset_IPNR
 from dataset_corpus_preprocessing.MIND_corpus_main import MIND_Corpus, MIND_DevTest_Dataset
 from dataset_corpus_preprocessing.MIND_corpus_SentiRec import MIND_Corpus_SentiRec, MIND_DevTest_Dataset_SentiRec
+from dataset_corpus_preprocessing.Fake_MIND_corpus import Fake_MIND_Corpus, MIND_DevTest_Dataset as Fake_MIND_DevTest_Dataset
 from torch.utils.data import DataLoader
 
 from config import Config
@@ -55,7 +56,7 @@ def _get_model_inputs(config, data_batch):
         else:
              return tuple(data_batch[:21] + [data_batch[23], data_batch[24], data_batch[21], data_batch[22]])
     
-    elif config.model == 'IPNR' or config.model == 'TCCM':
+    elif config.model == 'IPNR' or config.model == 'TCCM' or config.model == 'DREAM':
         return data_batch
         
     else:
@@ -68,7 +69,7 @@ def _get_model_inputs(config, data_batch):
         news_content_text = data_batch[18]
         news_content_mask = data_batch[19]
         news_content_entity = data_batch[20]
-        if config.dataset_name == 'MIND':
+        if config.dataset_name in ['MIND', 'gossipcop']:
             candidate_news_index = data_batch[22]
         else:
             candidate_news_index = data_batch[24]
@@ -94,7 +95,7 @@ def _get_model_inputs(config, data_batch):
         data_batch[18] = news_content_text
         data_batch[19] = news_content_mask
         data_batch[20] = news_content_entity
-        if config.dataset_name == 'MIND':
+        if config.dataset_name in ['MIND', 'gossipcop']:
             data_batch[22] = candidate_news_index
         else:
             data_batch[24] = candidate_news_index
@@ -455,7 +456,7 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
     assert mode in ['dev', 'test'], 'mode must be chosen from \'dev\' or \'test\''
     if config.dataset_name == 'ebnerd':
         if corpus is None:
-            if config.model == 'CPRS':
+            if config.model in ['CPRS', 'DREAM']:
                 from dataset_corpus_preprocessing.EBNeRD_corpus_CPRS import EBNeRD_Corpus as EBNeRD_Corpus_CPRS
                 corpus = EBNeRD_Corpus_CPRS(config)
             elif config.model == 'TCCM':
@@ -464,7 +465,7 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
             else:
                 corpus = EBNeRD_Corpus(config)
         
-        if config.model == 'CPRS':
+        if config.model in ['CPRS', 'DREAM']:
             from dataset_corpus_preprocessing.EBNeRD_corpus_CPRS import Ebnerd_DevTest_Dataset as Ebnerd_DevTest_Dataset_CPRS
             dataset = Ebnerd_DevTest_Dataset_CPRS(corpus, mode)
         elif config.model == 'TCCM':
@@ -483,6 +484,10 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
         else:
             corpus = MIND_Corpus(config)
             dataset = MIND_DevTest_Dataset(corpus, mode)
+    elif config.dataset_name == 'gossipcop':
+        if corpus is None:
+            corpus = Fake_MIND_Corpus(config)
+        dataset = Fake_MIND_DevTest_Dataset(corpus, mode)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False,
                             num_workers=batch_size // 16, pin_memory=True)
     indices = (corpus.dev_indices if mode == 'dev' else corpus.test_indices)
@@ -531,7 +536,7 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
             news_title_mask = data_batch[16]
             news_content_text = data_batch[18]
             news_content_mask = data_batch[19]
-            if config.dataset_name == 'MIND':
+            if config.dataset_name in ['MIND', 'gossipcop']:
                 candidate_news_index = data_batch[22]
             else:
                 candidate_news_index = data_batch[24]
@@ -551,7 +556,7 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
             data_batch[16] = news_title_mask
             data_batch[18] = news_content_text
             data_batch[19] = news_content_mask
-            if config.dataset_name == 'MIND':
+            if config.dataset_name in ['MIND', 'gossipcop']:
                 data_batch[22] = candidate_news_index
             else:
                 data_batch[24] = candidate_news_index
@@ -583,8 +588,8 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
                     }
                 scores[index: index + batch_size] = model(*args, **kwargs)[0]
 
-            elif config.model == "CPRS":
-                scores[index: index + batch_size] = model(*data_batch)[0]
+            elif config.model in ["CPRS", "DREAM"]:
+                scores[index: index + batch_size] = model(*data_batch)[0].squeeze(dim=1)
             elif config.model == "TCCM":
                 out = model(*data_batch)
                 if isinstance(out, tuple):
