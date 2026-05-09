@@ -46,6 +46,9 @@ class Trainer:
                 elif config.model == 'TCCM':
                     from dataset_corpus_preprocessing.EBNeRD_corpus_TCCM import EBNeRD_Corpus as EBNeRD_Corpus_TCCM
                     _corpus = EBNeRD_Corpus_TCCM(config)
+                elif config.model == 'SEIN':
+                    from dataset_corpus_preprocessing.EBNeRD_corpus_SEIN import EBNeRD_Corpus as EBNeRD_Corpus_SEIN
+                    _corpus = EBNeRD_Corpus_SEIN(config)
                 else:
                     _corpus = EBNeRD_Corpus(config)
                 self._corpus = _corpus
@@ -56,6 +59,9 @@ class Trainer:
             elif config.model == 'TCCM':
                 from dataset_corpus_preprocessing.EBNeRD_corpus_TCCM import Ebnerd_Train_Dataset as Ebnerd_Train_Dataset_TCCM
                 self.train_dataset = Ebnerd_Train_Dataset_TCCM(_corpus)
+            elif config.model == 'SEIN':
+                from dataset_corpus_preprocessing.EBNeRD_corpus_SEIN import Ebnerd_Train_Dataset as Ebnerd_Train_Dataset_SEIN
+                self.train_dataset = Ebnerd_Train_Dataset_SEIN(_corpus)
             else:
                 self.train_dataset = Ebnerd_Train_Dataset(_corpus)
 
@@ -145,6 +151,10 @@ class Trainer:
                     if isinstance(logits, tuple):
                         logits = logits[0]
                     loss = self.loss(logits)
+                elif self.config.model == "SEIN":
+                    outputs = self.model(*data_batch)
+                    logits, aux_loss = outputs if isinstance(outputs, tuple) else (outputs, 0.0)
+                    loss = getattr(self.config, 'sein_prediction_loss_weight', 1.0) * self.loss(logits) + aux_loss
                 else:
                     logits = self.model(*data_batch[:21])  # For other models like NRMS, NPA, etc.
                     if isinstance(logits, tuple):

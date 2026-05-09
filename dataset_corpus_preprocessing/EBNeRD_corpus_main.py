@@ -166,7 +166,9 @@ class EBNeRD_Corpus:
         image_embedding_file = 'cache/ebnerd/image_embedding-%s.pkl' % config.dataset_size
         user_history_graph_file = 'cache/ebnerd/user_history_graph-' + str(config.max_history_num) + ('' if config.no_self_connection else '-self') + ('' if config.no_adjacent_normalization else '-normalize-' + config.gcn_normalization_type) + '-' + config.dataset_size + '.pkl'
         
-        preprocessed_data_files = [user_ID_file, news_ID_file, category_file, subCategory_file, vocabulary_file, word_embedding_file, entity_file, entity_embedding_file, context_embedding_file, user_history_graph_file, sentiment_file, sentiment_label_file]
+        preprocessed_data_files = [user_ID_file, news_ID_file, category_file, subCategory_file, vocabulary_file, word_embedding_file, entity_file, entity_embedding_file, context_embedding_file, sentiment_file, sentiment_label_file]
+        if config.dataset_size != 'large' and config.model in ['CNE-SUE', 'CNRCL']:
+            preprocessed_data_files.append(user_history_graph_file)
         if config.model.lower() == 'mmrec':
             preprocessed_data_files.append(image_embedding_file)
 
@@ -384,6 +386,7 @@ class EBNeRD_Corpus:
         with open('cache/ebnerd/news_ID-%s.json' % config.dataset_size, 'r', encoding='utf-8') as news_ID_f:
             self.news_ID_dict = json.load(news_ID_f)
             self.news_num = len(self.news_ID_dict)
+            config.news_num = self.news_num
 
         with open('cache/ebnerd/category-%s.json' % config.dataset_size, 'r', encoding='utf-8') as category_f:
             self.category_dict = json.load(category_f)

@@ -1,139 +1,110 @@
 #!/usr/bin/env python3
 import os
-import json
 import shutil
-import random
-import numpy as np
-import collections
+from pathlib import Path
 
 import pandas as pd
 
-# setup random seed for reproducibility
-random.seed(0)
-np.random.seed(0)
 
-root = "../"
-# root
-ebnerd_demo_dataset_root = root + '/ebnerd_demo'
-ebnerd_small_dataset_root = root + '/ebnerd_small'
-ebnerd_large_dataset_root = root + '/ebnerd_large'
+REPO_ROOT = Path(__file__).resolve().parent.parent
+DATASET_ROOTS = {
+    'ebnerd_demo': REPO_ROOT / 'ebnerd_demo',
+    'ebnerd_small': REPO_ROOT / 'ebnerd_small',
+    'ebnerd_large': REPO_ROOT / 'ebnerd_large',
+}
+
 
 def confirm_overwrite(path: str) -> bool:
     if os.path.exists(path):
-        choice = input(f"already existed: {path}，recovered？(y/N): ").strip().lower()
+        choice = input(f"already existed: {path}, recovered? (y/N): ").strip().lower()
         return choice == 'y'
     return True
 
 
-def split_training_behaviors(size, train_ratio=0.8):
-    if size == 'ebnerd_demo':
-        behavior_file = os.path.join(ebnerd_demo_dataset_root, 'download', size, 'train', 'behaviors_.parquet')
-    elif size == 'ebnerd_small':
-        behavior_file = os.path.join(ebnerd_small_dataset_root, 'download', size, 'train', 'behaviors_.parquet')
-    elif size == 'ebnerd_large':
-        behavior_file = os.path.join(ebnerd_large_dataset_root, 'download', size, 'train', 'behaviors_.parquet')
+def dataset_root(size):
+    if size not in DATASET_ROOTS:
+        raise ValueError(f"Unsupported EB-NeRD dataset size: {size}")
+    return DATASET_ROOTS[size]
 
+
+def behavior_path(root, size, split):
+    return root / 'download' / size / split / 'behaviors_.parquet'
+
+
+def split_validation_behaviors(size, dev_ratio=0.5):
+    root = dataset_root(size)
+    behavior_file = behavior_path(root, size, 'validation')
     if not os.path.exists(behavior_file):
         raise FileNotFoundError(f"behavior file does not exist: {behavior_file}")
 
-    #  pandas  parquet
     df = pd.read_parquet(behavior_file)
-
-    #
     df = df.sample(frac=1, random_state=42).reset_index(drop=True)
 
-    #
-    train_num = int(len(df) * train_ratio)
-    train_df = df.iloc[:train_num]
-    dev_df = df.iloc[train_num:]
+    dev_num = int(len(df) * dev_ratio)
+    dev_df = df.iloc[:dev_num]
+    test_df = df.iloc[dev_num:]
 
-    return train_df, dev_df
+    return dev_df, test_df
+
+
+def prepare_split(root, size, mode, source_split, behavior_df=None):
+    out_dir = root / mode
+    if os.path.exists(out_dir):
+        if not confirm_overwrite(str(out_dir)):
+            print(f"Jump {mode} dataset preparation")
+            return
+        shutil.rmtree(out_dir)
+    os.makedirs(out_dir)
+
+    dst_behavior = out_dir / 'behaviors.parquet'
+    if behavior_df is None:
+        src_behavior = behavior_path(root, size, source_split)
+        if not os.path.exists(src_behavior):
+            raise FileNotFoundError(f"behavior file does not exist: {src_behavior}")
+        shutil.copyfile(src_behavior, dst_behavior)
+    else:
+        behavior_df.to_parquet(dst_behavior, index=False)
+
+    src_news = root / 'download' / size / 'news.parquet'
+    dst_news = out_dir / 'news.parquet'
+    if not os.path.exists(src_news):
+        raise FileNotFoundError(f"news file does not exist: {src_news}")
+    shutil.copyfile(src_news, dst_news)
+
+    src_history = root / 'download' / size / source_split / 'history.parquet'
+    dst_history = out_dir / 'history.parquet'
+    if not os.path.exists(src_history):
+        raise FileNotFoundError(f"history file does not exist: {src_history}")
+    shutil.copyfile(src_history, dst_history)
+
+
+def preprocess_ebnerd(size):
+    root = dataset_root(size)
+    dev_df, test_df = split_validation_behaviors(size=size)
+
+    prepare_split(root=root, size=size, mode='train', source_split='train')
+    prepare_split(root=root, size=size, mode='dev', source_split='validation', behavior_df=dev_df)
+    prepare_split(root=root, size=size, mode='test', source_split='validation', behavior_df=test_df)
+
+    train_count = len(pd.read_parquet(behavior_path(root, size, 'train')))
+    print(f"{size}: train={train_count}, dev={len(dev_df)}, test={len(test_df)}")
 
 
 def preprocess_ebnerd_demo(size):
-    global root, mode_
-    train_df, dev_df = split_training_behaviors(size=size)
-
-    if size == 'ebnerd_demo':
-        root = ebnerd_demo_dataset_root
-    elif size == 'ebnerd_small':
-        root = ebnerd_small_dataset_root
-    elif size == 'ebnerd_large':
-        root = ebnerd_large_dataset_root
-
-    # train/dev sets
-    for mode, df in [('train', train_df), ('dev', dev_df)]:
-        out_dir = os.path.join(root, mode)
-        if os.path.exists(out_dir):
-            if not confirm_overwrite(out_dir):
-                print(f"Jump {mode} dataset preparation")
-                continue
-            shutil.rmtree(out_dir)
-        os.makedirs(out_dir)
-
-        # save behaviors.parquet
-        df.to_parquet(os.path.join(out_dir, 'behaviors.parquet'), index=False)
-
-        # copy news.parquet, history.parquet
-        src_news = os.path.join(root, 'download', size, 'news.parquet')
-        dst_news = os.path.join(out_dir, 'news.parquet')
-        if confirm_overwrite(dst_news):
-            if not os.path.exists(src_news):
-                raise FileNotFoundError(f"news file does not exist: {src_news}")
-            shutil.copyfile(src_news, dst_news)
-
-        if mode == 'dev':
-            mode_ = 'validation'
-            src_news_ = os.path.join(root, 'download', size, mode_, 'history.parquet')
-        else:
-            src_news_ = os.path.join(root, 'download', size, mode, 'history.parquet')
-        dst_news_ = os.path.join(out_dir, 'history.parquet')
-        if confirm_overwrite(dst_news):
-            if not os.path.exists(src_news):
-                raise FileNotFoundError(f"news file does not exist: {src_news}")
-            shutil.copyfile(src_news_, dst_news_)
-
-
-
-    # test set
-    test_dir = os.path.join(root, 'test')
-    if os.path.exists(test_dir):
-        if not confirm_overwrite(test_dir):
-            print("Jump test dataset preparation")
-            return
-        shutil.rmtree(test_dir)
-    os.makedirs(test_dir)
-
-    for fname in ('behaviors_.parquet', 'news.parquet', 'history.parquet'):
-        if fname == 'behaviors_.parquet':
-            src = os.path.join(root, 'download', size, 'validation', fname)
-            dst = os.path.join(test_dir, 'behaviors.parquet')
-        elif fname == 'news.parquet':
-            src = os.path.join(root, 'download', size, fname)
-            dst = os.path.join(test_dir, 'news.parquet')
-        else:
-            src = os.path.join(root, 'download', size, 'validation', fname)
-            dst = os.path.join(test_dir, 'history.parquet')
-
-        if confirm_overwrite(dst):
-            if not os.path.exists(src):
-                raise FileNotFoundError(f"File does not exist: {src}")
-            shutil.copyfile(src, dst)
-
-
+    preprocess_ebnerd(size=size)
 
 
 def main():
     print("Prepare ebnerd_demo...")
-    preprocess_ebnerd_demo(size="ebnerd_demo")
+    preprocess_ebnerd(size="ebnerd_demo")
 
     print("Prepare ebnerd_small...")
-    preprocess_ebnerd_demo(size="ebnerd_small")
+    preprocess_ebnerd(size="ebnerd_small")
 
     # print("Prepare ebnerd_large...")
-    # preprocess_ebnerd_demo(size="ebnerd_large")
+    # preprocess_ebnerd(size="ebnerd_large")
 
-    print("All datasets are finished。")
+    print("All datasets are finished.")
 
 
 if __name__ == '__main__':

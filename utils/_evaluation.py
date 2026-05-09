@@ -56,7 +56,7 @@ def _get_model_inputs(config, data_batch):
         else:
              return tuple(data_batch[:21] + [data_batch[23], data_batch[24], data_batch[21], data_batch[22]])
     
-    elif config.model == 'IPNR' or config.model == 'TCCM' or config.model == 'DREAM':
+    elif config.model == 'IPNR' or config.model == 'TCCM' or config.model == 'DREAM' or config.model == 'SEIN':
         return data_batch
         
     else:
@@ -462,6 +462,9 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
             elif config.model == 'TCCM':
                 from dataset_corpus_preprocessing.EBNeRD_corpus_TCCM import EBNeRD_Corpus as EBNeRD_Corpus_TCCM
                 corpus = EBNeRD_Corpus_TCCM(config)
+            elif config.model == 'SEIN':
+                from dataset_corpus_preprocessing.EBNeRD_corpus_SEIN import EBNeRD_Corpus as EBNeRD_Corpus_SEIN
+                corpus = EBNeRD_Corpus_SEIN(config)
             else:
                 corpus = EBNeRD_Corpus(config)
         
@@ -471,6 +474,9 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
         elif config.model == 'TCCM':
             from dataset_corpus_preprocessing.EBNeRD_corpus_TCCM import Ebnerd_DevTest_Dataset as Ebnerd_DevTest_Dataset_TCCM
             dataset = Ebnerd_DevTest_Dataset_TCCM(corpus, mode)
+        elif config.model == 'SEIN':
+            from dataset_corpus_preprocessing.EBNeRD_corpus_SEIN import Ebnerd_DevTest_Dataset as Ebnerd_DevTest_Dataset_SEIN
+            dataset = Ebnerd_DevTest_Dataset_SEIN(corpus, mode)
         else:
             from dataset_corpus_preprocessing.EBNeRD_corpus_main import Ebnerd_DevTest_Dataset
             dataset = Ebnerd_DevTest_Dataset(corpus, mode)
@@ -591,6 +597,11 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
             elif config.model in ["CPRS", "DREAM"]:
                 scores[index: index + batch_size] = model(*data_batch)[0].squeeze(dim=1)
             elif config.model == "TCCM":
+                out = model(*data_batch)
+                if isinstance(out, tuple):
+                    out = out[0]
+                scores[index: index + batch_size] = out
+            elif config.model == "SEIN":
                 out = model(*data_batch)
                 if isinstance(out, tuple):
                     out = out[0]

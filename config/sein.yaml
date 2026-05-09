@@ -1,0 +1,17 @@
+category_embedding_dim: 50
+subCategory_embedding_dim: 50
+head_num: 20
+head_dim: 20
+attention_dim: 200
+word_embedding_dim: 1024
+
+sein_hidden_dim: 256
+sein_stage_num: 5
+sein_temporal_window_days: 7
+sein_gcn_layer_num: 2
+sein_attention_heads: 4
+sein_attention_layers: 1
+sein_temperature: 0.1
+sein_prediction_loss_weight: 1.0
+sein_consistency_loss_weight: 0.01
+sein_smoothness_loss_weight: 0.01

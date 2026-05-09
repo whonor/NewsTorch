@@ -5,6 +5,7 @@ import shutil
 from dataset_corpus_preprocessing.EBNeRD_corpus_main import EBNeRD_Corpus, Ebnerd_Train_Dataset, Ebnerd_DevTest_Dataset
 from dataset_corpus_preprocessing.EBNeRD_corpus_CPRS import EBNeRD_Corpus as EBNeRD_Corpus_CPRS
 from dataset_corpus_preprocessing.EBNeRD_corpus_TCCM import EBNeRD_Corpus as EBNeRD_Corpus_TCCM
+from dataset_corpus_preprocessing.EBNeRD_corpus_SEIN import EBNeRD_Corpus as EBNeRD_Corpus_SEIN
 from dataset_corpus_preprocessing.MIND_corpus_IPNR import MIND_Corpus_IPNR
 from dataset_corpus_preprocessing.MIND_corpus_SentiRec import MIND_Corpus_SentiRec, MIND_Train_Dataset_SentiRec, MIND_DevTest_Dataset_SentiRec
 from dataset_corpus_preprocessing.Fake_MIND_corpus import Fake_MIND_Corpus, MIND_DevTest_Dataset as Fake_MIND_DevTest_Dataset
@@ -26,6 +27,7 @@ from models.CenNewsRec import CenNewsRec
 from models.SentiDebias import SentiDebias
 from models.CNRCL import CNRCL
 from models.CPRS import CPRS
+from models.SEIN import SEIN
 from models.modules.cnrcl.trainer import TrainerCNRCL
 from models.modules.ipnr.trainer import TrainerIPNR
 from models.modules.mmrec.trainer import TrainerMMRec
@@ -71,7 +73,8 @@ def get_model_classes():
         'MMRec': MMRec,
         'CNRCL': CNRCL,
         'CPRS': CPRS,
-        'TCCM': TCCM
+        'TCCM': TCCM,
+        'SEIN': SEIN
     }
     return model_classes
 
@@ -95,6 +98,8 @@ def train(config: Config, corpus, wandb):
 
     model = model_classes[config.model](config)
     model.initialize()
+    if hasattr(model, 'set_corpus'):
+        model.set_corpus(corpus)
 
     run_index = get_run_index(config.result_dir)
     if config.dataset_name in ['MIND', 'gossipcop']:
@@ -137,6 +142,8 @@ def dev(config: Config, corpus):
         raise ValueError(f"Unknown model: {config.model}")
 
     model = model_classes[config.model](config)
+    if hasattr(model, 'set_corpus'):
+        model.set_corpus(corpus)
 
     assert os.path.exists(config.dev_model_path), 'Dev model does not exist : ' + config.dev_model_path
     model.load_state_dict(torch.load(config.dev_model_path, map_location=torch.device('cpu'))[model.model_name])
@@ -171,6 +178,8 @@ def test(config: Config, corpus):
         raise ValueError(f"Unknown model: {config.model}")
 
     model = model_classes[config.model](config)
+    if hasattr(model, 'set_corpus'):
+        model.set_corpus(corpus)
 
     assert os.path.exists(config.test_model_path), 'Test model does not exist : ' + config.test_model_path
     checkpoint = torch.load(config.test_model_path, map_location=torch.device('cpu'))
@@ -207,7 +216,11 @@ def test(config: Config, corpus):
 
     # Compute complexity and inference time
     if config.dataset_name == 'ebnerd':
-        dataset = Ebnerd_DevTest_Dataset(corpus, 'test')
+        if config.model == 'SEIN':
+            from dataset_corpus_preprocessing.EBNeRD_corpus_SEIN import Ebnerd_DevTest_Dataset as Ebnerd_DevTest_Dataset_SEIN
+            dataset = Ebnerd_DevTest_Dataset_SEIN(corpus, 'test')
+        else:
+            dataset = Ebnerd_DevTest_Dataset(corpus, 'test')
     elif config.dataset_name == 'MIND':
         if config.model == 'IPNR':
             dataset = MIND_DevTest_Dataset_IPNR(corpus, 'test')
@@ -300,6 +313,8 @@ if __name__ == '__main__':
             corpus = EBNeRD_Corpus_CPRS(config)
         elif config.model == 'TCCM':
             corpus = EBNeRD_Corpus_TCCM(config)
+        elif config.model == 'SEIN':
+            corpus = EBNeRD_Corpus_SEIN(config)
         else:
             corpus = EBNeRD_Corpus(config)
 

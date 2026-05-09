@@ -247,28 +247,18 @@ class Config:
                 mkdirs(self.prediction_dir)
 
         elif dataset_name == 'ebnerd':
-            # Load parquet for dev
-            if not os.path.exists(dev_truth_path):
-                dev_df = pd.read_parquet(os.path.join(self.dev_root, 'behaviors.parquet'))
-                with open(dev_truth_path, 'w', encoding='utf-8') as truth_f:
-                    for dev_ID, row in dev_df.iterrows():
+            def write_ebnerd_truth(behaviors_path, truth_path):
+                df = pd.read_parquet(behaviors_path)
+                with open(truth_path, 'w', encoding='utf-8') as truth_f:
+                    for row_ID, row in df.iterrows():
                         labels = row['labels']
                         if hasattr(labels, 'tolist'):
                             labels = labels.tolist()
-                        # remove space if string like '0 1 1 0'
                         label_str = str(labels).replace(' ', '')
-                        truth_f.write(('' if dev_ID == 0 else '\n') + str(dev_ID + 1) + ' ' + label_str)
+                        truth_f.write(('' if row_ID == 0 else '\n') + str(row_ID + 1) + ' ' + label_str)
 
-            # Load parquet for test
-            if not os.path.exists(test_truth_path):
-                test_df = pd.read_parquet(os.path.join(self.test_root, 'behaviors.parquet'))
-                with open(test_truth_path, 'w', encoding='utf-8') as truth_f:
-                    for test_ID, row in test_df.iterrows():
-                        labels = row['labels']
-                        if hasattr(labels, 'tolist'):
-                            labels = labels.tolist()
-                        label_str = str(labels).replace(' ', '')
-                        truth_f.write(('' if test_ID == 0 else '\n') + str(test_ID + 1) + ' ' + label_str)
+            write_ebnerd_truth(os.path.join(self.dev_root, 'behaviors.parquet'), dev_truth_path)
+            write_ebnerd_truth(os.path.join(self.test_root, 'behaviors.parquet'), test_truth_path)
 
         elif dataset_name == 'gossipcop':
             split_files = {
