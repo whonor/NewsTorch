@@ -219,45 +219,29 @@ NewsTorch computes multiple evaluation metrics during validation and testing:
 Results are automatically saved to CSV files for further analysis.
 
 
-## ▶️ Web GUI
+## Limitations
 
-1. Run the following command in the project root directory to start the web service:
+NewsTorch is still under active development. The current version has the following limitations.
 
-```bash
-python run_webui.py
-```
+### LLM Reproducibility
 
-2. Open your browser and visit `http://localhost:5000` to use the Web GUI.
+LLM-assisted news recommendation is difficult to reproduce exactly, especially when API-based LLMs are used. API-based models may change over time due to backend updates, decoding randomness, provider-specific changes, rate limits, pricing changes, and access availability.
 
-### Feature Description
+To improve reproducibility, we recommend recording the LLM provider, model name, prompt template, decoding parameters, and API/local checkpoint version. Users are also encouraged to cache generated responses, embeddings, or user/news profiles. However, fully deterministic reproduction of API-based LLM results cannot be guaranteed.
 
-#### Training Models
+### Dataset Coverage
 
-1. Select "Training" mode in the Web UI
-2. Select the model and dataset to train from the dropdown menu
-3. Set the Batch Size and Epoch parameters
-4. Click the "Start Training" button to launch the training task
+The current validation mainly focuses on MIND and EB-NeRD. Although these are widely used datasets in news recommendation research, they do not cover all possible data schemas, languages, metadata fields, behavior logs, licensing requirements, or temporal evaluation protocols.
 
-#### Validating Models
+Additional dataset-specific adapters may be required to support other news recommendation datasets.
 
-1. Select "Validation" mode in the Web UI
-2. Select the model and dataset from the dropdown menu
-3. Enter the path to the pre-trained model
-4. Click the "Start Validation" button to launch the validation task
+### Model Coverage
 
-#### Testing Models
+NewsTorch currently covers representative news recommendation models, including classical neural models, graph-based models, and initial LLM-assisted models. It does not aim to exhaustively implement all state-of-the-art architectures.
 
-1. Select "Testing" mode in the Web UI
-2. Select the model and dataset from the dropdown menu
-3. Enter the path to the pre-trained model
-4. Click the "Start Testing" button to launch the testing task
+Some recent models require specialized preprocessing, external knowledge sources, proprietary modules, or large pretrained backbones. These models may require additional engineering work before being integrated into NewsTorch.
 
-#### ⚠️ Notes
-
-- Training, validation, and testing tasks will run in the background without blocking the Web interface
-- Please ensure that the selected model and dataset combination is supported
-- The model path needs to be the full path relative to the project root directory
-
+NewsTorch should therefore be viewed as an extensible benchmarking framework for controlled comparison, rather than a complete leaderboard of all news recommendation methods.
 
 ## 🤝 Contributing
 
