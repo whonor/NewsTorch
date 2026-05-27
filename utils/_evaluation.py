@@ -18,14 +18,32 @@ import json
 from sklearn.metrics import roc_auc_score
 import time
 
+
+ONCE_DIRE_MODEL_NAMES = {"ONCE"}
+
+
+def _as_score_vector(score: torch.Tensor, batch_size: int) -> torch.Tensor:
+    if score.dim() == 1:
+        return score
+    if score.dim() == 2 and score.size(1) == 1:
+        return score.squeeze(dim=1)
+    if score.numel() == batch_size:
+        return score.reshape(batch_size)
+    raise ValueError(f"Expected one score per sample, got score shape {tuple(score.shape)} for batch size {batch_size}.")
+
+
 def _get_model_inputs(config, data_batch):
     data_batch = [item.cuda(non_blocking=True) if isinstance(item, torch.Tensor) else item for item in data_batch]
-    
+
     if config.model == 'MMRec':
         user_ID = data_batch[0]
+        user_category = data_batch[1]
+        user_subCategory = data_batch[2]
         user_title_text = data_batch[3]
         user_title_mask = data_batch[4]
         user_history_mask = data_batch[9]
+        news_category = data_batch[13]
+        news_subCategory = data_batch[14]
         news_title_text = data_batch[15]
         news_title_mask = data_batch[16]
         history_image_embedding = data_batch[25]
@@ -34,19 +52,23 @@ def _get_model_inputs(config, data_batch):
         news_feature = {
             "input_ids": news_title_text,
             "attention_mask": news_title_mask,
+            "category": news_category,
+            "subCategory": news_subCategory,
             "input_imgs": candidate_image_embedding.unsqueeze(1),
             "image_loc": torch.zeros(news_title_text.shape[0], 1, 5).cuda(non_blocking=True),
         }
         history_feature = {
             "input_ids": user_title_text,
             "attention_mask": user_title_mask,
+            "category": user_category,
+            "subCategory": user_subCategory,
             "input_imgs": history_image_embedding.unsqueeze(2),
             "image_loc": torch.zeros(user_title_text.shape[0], user_title_text.shape[1], 1, 5).cuda(non_blocking=True),
         }
         # MMRec forward signature: forward(self, news_feature, history_feature, user_history_mask, label=None, compute_loss=True)
         # compute_scores_mmrec calls: model(news_feature, history_feature, user_history_mask, None, compute_loss=False)
         return (news_feature, history_feature, user_history_mask, None, False)
-    
+
     elif config.model == 'SentiRec':
         if config.dataset_name == 'MIND':
              # 0-9: user features, 10-17: news features, 18-19: sentiment, 20-21: indices
@@ -55,9 +77,36 @@ def _get_model_inputs(config, data_batch):
              return tuple(args)
         else:
              return tuple(data_batch[:21] + [data_batch[23], data_batch[24], data_batch[21], data_batch[22]])
-    
+
     elif config.model == 'IPNR' or config.model == 'TCCM' or config.model == 'DREAM' or config.model == 'SEIN':
         return data_batch
+
+    elif config.model in ONCE_DIRE_MODEL_NAMES:
+        news_category = data_batch[13].unsqueeze(dim=1)
+        news_subCategory = data_batch[14].unsqueeze(dim=1)
+        news_title_text = data_batch[15].unsqueeze(dim=1)
+        news_title_mask = data_batch[16].unsqueeze(dim=1)
+        news_title_entity = data_batch[17].unsqueeze(dim=1)
+        news_content_text = data_batch[18].unsqueeze(dim=1)
+        news_content_mask = data_batch[19].unsqueeze(dim=1)
+        news_content_entity = data_batch[20].unsqueeze(dim=1)
+        candidate_news_index = data_batch[22] if config.dataset_name in ['MIND', 'gossipcop'] else data_batch[24]
+        candidate_news_index = candidate_news_index.unsqueeze(dim=1)
+
+        data_batch = list(data_batch)
+        data_batch[13] = news_category
+        data_batch[14] = news_subCategory
+        data_batch[15] = news_title_text
+        data_batch[16] = news_title_mask
+        data_batch[17] = news_title_entity
+        data_batch[18] = news_content_text
+        data_batch[19] = news_content_mask
+        data_batch[20] = news_content_entity
+        if config.dataset_name in ['MIND', 'gossipcop']:
+            data_batch[22] = candidate_news_index
+            return tuple(data_batch[:21] + [data_batch[21], data_batch[22]])
+        data_batch[24] = candidate_news_index
+        return tuple(data_batch[:21] + [data_batch[23], data_batch[24]])
         
     else:
         user_ID = data_batch[0]
@@ -606,6 +655,12 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
                 if isinstance(out, tuple):
                     out = out[0]
                 scores[index: index + batch_size] = out
+            elif config.model in ONCE_DIRE_MODEL_NAMES:
+                if config.dataset_name in ['MIND', 'gossipcop']:
+                    args = data_batch[:21] + [data_batch[21], data_batch[22]]
+                else:
+                    args = data_batch[:21] + [data_batch[23], data_batch[24]]
+                scores[index: index + batch_size] = _as_score_vector(model(*args), batch_size)
             else:
                 scores[index: index + batch_size] = model(*data_batch[:21])
             index += batch_size
@@ -647,9 +702,13 @@ def compute_scores_mmrec(config: Config, model: nn.Module, corpus, batch_size: i
         for data_batch in tqdm(dataloader):
             data_batch = [item.cuda(non_blocking=True) if isinstance(item, torch.Tensor) else item for item in data_batch]
             user_ID = data_batch[0]
+            user_category = data_batch[1]
+            user_subCategory = data_batch[2]
             user_title_text = data_batch[3]
             user_title_mask = data_batch[4]
             user_history_mask = data_batch[9]
+            news_category = data_batch[13]
+            news_subCategory = data_batch[14]
             news_title_text = data_batch[15]
             news_title_mask = data_batch[16]
             history_image_embedding = data_batch[25]
@@ -658,12 +717,16 @@ def compute_scores_mmrec(config: Config, model: nn.Module, corpus, batch_size: i
             news_feature = {
                 "input_ids": news_title_text,
                 "attention_mask": news_title_mask,
+                "category": news_category,
+                "subCategory": news_subCategory,
                 "input_imgs": candidate_image_embedding.unsqueeze(1),
                 "image_loc": torch.zeros(news_title_text.shape[0], 1, 5).cuda(non_blocking=True),
             }
             history_feature = {
                 "input_ids": user_title_text,
                 "attention_mask": user_title_mask,
+                "category": user_category,
+                "subCategory": user_subCategory,
                 "input_imgs": history_image_embedding.unsqueeze(2),
                 "image_loc": torch.zeros(user_title_text.shape[0], user_title_text.shape[1], 1, 5).cuda(non_blocking=True),
             }

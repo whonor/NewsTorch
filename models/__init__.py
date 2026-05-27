@@ -12,6 +12,7 @@ from .MMRec import MMRec
 from .NAML import NAML
 from .NPA import NPA
 from .NRMS import NRMS
+from .ONCE_DIRE_LLAMA1_NAML import ONCE_DIRE_LLAMA1_NAML
 from .SentiDebias import SentiDebias
 from .SentiRec import SentiRec
 from .TANR import TANR

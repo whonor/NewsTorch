@@ -14,6 +14,9 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 
 
+ONCE_DIRE_MODEL_NAMES = {"ONCE"}
+
+
 class Trainer:
     def __init__(self, model: nn.Module, config: Config, _corpus, wandb, run_index: int):
         self.wandb = wandb
@@ -155,6 +158,9 @@ class Trainer:
                     outputs = self.model(*data_batch)
                     logits, aux_loss = outputs if isinstance(outputs, tuple) else (outputs, 0.0)
                     loss = getattr(self.config, 'sein_prediction_loss_weight', 1.0) * self.loss(logits) + aux_loss
+                elif self.config.model in ONCE_DIRE_MODEL_NAMES:
+                    logits = self.model(*data_batch[:21], data_batch[21], data_batch[22])
+                    loss = self.loss(logits)
                 else:
                     logits = self.model(*data_batch[:21])  # For other models like NRMS, NPA, etc.
                     if isinstance(logits, tuple):

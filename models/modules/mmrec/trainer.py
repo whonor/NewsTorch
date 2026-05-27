@@ -18,8 +18,8 @@ class TrainerMMRec(Trainer):
             model = nn.DataParallel(model)
 
         for e in tqdm(range(1, self.epoch + 1)):
-            if self.config.dataset_name == 'MIND':
-                 self.train_dataset.negative_sampling() # MMRec uses ebnerd which doesn't need this
+            if hasattr(self.train_dataset, 'negative_sampling'):
+                self.train_dataset.negative_sampling()
             
             train_dataloader = DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.batch_size // 16, pin_memory=True)
             model.train()
@@ -27,19 +27,23 @@ class TrainerMMRec(Trainer):
 
             for data_tuple in tqdm(train_dataloader):
                 data_tuple = [item.cuda(non_blocking=True) if isinstance(item, torch.Tensor) else item for item in data_tuple]
-                (user_ID, _, _, user_title_text, user_title_mask, _, _, _, _, user_history_mask, _, _, _,
-                 _, _, news_title_text, news_title_mask, _, _, _, _, _, _, _, _,
+                (user_ID, user_category, user_subCategory, user_title_text, user_title_mask, _, _, _, _, user_history_mask, _, _, _,
+                 news_category, news_subCategory, news_title_text, news_title_mask, _, _, _, _, _, _, _, _,
                  history_image_embedding, candidate_image_embedding) = data_tuple
 
                 news_feature = {
                     "input_ids": news_title_text,
                     "attention_mask": news_title_mask,
+                    "category": news_category,
+                    "subCategory": news_subCategory,
                     "input_imgs": candidate_image_embedding.unsqueeze(2),
                     "image_loc": torch.zeros(news_title_text.shape[0], news_title_text.shape[1], 1, 5).cuda(non_blocking=True),
                 }
                 history_feature = {
                     "input_ids": user_title_text,
                     "attention_mask": user_title_mask,
+                    "category": user_category,
+                    "subCategory": user_subCategory,
                     "input_imgs": history_image_embedding.unsqueeze(2),
                     "image_loc": torch.zeros(user_title_text.shape[0], user_title_text.shape[1], 1, 5).cuda(non_blocking=True),
                 }

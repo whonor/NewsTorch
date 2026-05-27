@@ -61,7 +61,7 @@ class Config:
 
     def __init__(self):
         parser = argparse.ArgumentParser()
-        parser.add_argument('--model', type=str, default='SentiRec', help='Model name: NRMS, LSTUR, TANR, DKN, NAML, NPA, FIM, MINS, CENNEWSREC, IPNR, CNE-SUE, LKPNR, SentiDebias, SentiRec, MMRec, CNRCL, CPRS, DREAM')
+        parser.add_argument('--model', type=str, default='SentiRec', help='Model name: NRMS, LSTUR, TANR, DKN, NAML, NPA, FIM, MINS, CENNEWSREC, IPNR, CNE-SUE, LKPNR, SentiDebias, SentiRec, MMRec, CNRCL, CPRS, DREAM, ONCE')
         parser.add_argument('--batch_size', type=int, default='64', help='Batch size for training')
         parser.add_argument('--seed', type=int, default=0, help='Seed')
         parser.add_argument('--epoch', type=int, default=10, help='Epoch for training')

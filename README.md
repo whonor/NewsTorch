@@ -71,6 +71,7 @@ With NewsTorch, researchers and practitioners can quickly implement and evaluate
 | CNE-SUE | Neural News Recommendation with Collaborative News Encoding and Structural User Encoding | 2021 | Graph-based | models/CNE_SUE.py  general_runner.py                                 | config/cne-sue.yaml   | None                                                                                                                                                            |
 | IPNR | Intention-aware user modeling for personalized news recommendation | 2023 | Graph-based | models/IPNR.py models/modules/ipnr Conceptgraph general_runner.py    | config/ipnr.yaml      | First to download and execute Conceptgraph to generate graph data [here](https://drive.google.com/file/d/1rih15bSlXTHZg-JNdtxSoS3uiVfjjIyX/view?usp=sharing)    |
 | LKPNR | LKPNR: Large Language Models and Knowledge Graph for Personalized News Recommendation Framework | 2024 | LLM-based | models/LKPNR.py models/modules/LKPNR  KGraph_LKPNR general_runner.py | config/lkpnr.yaml | First to download and execute KGraph_LKPNR to generate required data [here](https://drive.google.com/file/d/1eGiw6Cg7yH-bdjcXJnIBmRjjPlVde69s/view?usp=sharing) |
+| ONCE | ONCE: Boosting Content-based Recommendation with Both Open- and Closed-source Large Language Models | 2024 | LLM-based | models/ONCE_DIRE_LLAMA1_NAML.py general_runner.py | config/once.yaml | Reproduces ONCE-DIRE-LLAMA with NAML-style user modeling. Requires local or Hugging Face-accessible LLaMA weights. Builds a cached lower-layer hidden-state store before training. |
 
 
 ## 🛠️ Installation
@@ -141,6 +142,12 @@ To train a model (e.g., NRMS) on the MIND dataset:
 
 ```bash
 python general_runner.py --model=NRMS --batch_size=64 --epoch=10
+```
+
+To train the ONCE-DIRE reproduction on MIND, set the LLaMA checkpoint in `config/once.yaml` or set `ONCE_LLAMA_MODEL`. For gated Meta checkpoints, request Hugging Face access and authenticate with `huggingface-cli login` or `HF_TOKEN`.
+
+```bash
+python general_runner.py --dataset_name=MIND --DATASET_ROOT=MIND-small --dataset_size=small --model=ONCE --batch_size=64 --epoch=10
 ```
 
 To test a trained model:

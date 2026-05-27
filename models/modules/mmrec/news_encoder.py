@@ -1,3 +1,6 @@
+import os
+import pickle
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -75,12 +78,20 @@ class NewsEncoder(nn.Module):
 
     def __init__(self, config):
         super().__init__()
+        self.config = config
         self.max_title_length = config.max_title_length
         self.hidden_dim = getattr(config, "mmrec_hidden_dim", getattr(config, "bi_hidden_size", 400))
-        self.word_embedding_dim = getattr(config, "word_embedding_dim", self.hidden_dim)
         self.vocab_size = getattr(config, "vocabulary_size", getattr(config, "vocab_size", 30522))
         self.image_embedding_dim = getattr(config, "image_embedding_dim", 2048)
         self.dropout_prob = getattr(config, "dropout_prob", getattr(config, "dropout_rate", 0.1))
+        self.pretrained_word_embedding_path = self._word_embedding_path(config)
+        pretrained_word_embedding = self._load_pretrained_word_embedding()
+        self.word_embedding_dim = (
+            pretrained_word_embedding.size(1)
+            if pretrained_word_embedding is not None
+            else getattr(config, "word_embedding_dim", self.hidden_dim)
+        )
+        self._pretrained_word_embedding = pretrained_word_embedding
 
         head_num = getattr(config, "mmrec_head_num", getattr(config, "head_num", 8))
         head_num = max(1, min(head_num, self.hidden_dim))
@@ -93,6 +104,18 @@ class NewsEncoder(nn.Module):
         self.word_embedding = nn.Embedding(self.vocab_size, self.word_embedding_dim, padding_idx=0)
         self.text_projection = nn.Linear(self.word_embedding_dim, self.hidden_dim)
         self.image_projection = nn.Linear(self.image_embedding_dim, self.hidden_dim)
+        self.use_metadata = getattr(config, "mmrec_use_metadata", True) and all(
+            hasattr(config, attr)
+            for attr in ("category_num", "subCategory_num", "category_embedding_dim", "subCategory_embedding_dim")
+        )
+        if self.use_metadata:
+            self.category_embedding = nn.Embedding(config.category_num, config.category_embedding_dim)
+            self.subCategory_embedding = nn.Embedding(config.subCategory_num, config.subCategory_embedding_dim)
+            self.metadata_projection = nn.Linear(
+                config.category_embedding_dim + config.subCategory_embedding_dim,
+                self.hidden_dim,
+            )
+            self.metadata_norm = nn.LayerNorm(self.hidden_dim)
         self.position_embedding = nn.Embedding(self.max_title_length, self.hidden_dim)
         self.text_self_attention = nn.MultiheadAttention(
             embed_dim=self.hidden_dim,
@@ -118,22 +141,81 @@ class NewsEncoder(nn.Module):
 
         self.initialize()
 
+    def _word_embedding_path(self, config):
+        file_name = (
+            'word_embedding-'
+            + str(config.word_threshold)
+            + '-'
+            + str(config.word_embedding_dim)
+            + '-'
+            + config.tokenizer
+            + '-'
+            + str(config.max_title_length)
+            + '-'
+            + str(config.max_abstract_length)
+            + '-'
+            + config.dataset_size
+            + '.pkl'
+        )
+        if getattr(config, "dataset_name", None) == 'MIND':
+            if getattr(config, "model", None) == 'IPNR':
+                return os.path.join('cache', 'IPNR', file_name)
+            return os.path.join('cache', file_name)
+        if getattr(config, "dataset_name", None) == 'ebnerd':
+            return os.path.join('cache', config.dataset_name, file_name)
+        return None
+
+    def _load_pretrained_word_embedding(self):
+        if not getattr(self.config, "mmrec_use_pretrained_word_embedding", True):
+            return None
+        if self.pretrained_word_embedding_path is None or not os.path.exists(self.pretrained_word_embedding_path):
+            return None
+        with open(self.pretrained_word_embedding_path, 'rb') as word_embedding_f:
+            embedding = pickle.load(word_embedding_f)
+        embedding = torch.as_tensor(embedding, dtype=torch.float32)
+        if embedding.dim() != 2:
+            raise ValueError(
+                f"Expected a 2D word embedding matrix at {self.pretrained_word_embedding_path}, "
+                f"got shape {tuple(embedding.shape)}."
+            )
+        return embedding
+
     def initialize(self):
-        nn.init.normal_(self.word_embedding.weight, mean=0.0, std=0.02)
+        pretrained_word_embedding = self._pretrained_word_embedding
+        if pretrained_word_embedding is None:
+            pretrained_word_embedding = self._load_pretrained_word_embedding()
+
+        if pretrained_word_embedding is None:
+            nn.init.normal_(self.word_embedding.weight, mean=0.0, std=0.02)
+        else:
+            nn.init.normal_(self.word_embedding.weight, mean=0.0, std=0.02)
+            row_num = min(self.word_embedding.weight.size(0), pretrained_word_embedding.size(0))
+            col_num = min(self.word_embedding.weight.size(1), pretrained_word_embedding.size(1))
+            with torch.no_grad():
+                self.word_embedding.weight[:row_num, :col_num].copy_(pretrained_word_embedding[:row_num, :col_num])
         nn.init.zeros_(self.word_embedding.weight[0])
+        self.word_embedding.weight.requires_grad = not getattr(self.config, "mmrec_freeze_word_embedding", False)
         nn.init.normal_(self.position_embedding.weight, mean=0.0, std=0.02)
+        if self.use_metadata:
+            nn.init.uniform_(self.category_embedding.weight, -0.1, 0.1)
+            nn.init.uniform_(self.subCategory_embedding.weight, -0.1, 0.1)
         for module in self.modules():
             if isinstance(module, nn.Linear):
                 nn.init.xavier_uniform_(module.weight)
                 if module.bias is not None:
                     nn.init.zeros_(module.bias)
+        self._pretrained_word_embedding = None
 
-    def _flatten_news(self, input_ids, attention_mask, input_imgs, image_attention_mask):
+    def _flatten_news(self, input_ids, attention_mask, input_imgs, image_attention_mask, category, subCategory):
         if input_ids.dim() == 3:
             batch_size, news_num, seq_len = input_ids.shape
             input_ids = input_ids.reshape(batch_size * news_num, seq_len)
             if attention_mask is not None:
                 attention_mask = attention_mask.reshape(batch_size * news_num, seq_len)
+            if category is not None:
+                category = category.reshape(batch_size * news_num)
+            if subCategory is not None:
+                subCategory = subCategory.reshape(batch_size * news_num)
 
             if input_imgs.dim() == 3:
                 input_imgs = input_imgs.unsqueeze(2)
@@ -144,15 +226,40 @@ class NewsEncoder(nn.Module):
             reshape_to = (batch_size, news_num)
         else:
             reshape_to = None
+            if category is not None:
+                category = category.reshape(-1)
+            if subCategory is not None:
+                subCategory = subCategory.reshape(-1)
             if input_imgs.dim() == 2:
                 input_imgs = input_imgs.unsqueeze(1)
 
-        return input_ids, attention_mask, input_imgs, image_attention_mask, reshape_to
+        return input_ids, attention_mask, input_imgs, image_attention_mask, category, subCategory, reshape_to
+
+    def _add_metadata(self, pooled_text, category, subCategory):
+        if not self.use_metadata or category is None or subCategory is None:
+            return pooled_text
+
+        category = category.to(dtype=torch.long, device=pooled_text.device).clamp(
+            min=0,
+            max=self.category_embedding.num_embeddings - 1,
+        )
+        subCategory = subCategory.to(dtype=torch.long, device=pooled_text.device).clamp(
+            min=0,
+            max=self.subCategory_embedding.num_embeddings - 1,
+        )
+        metadata = torch.cat(
+            [self.category_embedding(category), self.subCategory_embedding(subCategory)],
+            dim=-1,
+        )
+        metadata = self.metadata_projection(self.dropout(metadata))
+        return self.metadata_norm(pooled_text + metadata)
 
     def forward(
         self,
         input_ids,
         input_imgs,
+        category=None,
+        subCategory=None,
         image_loc=None,
         token_type_ids=None,
         attention_mask=None,
@@ -162,11 +269,13 @@ class NewsEncoder(nn.Module):
     ):
         del image_loc, token_type_ids, co_attention_mask, output_all_encoded_layers
 
-        input_ids, attention_mask, input_imgs, image_attention_mask, reshape_to = self._flatten_news(
+        input_ids, attention_mask, input_imgs, image_attention_mask, category, subCategory, reshape_to = self._flatten_news(
             input_ids,
             attention_mask,
             input_imgs,
             image_attention_mask,
+            category,
+            subCategory,
         )
 
         if attention_mask is None:
@@ -209,6 +318,7 @@ class NewsEncoder(nn.Module):
 
         pooled_text = self.text_pooler(text_feature, attention_mask)
         pooled_image = self.image_pooler(image_feature, image_attention_mask)
+        pooled_text = self._add_metadata(pooled_text, category, subCategory)
 
         if reshape_to is not None:
             pooled_text = pooled_text.view(*reshape_to, self.hidden_dim)

@@ -28,6 +28,7 @@ from models.SentiDebias import SentiDebias
 from models.CNRCL import CNRCL
 from models.CPRS import CPRS
 from models.SEIN import SEIN
+from models.ONCE_DIRE_LLAMA1_NAML import ONCE_DIRE_LLAMA1_NAML
 from models.modules.cnrcl.trainer import TrainerCNRCL
 from models.modules.ipnr.trainer import TrainerIPNR
 from models.modules.mmrec.trainer import TrainerMMRec
@@ -74,7 +75,8 @@ def get_model_classes():
         'CNRCL': CNRCL,
         'CPRS': CPRS,
         'TCCM': TCCM,
-        'SEIN': SEIN
+        'SEIN': SEIN,
+        'ONCE': ONCE_DIRE_LLAMA1_NAML
     }
     return model_classes
 
@@ -160,9 +162,14 @@ def dev(config: Config, corpus):
                                                      'dev',
                                                      dev_res_dir + '/' + config.model + '.txt', config.dataset_size)
     elif config.dataset_name == 'ebnerd':
-        auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = compute_scores(config, model, corpus, config.batch_size,
-                                                 'dev',
-                                                 dev_res_dir + '/' + config.model + '.txt', config.dataset_size)
+        if config.model == 'MMRec':
+            auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = compute_scores_mmrec(config, model, corpus, config.batch_size,
+                                                     'dev',
+                                                     dev_res_dir + '/' + config.model + '.txt', config.dataset_size)
+        else:
+            auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = compute_scores(config, model, corpus, config.batch_size,
+                                                     'dev',
+                                                     dev_res_dir + '/' + config.model + '.txt', config.dataset_size)
 
     print('Dev : ' + config.dev_model_path)
     print('AUC : %.4f\nMRR : %.4f\nnDCG@5 : %.4f\nnDCG@10 : %.4f\nMAE : %.4f\nRMSE : %.4f\nrecall@5 : %.4f'
