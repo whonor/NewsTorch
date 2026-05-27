@@ -1,4 +1,6 @@
+import csv
 import os
+import pickle
 import torch
 import torch.nn as nn
 from torchmetrics import MeanSquaredError, MeanAbsoluteError
@@ -7,6 +9,7 @@ from tqdm import tqdm
 from dataset_corpus_preprocessing.EBNeRD_corpus_main import EBNeRD_Corpus, Ebnerd_DevTest_Dataset
 from dataset_corpus_preprocessing.MIND_corpus_IPNR import MIND_DevTest_Dataset_IPNR
 from dataset_corpus_preprocessing.MIND_corpus_main import MIND_Corpus, MIND_DevTest_Dataset
+from dataset_corpus_preprocessing.MIND_corpus_SentiDebias import MIND_Corpus_SentiDebias, MIND_DevTest_Dataset_SentiDebias
 from dataset_corpus_preprocessing.MIND_corpus_SentiRec import MIND_Corpus_SentiRec, MIND_DevTest_Dataset_SentiRec
 from dataset_corpus_preprocessing.Fake_MIND_corpus import Fake_MIND_Corpus, MIND_DevTest_Dataset as Fake_MIND_DevTest_Dataset
 from torch.utils.data import DataLoader
@@ -20,6 +23,41 @@ import time
 
 
 ONCE_DIRE_MODEL_NAMES = {"ONCE"}
+CLICKBAIT_SCORE_ATTRS = (
+    "news_clickbait_scores",
+    "news_clickbait_score",
+    "news_clickbait",
+    "clickbait_scores",
+    "clickbait_score",
+    "clickbait",
+    "news_mllm_clickbait_scores",
+    "news_mllm_clickbait_score",
+    "mllm_clickbait_scores",
+    "mllm_clickbait_score",
+    "mllm_scores",
+)
+CLICKBAIT_SCORE_KEYS = (
+    "clickbait_score",
+    "clickbait",
+    "bait_score",
+    "mllm_clickbait_score",
+    "mllm_score",
+    "score",
+)
+CLICKBAIT_ID_KEYS = ("news_id", "news_ID", "article_id", "article_ID", "nid", "id")
+CLICKBAIT_CACHE_STEMS = (
+    "clickbait",
+    "clickbait_score",
+    "clickbait_scores",
+    "news_clickbait",
+    "news_clickbait_score",
+    "news_clickbait_scores",
+    "mllm_clickbait",
+    "mllm_clickbait_score",
+    "mllm_clickbait_scores",
+    "mllm_scores",
+    "visual_clickbait_scores",
+)
 
 
 def _as_score_vector(score: torch.Tensor, batch_size: int) -> torch.Tensor:
@@ -292,6 +330,240 @@ def RMSE_score(y_true: np.ndarray, y_score: np.ndarray) -> float:
     score = rmse(y_score, y_true)
     return score
 
+def tce_at_k(clickbait_scores, k=5):
+    """
+    Top-K Clickbait Exposure: average valid clickbait score among the top-k items.
+
+    Missing MLLM scores are encoded as values outside [0, 1] in the corpus cache;
+    those are ignored so missing annotations do not look like low exposure.
+    """
+    valid_scores = []
+    for score in clickbait_scores[:k]:
+        try:
+            score = float(score)
+        except (TypeError, ValueError):
+            continue
+        if np.isfinite(score) and 0.0 <= score <= 1.0:
+            valid_scores.append(score)
+    return float(np.mean(valid_scores)) if valid_scores else float("nan")
+
+
+def _coerce_clickbait_value(value):
+    if isinstance(value, dict):
+        for key in CLICKBAIT_SCORE_KEYS:
+            if key in value:
+                return _coerce_clickbait_value(value[key])
+        return float("nan")
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return float("nan")
+
+
+def _clickbait_array_from_mapping(raw_scores, corpus):
+    news_num = getattr(corpus, "news_num", None)
+    news_id_dict = getattr(corpus, "news_ID_dict", None)
+    if news_num is None:
+        return None
+
+    clickbait_scores = np.full(news_num, np.nan, dtype=np.float32)
+    for raw_key, raw_value in raw_scores.items():
+        index = None
+        if news_id_dict is not None and raw_key in news_id_dict:
+            index = news_id_dict[raw_key]
+        else:
+            try:
+                index = int(raw_key)
+            except (TypeError, ValueError):
+                index = None
+
+        if index is not None and 0 <= index < news_num:
+            clickbait_scores[index] = _coerce_clickbait_value(raw_value)
+    return clickbait_scores
+
+
+def _clickbait_array_from_records(raw_scores, corpus):
+    news_num = getattr(corpus, "news_num", None)
+    news_id_dict = getattr(corpus, "news_ID_dict", None)
+    if news_num is None or news_id_dict is None:
+        return None
+
+    clickbait_scores = np.full(news_num, np.nan, dtype=np.float32)
+    for record in raw_scores:
+        if not isinstance(record, dict):
+            return None
+
+        news_id = None
+        for key in CLICKBAIT_ID_KEYS:
+            if key in record:
+                news_id = str(record[key])
+                break
+        if news_id is None or news_id not in news_id_dict:
+            continue
+
+        score = float("nan")
+        for key in CLICKBAIT_SCORE_KEYS:
+            if key in record:
+                score = _coerce_clickbait_value(record[key])
+                break
+        clickbait_scores[news_id_dict[news_id]] = score
+    return clickbait_scores
+
+
+def _normalize_clickbait_scores(raw_scores, corpus):
+    if raw_scores is None:
+        return None
+
+    news_num = getattr(corpus, "news_num", None)
+    if isinstance(raw_scores, torch.Tensor):
+        raw_scores = raw_scores.detach().cpu().numpy()
+
+    if isinstance(raw_scores, np.ndarray):
+        try:
+            scores = raw_scores.astype(np.float32, copy=False).reshape(-1)
+        except (TypeError, ValueError):
+            scores = np.array([_coerce_clickbait_value(score) for score in raw_scores.reshape(-1)], dtype=np.float32)
+        if news_num is None or len(scores) == news_num:
+            return scores
+        return None
+
+    if isinstance(raw_scores, dict):
+        return _clickbait_array_from_mapping(raw_scores, corpus)
+
+    if isinstance(raw_scores, (list, tuple)):
+        if raw_scores and isinstance(raw_scores[0], dict):
+            return _clickbait_array_from_records(raw_scores, corpus)
+        scores = np.array([_coerce_clickbait_value(score) for score in raw_scores], dtype=np.float32)
+        if news_num is None or len(scores) == news_num:
+            return scores
+
+    return None
+
+
+def _load_clickbait_csv(path, corpus):
+    with open(path, newline="", encoding="utf-8") as score_f:
+        return _clickbait_array_from_records(csv.DictReader(score_f), corpus)
+
+
+def _load_clickbait_parquet(path, corpus):
+    import pandas as pd
+
+    raw_scores = pd.read_parquet(path).to_dict("records")
+    return _clickbait_array_from_records(raw_scores, corpus)
+
+
+def _load_clickbait_cache(path, corpus):
+    if path.endswith(".json"):
+        with open(path, "r", encoding="utf-8") as score_f:
+            raw_scores = json.load(score_f)
+        return _normalize_clickbait_scores(raw_scores, corpus)
+    if path.endswith(".pkl"):
+        with open(path, "rb") as score_f:
+            raw_scores = pickle.load(score_f)
+        return _normalize_clickbait_scores(raw_scores, corpus)
+    if path.endswith(".csv"):
+        return _load_clickbait_csv(path, corpus)
+    if path.endswith(".parquet"):
+        return _load_clickbait_parquet(path, corpus)
+    return None
+
+
+def _has_valid_clickbait_scores(clickbait_scores):
+    if clickbait_scores is None:
+        return False
+    scores = np.asarray(clickbait_scores, dtype=np.float32)
+    return bool(np.any(np.isfinite(scores) & (0.0 <= scores) & (scores <= 1.0)))
+
+
+def _candidate_clickbait_cache_paths(config):
+    cache_dirs = ["cache"]
+    if getattr(config, "dataset_name", None) == "ebnerd":
+        cache_dirs.insert(0, os.path.join("cache", "ebnerd"))
+    data_root = getattr(config, "DATASET_ROOT", None)
+    if data_root:
+        cache_dirs.append(os.path.join("cache", data_root))
+
+    suffixes = [getattr(config, "dataset_size", None), data_root]
+    suffixes = [suffix for suffix in suffixes if suffix]
+    paths = []
+    for cache_dir in cache_dirs:
+        for stem in CLICKBAIT_CACHE_STEMS:
+            for extension in ("json", "pkl", "csv", "parquet"):
+                paths.append(os.path.join(cache_dir, f"{stem}.{extension}"))
+                for suffix in suffixes:
+                    paths.append(os.path.join(cache_dir, f"{stem}-{suffix}.{extension}"))
+                    paths.append(os.path.join(cache_dir, f"{stem}_{suffix}.{extension}"))
+    return list(dict.fromkeys(paths))
+
+
+def get_clickbait_scores(config, corpus):
+    explicit_path = getattr(config, "clickbait_score_path", "")
+    if explicit_path and os.path.exists(explicit_path):
+        clickbait_scores = _load_clickbait_cache(explicit_path, corpus)
+        if _has_valid_clickbait_scores(clickbait_scores):
+            return clickbait_scores
+
+    for attr in CLICKBAIT_SCORE_ATTRS:
+        if hasattr(corpus, attr):
+            clickbait_scores = _normalize_clickbait_scores(getattr(corpus, attr), corpus)
+            if _has_valid_clickbait_scores(clickbait_scores):
+                return clickbait_scores
+
+    for path in _candidate_clickbait_cache_paths(config):
+        if not os.path.exists(path):
+            continue
+        clickbait_scores = _load_clickbait_cache(path, corpus)
+        if _has_valid_clickbait_scores(clickbait_scores):
+            return clickbait_scores
+
+    return None
+
+
+def _get_candidate_news_indices(corpus, mode):
+    behaviors = getattr(corpus, f"{mode}_behaviors", None)
+    if behaviors is None:
+        return None
+
+    candidate_news_indices = []
+    for behavior in behaviors:
+        try:
+            candidate_news_indices.append(int(behavior[3]))
+        except (IndexError, TypeError, ValueError):
+            return None
+    return candidate_news_indices
+
+
+def _build_sub_scores(indices, scores, candidate_news_indices=None):
+    sub_scores = [[] for _ in range(indices[-1] + 1)]
+    has_candidate_news_indices = (
+        candidate_news_indices is not None and len(candidate_news_indices) == len(scores)
+    )
+    for i, index in enumerate(indices):
+        entry = [scores[i], len(sub_scores[index])]
+        if has_candidate_news_indices:
+            entry.append(candidate_news_indices[i])
+        sub_scores[index].append(entry)
+    return sub_scores
+
+
+def _compute_tce_from_sub_scores(sub_scores, clickbait_scores, k=5):
+    if clickbait_scores is None:
+        return float("nan")
+
+    tces = []
+    for sub_score in sub_scores:
+        if not sub_score or len(sub_score[0]) < 3:
+            continue
+        ranked_clickbait_scores = [
+            clickbait_scores[entry[2]]
+            for entry in sorted(sub_score, key=lambda x: x[0], reverse=True)
+            if 0 <= entry[2] < len(clickbait_scores)
+        ]
+        tces.append(tce_at_k(ranked_clickbait_scores, k))
+
+    valid_tces = [score for score in tces if np.isfinite(score)]
+    return float(np.mean(valid_tces)) if valid_tces else float("nan")
+
 def recall_at_k(y_true, y_score, k=5):
     """
     Compute Recall@k using numpy for efficiency.
@@ -483,9 +755,11 @@ def compute_scores_IPNR(config: Config, model: nn.Module, mind_corpus: MIND_Corp
             scores[index: index+batch_size] = model(*data_batch).squeeze(dim=1) # [batch_size]
             index += batch_size
     scores = scores.tolist()
-    sub_scores = [[] for _ in range(indices[-1] + 1)]
-    for i, index in enumerate(indices):
-        sub_scores[index].append([scores[i], len(sub_scores[index])])
+    candidate_news_indices = _get_candidate_news_indices(mind_corpus, mode)
+    clickbait_scores = get_clickbait_scores(config, mind_corpus)
+    sub_scores = _build_sub_scores(indices, scores, candidate_news_indices)
+    tce5 = _compute_tce_from_sub_scores(sub_scores, clickbait_scores, 5)
+    tce10 = _compute_tce_from_sub_scores(sub_scores, clickbait_scores, 10)
     with open(result_file, 'w', encoding='utf-8') as result_f:
         for i, sub_score in enumerate(sub_scores):
             sub_score.sort(key=lambda x: x[0], reverse=True)
@@ -496,12 +770,12 @@ def compute_scores_IPNR(config: Config, model: nn.Module, mind_corpus: MIND_Corp
     if dataset != 'submission' or mode != 'test':
         with open("./cache/" + mode + '/ref/truth-%s.txt' % config.DATASET_ROOT, 'r', encoding='utf-8') as truth_f, open(result_file, 'r', encoding='utf-8') as result_f:
             auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = scoring(truth_f, result_f)
-        return auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10
+        return auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10, tce5, tce10
     else:
-        return None, None, None, None, None, None, None, None, None, None, None, None
+        return None, None, None, None, None, None, None, None, None, None, None, None, tce5, tce10
 
 
-def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mode: str, result_file: str, dataset: str):
+def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mode: str, result_file: str, dataset_size: str):
     assert mode in ['dev', 'test'], 'mode must be chosen from \'dev\' or \'test\''
     if config.dataset_name == 'ebnerd':
         if corpus is None:
@@ -519,31 +793,31 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
         
         if config.model in ['CPRS', 'DREAM']:
             from dataset_corpus_preprocessing.EBNeRD_corpus_CPRS import Ebnerd_DevTest_Dataset as Ebnerd_DevTest_Dataset_CPRS
-            dataset = Ebnerd_DevTest_Dataset_CPRS(corpus, mode)
+            devtest_dataset = Ebnerd_DevTest_Dataset_CPRS(corpus, mode)
         elif config.model == 'TCCM':
             from dataset_corpus_preprocessing.EBNeRD_corpus_TCCM import Ebnerd_DevTest_Dataset as Ebnerd_DevTest_Dataset_TCCM
-            dataset = Ebnerd_DevTest_Dataset_TCCM(corpus, mode)
+            devtest_dataset = Ebnerd_DevTest_Dataset_TCCM(corpus, mode)
         elif config.model == 'SEIN':
             from dataset_corpus_preprocessing.EBNeRD_corpus_SEIN import Ebnerd_DevTest_Dataset as Ebnerd_DevTest_Dataset_SEIN
-            dataset = Ebnerd_DevTest_Dataset_SEIN(corpus, mode)
+            devtest_dataset = Ebnerd_DevTest_Dataset_SEIN(corpus, mode)
         else:
             from dataset_corpus_preprocessing.EBNeRD_corpus_main import Ebnerd_DevTest_Dataset
-            dataset = Ebnerd_DevTest_Dataset(corpus, mode)
+            devtest_dataset = Ebnerd_DevTest_Dataset(corpus, mode)
     elif config.dataset_name == 'MIND':
         if config.model == 'SentiRec':
             corpus = MIND_Corpus_SentiRec(config)
-            dataset = MIND_DevTest_Dataset_SentiRec(corpus, mode)
+            devtest_dataset = MIND_DevTest_Dataset_SentiRec(corpus, mode)
         elif config.model == 'SentiDebias':
             corpus = MIND_Corpus_SentiDebias(config)
-            dataset = MIND_DevTest_Dataset_SentiDebias(corpus, mode)
+            devtest_dataset = MIND_DevTest_Dataset_SentiDebias(corpus, mode)
         else:
             corpus = MIND_Corpus(config)
-            dataset = MIND_DevTest_Dataset(corpus, mode)
+            devtest_dataset = MIND_DevTest_Dataset(corpus, mode)
     elif config.dataset_name == 'gossipcop':
         if corpus is None:
             corpus = Fake_MIND_Corpus(config)
-        dataset = Fake_MIND_DevTest_Dataset(corpus, mode)
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False,
+        devtest_dataset = Fake_MIND_DevTest_Dataset(corpus, mode)
+    dataloader = DataLoader(devtest_dataset, batch_size=batch_size, shuffle=False,
                             num_workers=batch_size // 16, pin_memory=True)
     indices = (corpus.dev_indices if mode == 'dev' else corpus.test_indices)
     scores = torch.zeros([len(indices)]).cuda()
@@ -665,9 +939,11 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
                 scores[index: index + batch_size] = model(*data_batch[:21])
             index += batch_size
     scores = scores.tolist()
-    sub_scores = [[] for _ in range(indices[-1] + 1)]
-    for i, index in enumerate(indices):
-        sub_scores[index].append([scores[i], len(sub_scores[index])])
+    candidate_news_indices = _get_candidate_news_indices(corpus, mode)
+    clickbait_scores = get_clickbait_scores(config, corpus)
+    sub_scores = _build_sub_scores(indices, scores, candidate_news_indices)
+    tce5 = _compute_tce_from_sub_scores(sub_scores, clickbait_scores, 5)
+    tce10 = _compute_tce_from_sub_scores(sub_scores, clickbait_scores, 10)
     with open(result_file, 'w', encoding='utf-8') as result_f:
         for i, sub_score in enumerate(sub_scores):
             sub_score.sort(key=lambda x: x[0], reverse=True)
@@ -675,12 +951,12 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
             for j in range(len(sub_score)):
                 result[sub_score[j][1]] = j + 1
             result_f.write(('' if i == 0 else '\n') + str(i + 1) + ' ' + str(result).replace(' ', ''))
-    if dataset != 'submission' or mode != 'test':
+    if dataset_size != 'submission' or mode != 'test':
         with open(config.data_path + '/' + mode + '/ref/truth-%s.txt' % config.DATASET_ROOT, 'r', encoding='utf-8') as truth_f, open(result_file, 'r', encoding='utf-8') as result_f:
             auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = scoring(truth_f, result_f)
-        return auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10
+        return auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10, tce5, tce10
     else:
-        return None, None, None, None, None, None, None, None, None, None, None, None
+        return None, None, None, None, None, None, None, None, None, None, None, None, tce5, tce10
 
 
 def compute_scores_mmrec(config: Config, model: nn.Module, corpus, batch_size: int, mode: str, result_file: str, dataset_size: str):
@@ -737,9 +1013,11 @@ def compute_scores_mmrec(config: Config, model: nn.Module, corpus, batch_size: i
 
             index += batch_size
     scores = scores.tolist()
-    sub_scores = [[] for _ in range(indices[-1] + 1)]
-    for i, index in enumerate(indices):
-        sub_scores[index].append([scores[i], len(sub_scores[index])])
+    candidate_news_indices = _get_candidate_news_indices(corpus, mode)
+    clickbait_scores = get_clickbait_scores(config, corpus)
+    sub_scores = _build_sub_scores(indices, scores, candidate_news_indices)
+    tce5 = _compute_tce_from_sub_scores(sub_scores, clickbait_scores, 5)
+    tce10 = _compute_tce_from_sub_scores(sub_scores, clickbait_scores, 10)
     with open(result_file, 'w', encoding='utf-8') as result_f:
         for i, sub_score in enumerate(sub_scores):
             sub_score.sort(key=lambda x: x[0], reverse=True)
@@ -750,9 +1028,9 @@ def compute_scores_mmrec(config: Config, model: nn.Module, corpus, batch_size: i
     if dataset_size != 'submission' or mode != 'test':
         with open(config.data_path + '/' + mode + '/ref/truth-%s.txt' % config.DATASET_ROOT, 'r', encoding='utf-8') as truth_f, open(result_file, 'r', encoding='utf-8') as result_f:
             auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = scoring(truth_f, result_f)
-        return auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10
+        return auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10, tce5, tce10
     else:
-        return None, None, None, None, None, None, None, None, None, None, None, None
+        return None, None, None, None, None, None, None, None, None, None, None, None, tce5, tce10
 
 
 def get_run_index(result_dir: str):

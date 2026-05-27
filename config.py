@@ -3,6 +3,8 @@ import argparse
 import time
 import csv
 
+os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+
 import pandas as pd
 import torch
 import random
@@ -72,6 +74,8 @@ class Config:
         parser.add_argument('--images_path', type=str, default='downloaded_images_ebnerd_small',
                             help='downloaded_images for demo or small')
         parser.add_argument('--word_embedding_dim', type=int, default=300, help='ebnerd: 1024; glove: 300')
+        parser.add_argument('--clickbait_score_path', type=str, default='',
+                            help='Optional JSON, PKL, CSV, or Parquet file with per-news clickbait scores for TCE')
 
         parser.add_argument('--dev_model_path', type=str,
                             default='/home/wanro238/NewsRecTorch/cache/best_models/small/NRMS/#1/NRMS',
@@ -115,6 +119,7 @@ class Config:
         self.early_stopping_epoch = 5
 
         self.word_embedding_dim = args.word_embedding_dim
+        self.clickbait_score_path = args.clickbait_score_path
         self.category_embedding_dim = 50
         self.subCategory_embedding_dim = 50
         self.entity_embedding_dim = 100

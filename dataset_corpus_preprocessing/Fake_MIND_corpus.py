@@ -33,6 +33,14 @@ class Fake_MIND_Corpus:
     SPLIT_FILES = {'train': 'train.csv', 'dev': 'val.csv', 'test': 'test.csv'}
     CATEGORY_PLACEHOLDER = 'unknown'
     SUBCATEGORY_PLACEHOLDER = 'unknown'
+    CLICKBAIT_SCORE_COLUMNS = (
+        'clickbait_score',
+        'clickbait',
+        'bait_score',
+        'mllm_clickbait_score',
+        'mllm_score',
+        'mllm_clickbait',
+    )
 
     @staticmethod
     def _source_dir(config: Config):
@@ -51,7 +59,15 @@ class Fake_MIND_Corpus:
                     'publisher': row.get('source') or '',
                     'title': row.get('title') or '',
                     'abstract': row.get('text') or '',
+                    'clickbait_score': Fake_MIND_Corpus._clickbait_score_from_row(row),
                 }
+
+    @staticmethod
+    def _clickbait_score_from_row(row):
+        for column in Fake_MIND_Corpus.CLICKBAIT_SCORE_COLUMNS:
+            if column in row and row[column] != '':
+                return row[column]
+        return -1.0
 
     @staticmethod
     def _read_behaviors(config: Config, split: str):
@@ -239,6 +255,7 @@ class Fake_MIND_Corpus:
         self.news_abstract_text = np.zeros([self.news_num, self.max_abstract_length], dtype=np.int32)
         self.news_abstract_mask = np.zeros([self.news_num, self.max_abstract_length], dtype=np.float32)
         self.news_abstract_entity = np.zeros([self.news_num, self.max_abstract_length], dtype=np.int32)
+        self.news_clickbait_scores = np.full([self.news_num], -1.0, dtype=np.float32)
         self.train_behaviors = []
         self.dev_behaviors = []
         self.dev_indices = []
@@ -269,6 +286,10 @@ class Fake_MIND_Corpus:
             index = self.news_ID_dict[news_ID]
             self.news_category[index] = self.category_dict.get(row['category'], 0)
             self.news_subCategory[index] = self.subCategory_dict.get(row['subCategory'], 0)
+            try:
+                self.news_clickbait_scores[index] = float(row['clickbait_score'])
+            except (TypeError, ValueError):
+                self.news_clickbait_scores[index] = -1.0
             self._fill_text(row['title'], config, self.news_title_text[index], self.news_title_mask[index], self.max_title_length)
             self._fill_text(row['abstract'], config, self.news_abstract_text[index], self.news_abstract_mask[index], self.max_abstract_length)
             self.title_word_num += len(Fake_MIND_Corpus._tokens(row['title'], config))

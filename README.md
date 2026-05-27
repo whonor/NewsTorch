@@ -220,6 +220,7 @@ NewsTorch computes multiple evaluation metrics during validation and testing:
 - **Recall@5/10**: Recall at K
 - **Hit@5/10**: Hit Rate at K
 - **Precision@5/10**: Precision at K
+- **TCE@5/10**: Top-K Clickbait Exposure over valid per-article clickbait scores
 - **MAE**: Mean Absolute Error
 - **RMSE**: Root Mean Square Error
 
