@@ -7,8 +7,8 @@ attention_dim: 200
 # MMRec specific parameters
 dropout_prob: 0.1
 mmrec_hidden_dim: 400
-mmrec_head_num: 8
+mmrec_head_num: 4
 mmrec_coattention_layers: 1
 mmrec_use_pretrained_word_embedding: true
 mmrec_freeze_word_embedding: true
-mmrec_use_metadata: true
+mmrec_use_metadata: false

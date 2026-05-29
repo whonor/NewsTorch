@@ -330,22 +330,28 @@ def RMSE_score(y_true: np.ndarray, y_score: np.ndarray) -> float:
     score = rmse(y_score, y_true)
     return score
 
-def tce_at_k(clickbait_scores, k=5):
+def dce_at_k(clickbait_scores, k=5):
     """
-    Top-K Clickbait Exposure: average valid clickbait score among the top-k items.
+    Discounted Clickbait Exposure: discounted average valid clickbait score
+    among the top-k items, weighted by 1 / log2(rank + 1).
 
-    Missing MLLM scores are encoded as values outside [0, 1] in the corpus cache;
-    those are ignored so missing annotations do not look like low exposure.
+    Missing clickbait scores are encoded as values outside [0, 1] in the corpus
+    cache; those are ignored so missing annotations do not look like low exposure.
     """
+    discounts = 1.0 / np.log2(np.arange(2, k + 2, dtype=np.float32))
     valid_scores = []
-    for score in clickbait_scores[:k]:
+    valid_discounts = []
+    for score, discount in zip(clickbait_scores[:k], discounts):
         try:
             score = float(score)
         except (TypeError, ValueError):
             continue
         if np.isfinite(score) and 0.0 <= score <= 1.0:
             valid_scores.append(score)
-    return float(np.mean(valid_scores)) if valid_scores else float("nan")
+            valid_discounts.append(float(discount))
+    if not valid_scores:
+        return float("nan")
+    return float(np.dot(valid_scores, valid_discounts) / np.sum(valid_discounts))
 
 
 def _coerce_clickbait_value(value):
@@ -546,11 +552,11 @@ def _build_sub_scores(indices, scores, candidate_news_indices=None):
     return sub_scores
 
 
-def _compute_tce_from_sub_scores(sub_scores, clickbait_scores, k=5):
+def _compute_dce_from_sub_scores(sub_scores, clickbait_scores, k=5):
     if clickbait_scores is None:
         return float("nan")
 
-    tces = []
+    dces = []
     for sub_score in sub_scores:
         if not sub_score or len(sub_score[0]) < 3:
             continue
@@ -559,10 +565,11 @@ def _compute_tce_from_sub_scores(sub_scores, clickbait_scores, k=5):
             for entry in sorted(sub_score, key=lambda x: x[0], reverse=True)
             if 0 <= entry[2] < len(clickbait_scores)
         ]
-        tces.append(tce_at_k(ranked_clickbait_scores, k))
+        dces.append(dce_at_k(ranked_clickbait_scores, k))
 
-    valid_tces = [score for score in tces if np.isfinite(score)]
-    return float(np.mean(valid_tces)) if valid_tces else float("nan")
+    valid_dces = [score for score in dces if np.isfinite(score)]
+    return float(np.mean(valid_dces)) if valid_dces else float("nan")
+
 
 def recall_at_k(y_true, y_score, k=5):
     """
@@ -758,8 +765,8 @@ def compute_scores_IPNR(config: Config, model: nn.Module, mind_corpus: MIND_Corp
     candidate_news_indices = _get_candidate_news_indices(mind_corpus, mode)
     clickbait_scores = get_clickbait_scores(config, mind_corpus)
     sub_scores = _build_sub_scores(indices, scores, candidate_news_indices)
-    tce5 = _compute_tce_from_sub_scores(sub_scores, clickbait_scores, 5)
-    tce10 = _compute_tce_from_sub_scores(sub_scores, clickbait_scores, 10)
+    dce5 = _compute_dce_from_sub_scores(sub_scores, clickbait_scores, 5)
+    dce10 = _compute_dce_from_sub_scores(sub_scores, clickbait_scores, 10)
     with open(result_file, 'w', encoding='utf-8') as result_f:
         for i, sub_score in enumerate(sub_scores):
             sub_score.sort(key=lambda x: x[0], reverse=True)
@@ -770,9 +777,9 @@ def compute_scores_IPNR(config: Config, model: nn.Module, mind_corpus: MIND_Corp
     if dataset != 'submission' or mode != 'test':
         with open("./cache/" + mode + '/ref/truth-%s.txt' % config.DATASET_ROOT, 'r', encoding='utf-8') as truth_f, open(result_file, 'r', encoding='utf-8') as result_f:
             auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = scoring(truth_f, result_f)
-        return auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10, tce5, tce10
+        return auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10, dce5, dce10
     else:
-        return None, None, None, None, None, None, None, None, None, None, None, None, tce5, tce10
+        return None, None, None, None, None, None, None, None, None, None, None, None, dce5, dce10
 
 
 def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mode: str, result_file: str, dataset_size: str):
@@ -942,8 +949,8 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
     candidate_news_indices = _get_candidate_news_indices(corpus, mode)
     clickbait_scores = get_clickbait_scores(config, corpus)
     sub_scores = _build_sub_scores(indices, scores, candidate_news_indices)
-    tce5 = _compute_tce_from_sub_scores(sub_scores, clickbait_scores, 5)
-    tce10 = _compute_tce_from_sub_scores(sub_scores, clickbait_scores, 10)
+    dce5 = _compute_dce_from_sub_scores(sub_scores, clickbait_scores, 5)
+    dce10 = _compute_dce_from_sub_scores(sub_scores, clickbait_scores, 10)
     with open(result_file, 'w', encoding='utf-8') as result_f:
         for i, sub_score in enumerate(sub_scores):
             sub_score.sort(key=lambda x: x[0], reverse=True)
@@ -954,9 +961,9 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
     if dataset_size != 'submission' or mode != 'test':
         with open(config.data_path + '/' + mode + '/ref/truth-%s.txt' % config.DATASET_ROOT, 'r', encoding='utf-8') as truth_f, open(result_file, 'r', encoding='utf-8') as result_f:
             auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = scoring(truth_f, result_f)
-        return auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10, tce5, tce10
+        return auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10, dce5, dce10
     else:
-        return None, None, None, None, None, None, None, None, None, None, None, None, tce5, tce10
+        return None, None, None, None, None, None, None, None, None, None, None, None, dce5, dce10
 
 
 def compute_scores_mmrec(config: Config, model: nn.Module, corpus, batch_size: int, mode: str, result_file: str, dataset_size: str):
@@ -1016,8 +1023,8 @@ def compute_scores_mmrec(config: Config, model: nn.Module, corpus, batch_size: i
     candidate_news_indices = _get_candidate_news_indices(corpus, mode)
     clickbait_scores = get_clickbait_scores(config, corpus)
     sub_scores = _build_sub_scores(indices, scores, candidate_news_indices)
-    tce5 = _compute_tce_from_sub_scores(sub_scores, clickbait_scores, 5)
-    tce10 = _compute_tce_from_sub_scores(sub_scores, clickbait_scores, 10)
+    dce5 = _compute_dce_from_sub_scores(sub_scores, clickbait_scores, 5)
+    dce10 = _compute_dce_from_sub_scores(sub_scores, clickbait_scores, 10)
     with open(result_file, 'w', encoding='utf-8') as result_f:
         for i, sub_score in enumerate(sub_scores):
             sub_score.sort(key=lambda x: x[0], reverse=True)
@@ -1028,9 +1035,9 @@ def compute_scores_mmrec(config: Config, model: nn.Module, corpus, batch_size: i
     if dataset_size != 'submission' or mode != 'test':
         with open(config.data_path + '/' + mode + '/ref/truth-%s.txt' % config.DATASET_ROOT, 'r', encoding='utf-8') as truth_f, open(result_file, 'r', encoding='utf-8') as result_f:
             auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = scoring(truth_f, result_f)
-        return auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10, tce5, tce10
+        return auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10, dce5, dce10
     else:
-        return None, None, None, None, None, None, None, None, None, None, None, None, tce5, tce10
+        return None, None, None, None, None, None, None, None, None, None, None, None, dce5, dce10
 
 
 def get_run_index(result_dir: str):

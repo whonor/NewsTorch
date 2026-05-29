@@ -74,14 +74,14 @@ class Config:
         parser.add_argument('--images_path', type=str, default='downloaded_images_ebnerd_small',
                             help='downloaded_images for demo or small')
         parser.add_argument('--word_embedding_dim', type=int, default=300, help='ebnerd: 1024; glove: 300')
-        parser.add_argument('--clickbait_score_path', type=str, default='',
-                            help='Optional JSON, PKL, CSV, or Parquet file with per-news clickbait scores for TCE')
+        parser.add_argument('--clickbait_score_path', type=str, default='cache/visual_clickbait_scores_ebnerd_demo.parquet',
+                            help='Optional JSON, PKL, CSV, or Parquet file with per-news clickbait scores for DCE')
 
         parser.add_argument('--dev_model_path', type=str,
-                            default='/home/wanro238/NewsRecTorch/cache/best_models/small/NRMS/#1/NRMS',
+                            default='cache/best_models/small/NRMS/#1/NRMS',
                             help='The path of the best model')
         parser.add_argument('--test_model_path', type=str,
-                            default='/home/wanro238/NewsRecTorch/cache/best_models/small/NRMS/#1/NRMS',
+                            default='cache/best_models/small/NRMS/#1/NRMS',
                             help='The path of the best model')
         args, _ = parser.parse_known_args()
         self.model = args.model

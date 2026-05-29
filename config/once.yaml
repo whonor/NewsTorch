@@ -1,0 +1,26 @@
+hidden_size: 256
+attention_dim: 256
+
+# Hugging Face model ID or local directory for LLaMA 2.
+# This Meta repo is gated; request access on Hugging Face and set HF_TOKEN/ONCE_HF_TOKEN,
+# or set ONCE_LLAMA_MODEL to a local checkpoint directory.
+once_lm_model_name_or_path: "meta-llama/Llama-2-7b-hf"
+once_hf_token_env: "HF_TOKEN"
+once_cache_key: "llama2"
+once_cache_dir: "cache/once_dire_llama2_naml"
+once_cache_dtype: "float16"
+once_max_length: 64
+once_item_page_size: 1
+once_forward_page_size: 32
+
+# Legommenders ONCE-DIRE-LLAMA uses --tune_from -2.
+# For LLaMA-7B this resolves to layer 30 and fine-tunes the final upper layer.
+once_tune_from: -2
+once_dtype: "bfloat16"
+once_trust_remote_code: true
+once_local_files_only: false
+
+once_use_lora: false
+once_lora_r: 32
+once_lora_alpha: 128
+once_lora_dropout: 0.1

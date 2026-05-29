@@ -105,14 +105,14 @@ class TrainerIPNR:
             wandb.log({'epoch': e, 'train_loss': epoch_loss / len(self.train_dataset)}, step=e)
 
             # validation
-            auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10, tce5, tce10 = compute_scores_IPNR(self.config, model, self.mind_corpus, self.batch_size * 3 // 2, 'dev', self.dev_res_dir + '/' + model.model_name + '-' + str(e) + '.txt', self._dataset)
+            auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10, dce5, dce10 = compute_scores_IPNR(self.config, model, self.mind_corpus, self.batch_size * 3 // 2, 'dev', self.dev_res_dir + '/' + model.model_name + '-' + str(e) + '.txt', self._dataset)
             self.auc_results.append(auc)
             self.mrr_results.append(mrr)
             self.ndcg5_results.append(ndcg5)
             self.ndcg10_results.append(ndcg10)
             print('Epoch %d : dev done\nDev criterions' % e)
-            print('AUC = {:.4f}\nMRR = {:.4f}\nnDCG@5 = {:.4f}\nnDCG@10 = {:.4f}\nTCE@5 = {:.4f}\nTCE@10 = {:.4f}'.format(auc, mrr, ndcg5, ndcg10, tce5, tce10))
-            wandb.log({'epoch': e, 'dev_auc': auc, 'dev_mrr': mrr, 'dev_ndcg5': ndcg5, 'dev_ndcg10': ndcg10, 'dev_tce5': tce5, 'dev_tce10': tce10}, step=e)
+            print('AUC = {:.4f}\nMRR = {:.4f}\nnDCG@5 = {:.4f}\nnDCG@10 = {:.4f}\nDCE@5 = {:.4f}\nDCE@10 = {:.4f}'.format(auc, mrr, ndcg5, ndcg10, dce5, dce10))
+            wandb.log({'epoch': e, 'dev_auc': auc, 'dev_mrr': mrr, 'dev_ndcg5': ndcg5, 'dev_ndcg10': ndcg10, 'dev_dce5': dce5, 'dev_dce10': dce10}, step=e)
             if self.dev_criterion == 'auc':
                 if auc >= self.best_dev_auc:
                     self.best_dev_auc = auc
