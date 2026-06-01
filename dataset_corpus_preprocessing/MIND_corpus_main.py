@@ -9,6 +9,7 @@ import nltk
 import pandas as pd
 from nltk.tokenize import word_tokenize
 from torchtext.vocab import GloVe
+from utils import _transformers_compat
 from transformers import AutoTokenizer
 
 from config import Config

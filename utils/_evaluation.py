@@ -539,15 +539,79 @@ def _get_candidate_news_indices(corpus, mode):
     return candidate_news_indices
 
 
-def _build_sub_scores(indices, scores, candidate_news_indices=None):
+def _get_candidate_engagement_values(corpus, mode):
+    behaviors = getattr(corpus, f"{mode}_behaviors", None)
+    if behaviors is None:
+        return None, None
+
+    read_times = []
+    scroll_percentages = []
+    for behavior in behaviors:
+        read_times.append(behavior[6] if len(behavior) > 6 else np.nan)
+        scroll_percentages.append(behavior[7] if len(behavior) > 7 else np.nan)
+    return read_times, scroll_percentages
+
+
+def _coerce_finite_float(value):
+    try:
+        value = float(value)
+    except (TypeError, ValueError):
+        return None
+    return value if np.isfinite(value) else None
+
+
+def _scroll_confidence(scroll_percentage):
+    scroll_percentage = _coerce_finite_float(scroll_percentage)
+    if scroll_percentage is None or scroll_percentage < 0.0:
+        return None
+    if scroll_percentage > 1.0:
+        scroll_percentage /= 100.0
+    return float(np.clip(scroll_percentage, 0.0, 1.0))
+
+
+def _read_time_confidence(read_time, read_time_scale):
+    read_time = _coerce_finite_float(read_time)
+    if read_time is None or read_time <= 0.0 or read_time_scale is None or read_time_scale <= 0.0:
+        return None
+    confidence = np.log1p(read_time) / np.log1p(read_time_scale)
+    return float(np.clip(confidence, 0.0, 1.0))
+
+
+def _engagement_confidence(read_time, scroll_percentage, read_time_scale):
+    confidences = []
+    read_confidence = _read_time_confidence(read_time, read_time_scale)
+    scroll_confidence = _scroll_confidence(scroll_percentage)
+    if read_confidence is not None:
+        confidences.append(read_confidence)
+    if scroll_confidence is not None:
+        confidences.append(scroll_confidence)
+    if not confidences:
+        return None
+    return float(np.mean(confidences))
+
+
+def _build_sub_scores(indices, scores, candidate_news_indices=None, candidate_read_times=None, candidate_scroll_percentages=None):
+    if not indices:
+        return []
+
     sub_scores = [[] for _ in range(indices[-1] + 1)]
     has_candidate_news_indices = (
         candidate_news_indices is not None and len(candidate_news_indices) == len(scores)
     )
+    has_candidate_read_times = (
+        candidate_read_times is not None and len(candidate_read_times) == len(scores)
+    )
+    has_candidate_scroll_percentages = (
+        candidate_scroll_percentages is not None and len(candidate_scroll_percentages) == len(scores)
+    )
     for i, index in enumerate(indices):
-        entry = [scores[i], len(sub_scores[index])]
+        entry = [scores[i], len(sub_scores[index]), None, np.nan, np.nan]
         if has_candidate_news_indices:
-            entry.append(candidate_news_indices[i])
+            entry[2] = candidate_news_indices[i]
+        if has_candidate_read_times:
+            entry[3] = candidate_read_times[i]
+        if has_candidate_scroll_percentages:
+            entry[4] = candidate_scroll_percentages[i]
         sub_scores[index].append(entry)
     return sub_scores
 
@@ -558,17 +622,237 @@ def _compute_dce_from_sub_scores(sub_scores, clickbait_scores, k=5):
 
     dces = []
     for sub_score in sub_scores:
-        if not sub_score or len(sub_score[0]) < 3:
+        if not sub_score:
             continue
         ranked_clickbait_scores = [
             clickbait_scores[entry[2]]
             for entry in sorted(sub_score, key=lambda x: x[0], reverse=True)
-            if 0 <= entry[2] < len(clickbait_scores)
+            if entry[2] is not None and 0 <= entry[2] < len(clickbait_scores)
         ]
         dces.append(dce_at_k(ranked_clickbait_scores, k))
 
     valid_dces = [score for score in dces if np.isfinite(score)]
     return float(np.mean(valid_dces)) if valid_dces else float("nan")
+
+
+def _clicked_read_time_scale(sub_scores, truth_file_path):
+    read_times = []
+
+    with open(truth_file_path, "r", encoding="utf-8") as truth_f:
+        for line_index, truth_line in enumerate(truth_f):
+            impid, labels = parse_line(truth_line)
+            if labels == []:
+                continue
+
+            try:
+                sub_score_index = int(impid) - 1
+            except (TypeError, ValueError):
+                sub_score_index = line_index
+
+            if sub_score_index < 0 or sub_score_index >= len(sub_scores):
+                continue
+
+            sub_score = sub_scores[sub_score_index]
+            if not sub_score:
+                continue
+
+            for entry in sub_score:
+                candidate_position = entry[1]
+                if candidate_position >= len(labels) or labels[candidate_position] <= 0:
+                    continue
+                read_time = _coerce_finite_float(entry[3])
+                if read_time is not None and read_time > 0.0:
+                    read_times.append(read_time)
+
+    if not read_times:
+        return None
+    return max(float(np.percentile(read_times, 95)), 1.0)
+
+
+def _candidate_read_time_scale(sub_scores):
+    read_times = []
+    for sub_score in sub_scores:
+        for entry in sub_score:
+            read_time = _coerce_finite_float(entry[3])
+            if read_time is not None and read_time > 0.0:
+                read_times.append(read_time)
+
+    if not read_times:
+        return None
+    return max(float(np.percentile(read_times, 95)), 1.0)
+
+
+def _cba_gain(entry, labels, clickbait_scores, read_time_scale):
+    candidate_position = entry[1]
+    if candidate_position >= len(labels) or labels[candidate_position] <= 0:
+        return 0.0
+    if clickbait_scores is None:
+        return float("nan")
+
+    news_index = entry[2]
+    if news_index is None or news_index < 0 or news_index >= len(clickbait_scores):
+        return float("nan")
+
+    clickbait_score = _coerce_finite_float(clickbait_scores[news_index])
+    if clickbait_score is None or clickbait_score < 0.0 or clickbait_score > 1.0:
+        return float("nan")
+
+    q_i = _engagement_confidence(entry[3], entry[4], read_time_scale)
+    if q_i is None:
+        return float("nan")
+    return float(q_i * (1.0 - clickbait_score))
+
+
+def _visual_clickbait_label(entry, clickbait_scores, read_time_scale, clickbait_threshold, satisfaction_threshold):
+    if clickbait_scores is None:
+        return None
+
+    news_index = entry[2]
+    if news_index is None or news_index < 0 or news_index >= len(clickbait_scores):
+        return None
+
+    clickbait_score = _coerce_finite_float(clickbait_scores[news_index])
+    if clickbait_score is None or clickbait_score < 0.0 or clickbait_score > 1.0:
+        return None
+
+    q_i = _engagement_confidence(entry[3], entry[4], read_time_scale)
+    if q_i is None:
+        return None
+
+    return bool(clickbait_score >= clickbait_threshold and q_i <= satisfaction_threshold)
+
+
+def _compute_cb_hr_from_sub_scores(
+    sub_scores,
+    clickbait_scores,
+    ks=(5, 10),
+    clickbait_threshold=0.5,
+    satisfaction_threshold=0.5,
+):
+    """
+    Clickbait Hit Rate@K: fraction of impressions whose top-k list contains
+    at least one visual clickbait candidate.
+    """
+    if clickbait_scores is None:
+        return {k: float("nan") for k in ks}
+
+    clickbait_threshold = _coerce_finite_float(clickbait_threshold)
+    satisfaction_threshold = _coerce_finite_float(satisfaction_threshold)
+    if clickbait_threshold is None or satisfaction_threshold is None:
+        return {k: float("nan") for k in ks}
+
+    read_time_scale = _candidate_read_time_scale(sub_scores)
+    cb_hrs = {k: [] for k in ks}
+
+    for sub_score in sub_scores:
+        if not sub_score:
+            continue
+
+        label_by_candidate_position = {}
+        for entry in sub_score:
+            visual_clickbait = _visual_clickbait_label(
+                entry,
+                clickbait_scores,
+                read_time_scale,
+                clickbait_threshold,
+                satisfaction_threshold,
+            )
+            if visual_clickbait is not None:
+                label_by_candidate_position[entry[1]] = visual_clickbait
+
+        if not label_by_candidate_position:
+            continue
+
+        ranked_entries = sorted(sub_score, key=lambda x: x[0], reverse=True)
+        for k in ks:
+            top_k_entries = ranked_entries[:k]
+            cb_hrs[k].append(float(any(
+                label_by_candidate_position.get(entry[1], False)
+                for entry in top_k_entries
+            )))
+
+    return {
+        k: float(np.mean(scores)) if scores else float("nan")
+        for k, scores in cb_hrs.items()
+    }
+
+
+def _compute_cb_hr_metrics(config, sub_scores, clickbait_scores):
+    cb_hrs = _compute_cb_hr_from_sub_scores(
+        sub_scores,
+        clickbait_scores,
+        (5, 10),
+        getattr(config, "cbhr_clickbait_threshold", 0.5),
+        getattr(config, "cbhr_satisfaction_threshold", 0.5),
+    )
+    return cb_hrs[5], cb_hrs[10]
+
+
+def _cba_ndcg_at_k(ranked_gains, k):
+    if not ranked_gains:
+        return float("nan")
+
+    gains = np.nan_to_num(np.asarray(ranked_gains, dtype=np.float32), nan=0.0, posinf=0.0, neginf=0.0)
+    if not np.any(gains > 0.0):
+        return float("nan")
+
+    actual_gains = gains[:k]
+    discounts = np.log2(np.arange(len(actual_gains), dtype=np.float32) + 2.0)
+    actual = float(np.sum(actual_gains / discounts))
+
+    ideal_gains = np.sort(gains)[::-1][:k]
+    ideal_discounts = np.log2(np.arange(len(ideal_gains), dtype=np.float32) + 2.0)
+    ideal = float(np.sum(ideal_gains / ideal_discounts))
+    return actual / ideal if ideal > 0.0 else float("nan")
+
+
+def _compute_cba_ndcg_from_sub_scores(sub_scores, truth_file_path, clickbait_scores, ks=(5, 10)):
+    if clickbait_scores is None:
+        return {k: float("nan") for k in ks}
+
+    read_time_scale = _clicked_read_time_scale(sub_scores, truth_file_path)
+    cba_ndcgs = {k: [] for k in ks}
+
+    with open(truth_file_path, "r", encoding="utf-8") as truth_f:
+        for line_index, truth_line in enumerate(truth_f):
+            impid, labels = parse_line(truth_line)
+            if labels == []:
+                continue
+
+            try:
+                sub_score_index = int(impid) - 1
+            except (TypeError, ValueError):
+                sub_score_index = line_index
+
+            if sub_score_index < 0 or sub_score_index >= len(sub_scores):
+                continue
+
+            sub_score = sub_scores[sub_score_index]
+            if not sub_score:
+                continue
+
+            gain_by_candidate_position = {
+                entry[1]: _cba_gain(entry, labels, clickbait_scores, read_time_scale)
+                for entry in sub_score
+            }
+            positive_gains = [
+                gain for gain in gain_by_candidate_position.values()
+                if np.isfinite(gain) and gain > 0.0
+            ]
+            if not positive_gains:
+                continue
+
+            ranked_entries = sorted(sub_score, key=lambda x: x[0], reverse=True)
+            ranked_gains = [gain_by_candidate_position.get(entry[1], 0.0) for entry in ranked_entries]
+            for k in ks:
+                score = _cba_ndcg_at_k(ranked_gains, k)
+                if np.isfinite(score):
+                    cba_ndcgs[k].append(score)
+
+    return {
+        k: float(np.mean(scores)) if scores else float("nan")
+        for k, scores in cba_ndcgs.items()
+    }
 
 
 def recall_at_k(y_true, y_score, k=5):
@@ -763,10 +1047,12 @@ def compute_scores_IPNR(config: Config, model: nn.Module, mind_corpus: MIND_Corp
             index += batch_size
     scores = scores.tolist()
     candidate_news_indices = _get_candidate_news_indices(mind_corpus, mode)
+    candidate_read_times, candidate_scroll_percentages = _get_candidate_engagement_values(mind_corpus, mode)
     clickbait_scores = get_clickbait_scores(config, mind_corpus)
-    sub_scores = _build_sub_scores(indices, scores, candidate_news_indices)
+    sub_scores = _build_sub_scores(indices, scores, candidate_news_indices, candidate_read_times, candidate_scroll_percentages)
     dce5 = _compute_dce_from_sub_scores(sub_scores, clickbait_scores, 5)
     dce10 = _compute_dce_from_sub_scores(sub_scores, clickbait_scores, 10)
+    cb_hr5, cb_hr10 = _compute_cb_hr_metrics(config, sub_scores, clickbait_scores)
     with open(result_file, 'w', encoding='utf-8') as result_f:
         for i, sub_score in enumerate(sub_scores):
             sub_score.sort(key=lambda x: x[0], reverse=True)
@@ -775,11 +1061,15 @@ def compute_scores_IPNR(config: Config, model: nn.Module, mind_corpus: MIND_Corp
                 result[sub_score[j][1]] = j + 1
             result_f.write(('' if i == 0 else '\n') + str(i + 1) + ' ' + str(result).replace(' ', ''))
     if dataset != 'submission' or mode != 'test':
-        with open("./cache/" + mode + '/ref/truth-%s.txt' % config.DATASET_ROOT, 'r', encoding='utf-8') as truth_f, open(result_file, 'r', encoding='utf-8') as result_f:
+        truth_file_path = "./cache/" + mode + '/ref/truth-%s.txt' % config.DATASET_ROOT
+        cba_ndcgs = _compute_cba_ndcg_from_sub_scores(sub_scores, truth_file_path, clickbait_scores, (5, 10))
+        cba_ndcg5 = cba_ndcgs[5]
+        cba_ndcg10 = cba_ndcgs[10]
+        with open(truth_file_path, 'r', encoding='utf-8') as truth_f, open(result_file, 'r', encoding='utf-8') as result_f:
             auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = scoring(truth_f, result_f)
-        return auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10, dce5, dce10
+        return auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10, dce5, dce10, cba_ndcg5, cba_ndcg10, cb_hr5, cb_hr10
     else:
-        return None, None, None, None, None, None, None, None, None, None, None, None, dce5, dce10
+        return None, None, None, None, None, None, None, None, None, None, None, None, dce5, dce10, None, None, cb_hr5, cb_hr10
 
 
 def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mode: str, result_file: str, dataset_size: str):
@@ -947,10 +1237,12 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
             index += batch_size
     scores = scores.tolist()
     candidate_news_indices = _get_candidate_news_indices(corpus, mode)
+    candidate_read_times, candidate_scroll_percentages = _get_candidate_engagement_values(corpus, mode)
     clickbait_scores = get_clickbait_scores(config, corpus)
-    sub_scores = _build_sub_scores(indices, scores, candidate_news_indices)
+    sub_scores = _build_sub_scores(indices, scores, candidate_news_indices, candidate_read_times, candidate_scroll_percentages)
     dce5 = _compute_dce_from_sub_scores(sub_scores, clickbait_scores, 5)
     dce10 = _compute_dce_from_sub_scores(sub_scores, clickbait_scores, 10)
+    cb_hr5, cb_hr10 = _compute_cb_hr_metrics(config, sub_scores, clickbait_scores)
     with open(result_file, 'w', encoding='utf-8') as result_f:
         for i, sub_score in enumerate(sub_scores):
             sub_score.sort(key=lambda x: x[0], reverse=True)
@@ -959,11 +1251,15 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
                 result[sub_score[j][1]] = j + 1
             result_f.write(('' if i == 0 else '\n') + str(i + 1) + ' ' + str(result).replace(' ', ''))
     if dataset_size != 'submission' or mode != 'test':
-        with open(config.data_path + '/' + mode + '/ref/truth-%s.txt' % config.DATASET_ROOT, 'r', encoding='utf-8') as truth_f, open(result_file, 'r', encoding='utf-8') as result_f:
+        truth_file_path = config.data_path + '/' + mode + '/ref/truth-%s.txt' % config.DATASET_ROOT
+        cba_ndcgs = _compute_cba_ndcg_from_sub_scores(sub_scores, truth_file_path, clickbait_scores, (5, 10))
+        cba_ndcg5 = cba_ndcgs[5]
+        cba_ndcg10 = cba_ndcgs[10]
+        with open(truth_file_path, 'r', encoding='utf-8') as truth_f, open(result_file, 'r', encoding='utf-8') as result_f:
             auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = scoring(truth_f, result_f)
-        return auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10, dce5, dce10
+        return auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10, dce5, dce10, cba_ndcg5, cba_ndcg10, cb_hr5, cb_hr10
     else:
-        return None, None, None, None, None, None, None, None, None, None, None, None, dce5, dce10
+        return None, None, None, None, None, None, None, None, None, None, None, None, dce5, dce10, None, None, cb_hr5, cb_hr10
 
 
 def compute_scores_mmrec(config: Config, model: nn.Module, corpus, batch_size: int, mode: str, result_file: str, dataset_size: str):
@@ -1021,10 +1317,12 @@ def compute_scores_mmrec(config: Config, model: nn.Module, corpus, batch_size: i
             index += batch_size
     scores = scores.tolist()
     candidate_news_indices = _get_candidate_news_indices(corpus, mode)
+    candidate_read_times, candidate_scroll_percentages = _get_candidate_engagement_values(corpus, mode)
     clickbait_scores = get_clickbait_scores(config, corpus)
-    sub_scores = _build_sub_scores(indices, scores, candidate_news_indices)
+    sub_scores = _build_sub_scores(indices, scores, candidate_news_indices, candidate_read_times, candidate_scroll_percentages)
     dce5 = _compute_dce_from_sub_scores(sub_scores, clickbait_scores, 5)
     dce10 = _compute_dce_from_sub_scores(sub_scores, clickbait_scores, 10)
+    cb_hr5, cb_hr10 = _compute_cb_hr_metrics(config, sub_scores, clickbait_scores)
     with open(result_file, 'w', encoding='utf-8') as result_f:
         for i, sub_score in enumerate(sub_scores):
             sub_score.sort(key=lambda x: x[0], reverse=True)
@@ -1033,11 +1331,15 @@ def compute_scores_mmrec(config: Config, model: nn.Module, corpus, batch_size: i
                 result[sub_score[j][1]] = j + 1
             result_f.write(('' if i == 0 else '\n') + str(i + 1) + ' ' + str(result).replace(' ', ''))
     if dataset_size != 'submission' or mode != 'test':
-        with open(config.data_path + '/' + mode + '/ref/truth-%s.txt' % config.DATASET_ROOT, 'r', encoding='utf-8') as truth_f, open(result_file, 'r', encoding='utf-8') as result_f:
+        truth_file_path = config.data_path + '/' + mode + '/ref/truth-%s.txt' % config.DATASET_ROOT
+        cba_ndcgs = _compute_cba_ndcg_from_sub_scores(sub_scores, truth_file_path, clickbait_scores, (5, 10))
+        cba_ndcg5 = cba_ndcgs[5]
+        cba_ndcg10 = cba_ndcgs[10]
+        with open(truth_file_path, 'r', encoding='utf-8') as truth_f, open(result_file, 'r', encoding='utf-8') as result_f:
             auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = scoring(truth_f, result_f)
-        return auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10, dce5, dce10
+        return auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10, dce5, dce10, cba_ndcg5, cba_ndcg10, cb_hr5, cb_hr10
     else:
-        return None, None, None, None, None, None, None, None, None, None, None, None, dce5, dce10
+        return None, None, None, None, None, None, None, None, None, None, None, None, dce5, dce10, None, None, cb_hr5, cb_hr10
 
 
 def get_run_index(result_dir: str):

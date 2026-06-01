@@ -20,7 +20,7 @@ once_dtype: "bfloat16"
 once_trust_remote_code: true
 once_local_files_only: false
 
-once_use_lora: false
+once_use_lora: true
 once_lora_r: 32
 once_lora_alpha: 128
 once_lora_dropout: 0.1

@@ -158,6 +158,10 @@ class Trainer:
                     outputs = self.model(*data_batch)
                     logits, aux_loss = outputs if isinstance(outputs, tuple) else (outputs, 0.0)
                     loss = getattr(self.config, 'sein_prediction_loss_weight', 1.0) * self.loss(logits) + aux_loss
+                elif self.config.model == "S2LENR":
+                    outputs = self.model(*data_batch[:21])
+                    logits, ssl_loss = outputs if isinstance(outputs, tuple) else (outputs, 0.0)
+                    loss = self.loss(logits) + getattr(self.config, 's2lenr_ssl_weight', 0.1) * ssl_loss
                 elif self.config.model in ONCE_DIRE_MODEL_NAMES:
                     if self.config.dataset_name in ['MIND', 'gossipcop']:
                         logits = self.model(*data_batch[:21], data_batch[21], data_batch[22])
@@ -182,7 +186,7 @@ class Trainer:
             self.wandb.log({'train epoch': e, 'loss': epoch_loss / len(self.train_dataset)})
 
             # validation
-            auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10, dce5, dce10 = compute_scores(self.config, model, self._corpus, self.batch_size,
+            auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10, dce5, dce10, cba_ndcg5, cba_ndcg10, cb_hr5, cb_hr10 = compute_scores(self.config, model, self._corpus, self.batch_size,
                                                      'dev', self.dev_res_dir + '/' + self.config.model + '-' + str(
                     e) + '.txt', self._dataset)
 
@@ -191,8 +195,8 @@ class Trainer:
             self.ndcg5_results.append(ndcg5)
             self.ndcg10_results.append(ndcg10)
             print('Epoch %d : dev done\nDev criterions' % e)
-            print('AUC = {:.4f}\nMRR = {:.4f}\nnDCG@5 = {:.4f}\nnDCG@10 = {:.4f}\nDCE@5 = {:.4f}\nDCE@10 = {:.4f}'.format(auc, mrr, ndcg5, ndcg10, dce5, dce10))
-            self.wandb.log({'validation epoch': e, 'AUC': auc, 'MRR': mrr, 'nDCG@5': ndcg5, 'nDCG@10': ndcg10, 'DCE@5': dce5, 'DCE@10': dce10})
+            print('AUC = {:.4f}\nMRR = {:.4f}\nnDCG@5 = {:.4f}\nnDCG@10 = {:.4f}\nDCE@5 = {:.4f}\nDCE@10 = {:.4f}\nCBA-NDCG@5 = {:.4f}\nCBA-NDCG@10 = {:.4f}\nCB-HR@5 = {:.4f}\nCB-HR@10 = {:.4f}'.format(auc, mrr, ndcg5, ndcg10, dce5, dce10, cba_ndcg5, cba_ndcg10, cb_hr5, cb_hr10))
+            self.wandb.log({'validation epoch': e, 'AUC': auc, 'MRR': mrr, 'nDCG@5': ndcg5, 'nDCG@10': ndcg10, 'DCE@5': dce5, 'DCE@10': dce10, 'CBA-NDCG@5': cba_ndcg5, 'CBA-NDCG@10': cba_ndcg10, 'CB-HR@5': cb_hr5, 'CB-HR@10': cb_hr10})
             avg = AvgMetric(auc, mrr, ndcg5, ndcg10)
             if avg >= self.best_dev_avg:
                 self.best_dev_avg = avg

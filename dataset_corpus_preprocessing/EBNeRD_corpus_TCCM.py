@@ -11,11 +11,13 @@ from nltk.tokenize import word_tokenize
 from tqdm import tqdm
 
 from config import Config
+from utils import _transformers_compat
 import torch
 import numpy as np
 from dataset_corpus_preprocessing.ebnerd_behavior_utils import (
     as_list,
     candidate_read_time,
+    candidate_scroll_percentage,
     pad_history_read_time,
 )
 
@@ -543,6 +545,7 @@ class EBNeRD_Corpus:
                 history = row['history']
                 history_read_time = row.get('history_read_time', [])
                 next_read_time = row.get('next_read_time', 0.0)
+                next_scroll_percentage = row.get('next_scroll_percentage', np.nan)
                 labels = row.get('labels', None)
                 impressions = row['candidates']
                 impressions_list = [str(x).strip() for x in as_list(impressions)]
@@ -585,7 +588,8 @@ class EBNeRD_Corpus:
                                 non_click_impressions,
                                 behavior_index,
                                 user_history_read_time,
-                                candidate_read_time(next_read_time, impression_position)
+                                candidate_read_time(next_read_time, impression_position),
+                                candidate_scroll_percentage(next_scroll_percentage, impression_position)
                             ])
                 elif mode == 'dev':
                     for impression_position, impression in enumerate(impressions_list):
@@ -598,7 +602,8 @@ class EBNeRD_Corpus:
                             imp_id,
                             behavior_index,
                             user_history_read_time,
-                            candidate_read_time(next_read_time, impression_position)
+                            candidate_read_time(next_read_time, impression_position),
+                            candidate_scroll_percentage(next_scroll_percentage, impression_position)
                         ])
                 elif mode == 'test':
                     for impression_position, impression in enumerate(impressions_list):
@@ -611,7 +616,8 @@ class EBNeRD_Corpus:
                             imp_id,
                             behavior_index,
                             user_history_read_time,
-                            candidate_read_time(next_read_time, impression_position)
+                            candidate_read_time(next_read_time, impression_position),
+                            candidate_scroll_percentage(next_scroll_percentage, impression_position)
                         ])
         train_path = os.path.join(config.train_root, 'behaviors.parquet')
         dev_path = os.path.join(config.dev_root, 'behaviors.parquet')

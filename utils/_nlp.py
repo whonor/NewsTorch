@@ -2,6 +2,7 @@ from tqdm import tqdm
 import torch
 
 from utils._python import get_torch_device
+from utils import _transformers_compat
 
 try:
     from torch.utils.data import DataLoader, TensorDataset

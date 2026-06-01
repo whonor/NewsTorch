@@ -5,6 +5,7 @@
 # @File    : fastformer.py
 # @Software: PyCharm
 
+from utils import _transformers_compat
 from transformers import BertConfig
 from transformers.models.bert.modeling_bert import BertSelfOutput, BertIntermediate, BertOutput
 

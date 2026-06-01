@@ -72,6 +72,7 @@ With NewsTorch, researchers and practitioners can quickly implement and evaluate
 | IPNR | Intention-aware user modeling for personalized news recommendation | 2023 | Graph-based | models/IPNR.py models/modules/ipnr Conceptgraph general_runner.py    | config/ipnr.yaml      | First to download and execute Conceptgraph to generate graph data [here](https://drive.google.com/file/d/1rih15bSlXTHZg-JNdtxSoS3uiVfjjIyX/view?usp=sharing)    |
 | LKPNR | LKPNR: Large Language Models and Knowledge Graph for Personalized News Recommendation Framework | 2024 | LLM-based | models/LKPNR.py models/modules/LKPNR  KGraph_LKPNR general_runner.py | config/lkpnr.yaml | First to download and execute KGraph_LKPNR to generate required data [here](https://drive.google.com/file/d/1eGiw6Cg7yH-bdjcXJnIBmRjjPlVde69s/view?usp=sharing) |
 | ONCE | ONCE: Boosting Content-based Recommendation with Both Open- and Closed-source Large Language Models | 2024 | LLM-based | models/ONCE_DIRE_LLAMA1_NAML.py general_runner.py | config/once.yaml | Reproduces ONCE-DIRE-LLAMA with NAML-style user modeling. Requires local or Hugging Face-accessible LLaMA weights. Builds a cached lower-layer hidden-state store before training. |
+| S2LENR | Towards S2-Challenges Underlying LLM-Based Augmentation for Personalized News Recommendation | 2025 | LLM-based | models/S2LENR.py scripts/generate_s2lenr_qwen_news.py general_runner.py | config/s2lenr.yaml | Structure-aware and semantic-aware LLM augmentation. Generate the JSONL cache locally with Qwen/Qwen3-32B before training for the full model. |
 
 
 ## 🛠️ Installation
@@ -150,6 +151,20 @@ To train the ONCE-DIRE reproduction on MIND, set the LLaMA checkpoint in `config
 python general_runner.py --dataset_name=MIND --DATASET_ROOT=MIND-small --dataset_size=small --model=ONCE --batch_size=64 --epoch=10
 ```
 
+To train S2LENR, first generate the user-level synthetic-news cache locally with `Qwen/Qwen3-32B`, then launch training. The generator uses Hugging Face `transformers` and disables Qwen3 thinking mode by default for efficient instruction-style generation:
+
+```bash
+python scripts/generate_s2lenr_qwen_news.py --dataset_name=MIND --DATASET_ROOT=MIND-small
+python general_runner.py --dataset_name=MIND --DATASET_ROOT=MIND-small --dataset_size=small --model=S2LENR --batch_size=64 --epoch=10
+```
+
+For EB-NeRD, use the EB-NeRD root and embedding dimension used by the existing EB-NeRD configs:
+
+```bash
+python scripts/generate_s2lenr_qwen_news.py --dataset_name=ebnerd --DATASET_ROOT=ebnerd_demo
+python general_runner.py --dataset_name=ebnerd --DATASET_ROOT=ebnerd_demo --dataset_size=demo --model=S2LENR --batch_size=64 --epoch=10 --word_embedding_dim=1024
+```
+
 To test a trained model:
 ```bash
 python general_runner.py --mode=test --model=NRMS --test_model_path=path/to/your/model
@@ -221,6 +236,8 @@ NewsTorch computes multiple evaluation metrics during validation and testing:
 - **Hit@5/10**: Hit Rate at K
 - **Precision@5/10**: Precision at K
 - **DCE@5/10**: Discounted Clickbait Exposure over valid per-article clickbait scores
+- **CBA-NDCG@5/10**: Clickbait-adjusted nDCG using post-click engagement confidence and visual clickbait risk
+- **CB-HR@5/10**: Clickbait Hit Rate, the fraction of recommendation lists containing at least one visual clickbait item in the top K; lower is better
 - **MAE**: Mean Absolute Error
 - **RMSE**: Root Mean Square Error
 

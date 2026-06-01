@@ -1,6 +1,7 @@
 from utils._python import create_lookup_dict
 import polars as pl
 from utils._constants import DEFAULT_ARTICLE_ID_COL
+from utils import _transformers_compat
 
 try:
     from transformers import AutoTokenizer

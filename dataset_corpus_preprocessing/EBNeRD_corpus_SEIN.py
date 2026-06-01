@@ -179,7 +179,8 @@ class EBNeRD_Corpus(BaseEBNeRD_Corpus):
     @staticmethod
     def _append_stage_ids(behaviors, split_stage_ids):
         for behavior in behaviors:
-            behavior_index = int(behavior[5] if len(behavior) > 7 else behavior[4])
+            behavior_index_value = behavior[5] if isinstance(behavior[4], (list, tuple, np.ndarray)) else behavior[4]
+            behavior_index = int(behavior_index_value)
             if behavior_index >= len(split_stage_ids):
                 raise ValueError(
                     "SEIN history stage cache is incompatible with the prepared behaviors: "

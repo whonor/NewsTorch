@@ -97,7 +97,7 @@ class TrainerSentiRec(Trainer):
             self.wandb.log({'train epoch': e, 'loss': epoch_loss / len(self.train_dataset)})
 
             # validation (uses the same logic as the base Trainer)
-            auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10, dce5, dce10 = compute_scores(self.config, model, self._corpus, self.batch_size,
+            auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10, dce5, dce10, cba_ndcg5, cba_ndcg10, cb_hr5, cb_hr10 = compute_scores(self.config, model, self._corpus, self.batch_size,
                                                      'dev', self.dev_res_dir + '/' + self.config.model + '-' + str(
                     e) + '.txt', self._dataset)
             
@@ -106,8 +106,8 @@ class TrainerSentiRec(Trainer):
             self.ndcg5_results.append(ndcg5)
             self.ndcg10_results.append(ndcg10)
             print('Epoch %d : dev done\nDev criterions' % e)
-            print('AUC = {:.4f}\nMRR = {:.4f}\nnDCG@5 = {:.4f}\nnDCG@10 = {:.4f}\nDCE@5 = {:.4f}\nDCE@10 = {:.4f}'.format(auc, mrr, ndcg5, ndcg10, dce5, dce10))
-            self.wandb.log({'validation epoch': e, 'AUC': auc, 'MRR': mrr, 'nDCG@5': ndcg5, 'nDCG@10': ndcg10, 'DCE@5': dce5, 'DCE@10': dce10})
+            print('AUC = {:.4f}\nMRR = {:.4f}\nnDCG@5 = {:.4f}\nnDCG@10 = {:.4f}\nDCE@5 = {:.4f}\nDCE@10 = {:.4f}\nCBA-NDCG@5 = {:.4f}\nCBA-NDCG@10 = {:.4f}\nCB-HR@5 = {:.4f}\nCB-HR@10 = {:.4f}'.format(auc, mrr, ndcg5, ndcg10, dce5, dce10, cba_ndcg5, cba_ndcg10, cb_hr5, cb_hr10))
+            self.wandb.log({'validation epoch': e, 'AUC': auc, 'MRR': mrr, 'nDCG@5': ndcg5, 'nDCG@10': ndcg10, 'DCE@5': dce5, 'DCE@10': dce10, 'CBA-NDCG@5': cba_ndcg5, 'CBA-NDCG@10': cba_ndcg10, 'CB-HR@5': cb_hr5, 'CB-HR@10': cb_hr10})
             avg = AvgMetric(auc, mrr, ndcg5, ndcg10)
             if avg >= self.best_dev_avg:
                 self.best_dev_avg = avg

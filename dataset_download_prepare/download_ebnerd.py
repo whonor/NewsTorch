@@ -144,7 +144,8 @@ def _load_behaviors(source_file_path, dst_dir, split="train"):
             "article_ids_clicked",
             "impression_id",
             "user_id",
-            "next_read_time"
+            "next_read_time",
+            "next_scroll_percentage"
         ])
         # .pipe(
         #     sampling_strategy_wu2019,
@@ -166,7 +167,7 @@ def _load_behaviors(source_file_path, dst_dir, split="train"):
     '''
     # column_names = ["impression_id", "user_id", "impression_time", "article_id_fixed", "article_ids_inview",
     #                 "article_ids_clicked", "labels"]
-    new_names = ["impid", "uid", "time", "history", "history_read_time", "impressions", "labels", "next_read_time"]
+    new_names = ["impid", "uid", "time", "history", "history_read_time", "impressions", "labels", "next_read_time", "next_scroll_percentage"]
     behaviors = df_behaviors.rename({"impression_id": "impid",
                                           "user_id": "uid",
                                           "impression_time": "time",
@@ -259,5 +260,4 @@ if __name__ == '__main__':
         print("Please install dependencies：pip install requests tqdm", file=sys.stderr)
         sys.exit(1)
     main()
-
 

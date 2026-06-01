@@ -122,7 +122,7 @@ class TrainerCNRCL:
 
             # validation
             # Standard compute_scores should work now as forward returns only logits when not training
-            auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10, dce5, dce10 = compute_scores(
+            auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10, dce5, dce10, cba_ndcg5, cba_ndcg10, cb_hr5, cb_hr10 = compute_scores(
                 self.config, model, self.corpus, self.batch_size * 3 // 2, 'dev', 
                 self.dev_res_dir + '/' + model.model_name + '-' + str(e) + '.txt', self._dataset
             )
@@ -133,8 +133,8 @@ class TrainerCNRCL:
             self.ndcg10_results.append(ndcg10)
             
             print('Epoch %d : dev done\nDev criterions' % e)
-            print('AUC = {:.4f}\nMRR = {:.4f}\nnDCG@5 = {:.4f}\nnDCG@10 = {:.4f}\nDCE@5 = {:.4f}\nDCE@10 = {:.4f}'.format(auc, mrr, ndcg5, ndcg10, dce5, dce10))
-            wandb.log({'epoch': e, 'dev_auc': auc, 'dev_mrr': mrr, 'dev_ndcg5': ndcg5, 'dev_ndcg10': ndcg10, 'dev_dce5': dce5, 'dev_dce10': dce10}, step=e)
+            print('AUC = {:.4f}\nMRR = {:.4f}\nnDCG@5 = {:.4f}\nnDCG@10 = {:.4f}\nDCE@5 = {:.4f}\nDCE@10 = {:.4f}\nCBA-NDCG@5 = {:.4f}\nCBA-NDCG@10 = {:.4f}\nCB-HR@5 = {:.4f}\nCB-HR@10 = {:.4f}'.format(auc, mrr, ndcg5, ndcg10, dce5, dce10, cba_ndcg5, cba_ndcg10, cb_hr5, cb_hr10))
+            wandb.log({'epoch': e, 'dev_auc': auc, 'dev_mrr': mrr, 'dev_ndcg5': ndcg5, 'dev_ndcg10': ndcg10, 'dev_dce5': dce5, 'dev_dce10': dce10, 'dev_cba_ndcg5': cba_ndcg5, 'dev_cba_ndcg10': cba_ndcg10, 'dev_cb_hr5': cb_hr5, 'dev_cb_hr10': cb_hr10}, step=e)
             
             avg = AvgMetric(auc, mrr, ndcg5, ndcg10)
             if avg >= self.best_dev_avg:

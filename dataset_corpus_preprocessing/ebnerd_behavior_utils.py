@@ -35,3 +35,7 @@ def candidate_read_time(value, position=None):
     if len(values) == 1:
         return as_float(values[0], np.nan)
     return np.nan
+
+
+def candidate_scroll_percentage(value, position=None):
+    return candidate_read_time(value, position)
