@@ -73,7 +73,7 @@ class Config:
         parser.add_argument('--dataset_size', type=str, default='demo', help='Dataset variant, can be small, large, or demo, if submit the predictions submission')
         parser.add_argument('--images_path', type=str, default='downloaded_images_ebnerd_small',
                             help='downloaded_images for demo or small')
-        parser.add_argument('--word_embedding_dim', type=int, default=300, help='ebnerd: 1024; glove: 300')
+        parser.add_argument('--word_embedding_dim', type=int, default=1024, help='ebnerd: 1024; glove: 300')
         parser.add_argument('--clickbait_score_path', type=str, default='cache/visual_clickbait_scores_ebnerd_demo.parquet',
                             help='Optional JSON, PKL, CSV, or Parquet file with per-news clickbait scores for DCE, CBA-NDCG, and CB-HR')
         parser.add_argument('--cbhr_clickbait_threshold', type=float, default=0.5,
