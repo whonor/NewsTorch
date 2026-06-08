@@ -63,7 +63,7 @@ class Config:
 
     def __init__(self):
         parser = argparse.ArgumentParser()
-        parser.add_argument('--model', type=str, default='SentiRec', help='Model name: NRMS, LSTUR, TANR, DKN, NAML, NPA, FIM, MINS, CENNEWSREC, IPNR, CNE-SUE, LKPNR, SentiDebias, SentiRec, MMRec, CNRCL, CPRS, DREAM, ONCE, S2LENR')
+        parser.add_argument('--model', type=str, default='SentiRec', help='Model name: NRMS, LSTUR, TANR, DKN, NAML, NPA, FIM, MINS, CENNEWSREC, IPNR, CNE-SUE, LKPNR, SentiDebias, SentiRec, MMRec, CNRCL, CPRS, ONCE, S2LENR')
         parser.add_argument('--batch_size', type=int, default='64', help='Batch size for training')
         parser.add_argument('--seed', type=int, default=0, help='Seed')
         parser.add_argument('--epoch', type=int, default=10, help='Epoch for training')
@@ -71,16 +71,9 @@ class Config:
         parser.add_argument('--DATASET_ROOT', type=str, default='ebnerd_demo', help='Default dataset name, can be ebnerd_demo, ebnerd_small, ebnerd_large, MIND-small, or MIND-large; gossipcop')
         parser.add_argument('--dataset_name', type=str, default='ebnerd', help='Name of the dataset to be used, MIND, ebnerd, gossipcop')
         parser.add_argument('--dataset_size', type=str, default='demo', help='Dataset variant, can be small, large, or demo, if submit the predictions submission')
-        parser.add_argument('--images_path', type=str, default='downloaded_images_ebnerd_small',
+        parser.add_argument('--images_path', type=str, default='downloaded_images_ebnerd_demo',
                             help='downloaded_images for demo or small')
         parser.add_argument('--word_embedding_dim', type=int, default=1024, help='ebnerd: 1024; glove: 300')
-        parser.add_argument('--clickbait_score_path', type=str, default='cache/visual_clickbait_scores_ebnerd_demo.parquet',
-                            help='Optional JSON, PKL, CSV, or Parquet file with per-news clickbait scores for DCE, CBA-NDCG, and CB-HR')
-        parser.add_argument('--cbhr_clickbait_threshold', type=float, default=0.5,
-                            help='Clickbait score threshold tau_b for CB-HR@K')
-        parser.add_argument('--cbhr_satisfaction_threshold', type=float, default=0.5,
-                            help='Post-click satisfaction threshold tau_q for CB-HR@K')
-
         parser.add_argument('--dev_model_path', type=str,
                             default='cache/best_models/small/NRMS/#1/NRMS',
                             help='The path of the best model')
@@ -123,9 +116,6 @@ class Config:
         self.early_stopping_epoch = 5
 
         self.word_embedding_dim = args.word_embedding_dim
-        self.clickbait_score_path = args.clickbait_score_path
-        self.cbhr_clickbait_threshold = args.cbhr_clickbait_threshold
-        self.cbhr_satisfaction_threshold = args.cbhr_satisfaction_threshold
         self.category_embedding_dim = 50
         self.subCategory_embedding_dim = 50
         self.entity_embedding_dim = 100
