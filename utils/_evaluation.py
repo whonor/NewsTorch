@@ -7,6 +7,11 @@ from torchmetrics import MeanSquaredError, MeanAbsoluteError
 from tqdm import tqdm
 
 from dataset_corpus_preprocessing.EBNeRD_corpus_main import EBNeRD_Corpus, Ebnerd_DevTest_Dataset
+from dataset_corpus_preprocessing.Adressa_corpus_main import (
+    Adressa_Corpus,
+    Adressa_DevTest_Dataset,
+    Adressa_DevTest_Dataset_IPNR,
+)
 from dataset_corpus_preprocessing.MIND_corpus_IPNR import MIND_DevTest_Dataset_IPNR
 from dataset_corpus_preprocessing.MIND_corpus_main import MIND_Corpus, MIND_DevTest_Dataset
 from dataset_corpus_preprocessing.MIND_corpus_SentiDebias import MIND_Corpus_SentiDebias, MIND_DevTest_Dataset_SentiDebias
@@ -119,7 +124,7 @@ def _get_model_inputs(config, data_batch):
     elif config.model == 'IPNR' or config.model == 'TCCM' or config.model == 'DREAM' or config.model == 'SEIN':
         return data_batch
 
-    elif config.model in ONCE_DIRE_MODEL_NAMES:
+    elif config.model in ONCE_DIRE_MODEL_NAMES or config.model == 'PNR-LLM':
         news_category = data_batch[13].unsqueeze(dim=1)
         news_subCategory = data_batch[14].unsqueeze(dim=1)
         news_title_text = data_batch[15].unsqueeze(dim=1)
@@ -192,8 +197,8 @@ def _get_model_inputs(config, data_batch):
         elif config.model == "CNE-SUE" or config.model == "DKN" or config.model == "FIM":
              return data_batch[:21]
         elif config.model == "LKPNR":
-            if config.dataset_name == 'ebnerd':
-                return data_batch[:21] + data_batch[23:26]
+            if config.dataset_name in {'ebnerd', 'Adressa'}:
+                return data_batch[:21] + data_batch[23:25]
             else:
                 return data_batch
         elif config.model == "SentiDebias":
@@ -206,7 +211,7 @@ def _get_model_inputs(config, data_batch):
             if config.dataset_name == 'MIND':
                 # 0-9: user, 10-17: news, 18: sent_hist, 19: sent_cand
                 return tuple(list(data_batch[:10]) + [None, None, None] + list(data_batch[10:18]) + [discretize(data_batch[18]), discretize(data_batch[19])])
-            elif config.dataset_name == 'ebnerd':
+            elif config.dataset_name in {'ebnerd', 'Adressa'}:
                 # Ebnerd: 0-9 user, 10-12 graph, 13-20 news, 21 hist_sent, 22 cand_sent
                 return tuple(list(data_batch[:10]) + [None, None, None] + list(data_batch[13:21]) + [discretize(data_batch[21]), discretize(data_batch[22])])
         else:
@@ -1021,7 +1026,12 @@ def scoring(truth_f, sub_f):
 
 def compute_scores_IPNR(config: Config, model: nn.Module, mind_corpus: MIND_Corpus, batch_size: int, mode: str, result_file: str, dataset: str):
     assert mode in ['dev', 'test'], 'mode must be chosen from \'dev\' or \'test\''
-    dataloader = DataLoader(MIND_DevTest_Dataset_IPNR(mind_corpus, mode), batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=True)
+    eval_dataset = (
+        Adressa_DevTest_Dataset_IPNR(mind_corpus, mode)
+        if config.dataset_name == 'Adressa'
+        else MIND_DevTest_Dataset_IPNR(mind_corpus, mode)
+    )
+    dataloader = DataLoader(eval_dataset, batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=True)
     indices = (mind_corpus.dev_indices if mode == 'dev' else mind_corpus.test_indices)
     scores = torch.zeros([len(indices)]).cuda()
     index = 0
@@ -1043,16 +1053,19 @@ def compute_scores_IPNR(config: Config, model: nn.Module, mind_corpus: MIND_Corp
             news_concept_text = news_concept_text.unsqueeze(dim=1)
             news_concept_mask = news_concept_mask.unsqueeze(dim=1)
 
+            data_batch[13] = news_category
+            data_batch[14] = news_subCategory
+            data_batch[15] = news_title_text
+            data_batch[16] = news_title_mask
+            data_batch[18] = news_content_text
+            data_batch[19] = news_content_mask
+            data_batch[21] = news_concept_text
+            data_batch[22] = news_concept_mask
+
             scores[index: index+batch_size] = model(*data_batch).squeeze(dim=1) # [batch_size]
             index += batch_size
     scores = scores.tolist()
-    candidate_news_indices = _get_candidate_news_indices(mind_corpus, mode)
-    candidate_read_times, candidate_scroll_percentages = _get_candidate_engagement_values(mind_corpus, mode)
-    clickbait_scores = get_clickbait_scores(config, mind_corpus)
-    sub_scores = _build_sub_scores(indices, scores, candidate_news_indices, candidate_read_times, candidate_scroll_percentages)
-    dce5 = _compute_dce_from_sub_scores(sub_scores, clickbait_scores, 5)
-    dce10 = _compute_dce_from_sub_scores(sub_scores, clickbait_scores, 10)
-    cb_hr5, cb_hr10 = _compute_cb_hr_metrics(config, sub_scores, clickbait_scores)
+    sub_scores = _build_sub_scores(indices, scores)
     with open(result_file, 'w', encoding='utf-8') as result_f:
         for i, sub_score in enumerate(sub_scores):
             sub_score.sort(key=lambda x: x[0], reverse=True)
@@ -1062,14 +1075,11 @@ def compute_scores_IPNR(config: Config, model: nn.Module, mind_corpus: MIND_Corp
             result_f.write(('' if i == 0 else '\n') + str(i + 1) + ' ' + str(result).replace(' ', ''))
     if dataset != 'submission' or mode != 'test':
         truth_file_path = "./cache/" + mode + '/ref/truth-%s.txt' % config.DATASET_ROOT
-        cba_ndcgs = _compute_cba_ndcg_from_sub_scores(sub_scores, truth_file_path, clickbait_scores, (5, 10))
-        cba_ndcg5 = cba_ndcgs[5]
-        cba_ndcg10 = cba_ndcgs[10]
         with open(truth_file_path, 'r', encoding='utf-8') as truth_f, open(result_file, 'r', encoding='utf-8') as result_f:
             auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = scoring(truth_f, result_f)
-        return auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10, dce5, dce10, cba_ndcg5, cba_ndcg10, cb_hr5, cb_hr10
+        return auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10
     else:
-        return None, None, None, None, None, None, None, None, None, None, None, None, dce5, dce10, None, None, cb_hr5, cb_hr10
+        return (None,) * 12
 
 
 def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mode: str, result_file: str, dataset_size: str):
@@ -1114,6 +1124,10 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
         if corpus is None:
             corpus = Fake_MIND_Corpus(config)
         devtest_dataset = Fake_MIND_DevTest_Dataset(corpus, mode)
+    elif config.dataset_name == 'Adressa':
+        if corpus is None:
+            corpus = Adressa_Corpus(config)
+        devtest_dataset = Adressa_DevTest_Dataset(corpus, mode)
     dataloader = DataLoader(devtest_dataset, batch_size=batch_size, shuffle=False,
                             num_workers=batch_size // 16, pin_memory=True)
     indices = (corpus.dev_indices if mode == 'dev' else corpus.test_indices)
@@ -1149,7 +1163,7 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
                      # 0-9: user, 10-17: news, 18: sent_hist, 19: sent_cand
                      args = list(data_batch[:10]) + [None, None, None] + list(data_batch[10:18]) + [discretize(data_batch[18]), discretize(data_batch[19])]
                      scores[index: index + batch_size] = model(*args)[1]
-                elif config.dataset_name == 'ebnerd':
+                elif config.dataset_name in {'ebnerd', 'Adressa'}:
                      # Ebnerd: 0-9 user, 10-12 graph, 13-20 news, 21 hist_sent, 22 cand_sent
                      args = list(data_batch[:10]) + [None, None, None] + list(data_batch[13:21]) + [discretize(data_batch[21]), discretize(data_batch[22])]
                      scores[index: index + batch_size] = model(*args)[1]
@@ -1160,8 +1174,10 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
             news_subCategory = data_batch[14]
             news_title_text = data_batch[15]
             news_title_mask = data_batch[16]
+            news_title_entity = data_batch[17]
             news_content_text = data_batch[18]
             news_content_mask = data_batch[19]
+            news_content_entity = data_batch[20]
             if config.dataset_name in ['MIND', 'gossipcop']:
                 candidate_news_index = data_batch[22]
             else:
@@ -1172,16 +1188,20 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
             news_subCategory = news_subCategory.unsqueeze(dim=1)
             news_title_text = news_title_text.unsqueeze(dim=1)
             news_title_mask = news_title_mask.unsqueeze(dim=1)
+            news_title_entity = news_title_entity.unsqueeze(dim=1)
             news_content_text = news_content_text.unsqueeze(dim=1)
             news_content_mask = news_content_mask.unsqueeze(dim=1)
+            news_content_entity = news_content_entity.unsqueeze(dim=1)
             candidate_news_index = candidate_news_index.unsqueeze(dim=1)
 
             data_batch[13] = news_category
             data_batch[14] = news_subCategory
             data_batch[15] = news_title_text
             data_batch[16] = news_title_mask
+            data_batch[17] = news_title_entity
             data_batch[18] = news_content_text
             data_batch[19] = news_content_mask
+            data_batch[20] = news_content_entity
             if config.dataset_name in ['MIND', 'gossipcop']:
                 data_batch[22] = candidate_news_index
             else:
@@ -1193,8 +1213,8 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
             elif config.model == "CNE-SUE" or config.model == "DKN" or config.model == "FIM":
                 scores[index: index + batch_size] = model(*data_batch[:21]).squeeze(1)
             elif config.model == "LKPNR":
-                if config.dataset_name == 'ebnerd':
-                    model_args = data_batch[:21] + data_batch[23:26]
+                if config.dataset_name in {'ebnerd', 'Adressa'}:
+                    model_args = data_batch[:21] + data_batch[23:25]
                     scores[index: index + batch_size] = model(*model_args).squeeze(dim=1)
                 else:
                     scores[index: index + batch_size] = model(*data_batch).squeeze(dim=1)
@@ -1232,17 +1252,17 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
                 else:
                     args = data_batch[:21] + [data_batch[23], data_batch[24]]
                 scores[index: index + batch_size] = _as_score_vector(model(*args), batch_size)
+            elif config.model == "PNR-LLM":
+                if config.dataset_name in ['MIND', 'gossipcop']:
+                    args = data_batch[:21] + [data_batch[21], data_batch[22]]
+                else:
+                    args = data_batch[:21] + [data_batch[23], data_batch[24]]
+                scores[index: index + batch_size] = _as_score_vector(model(*args), batch_size)
             else:
                 scores[index: index + batch_size] = model(*data_batch[:21])
             index += batch_size
     scores = scores.tolist()
-    candidate_news_indices = _get_candidate_news_indices(corpus, mode)
-    candidate_read_times, candidate_scroll_percentages = _get_candidate_engagement_values(corpus, mode)
-    clickbait_scores = get_clickbait_scores(config, corpus)
-    sub_scores = _build_sub_scores(indices, scores, candidate_news_indices, candidate_read_times, candidate_scroll_percentages)
-    dce5 = _compute_dce_from_sub_scores(sub_scores, clickbait_scores, 5)
-    dce10 = _compute_dce_from_sub_scores(sub_scores, clickbait_scores, 10)
-    cb_hr5, cb_hr10 = _compute_cb_hr_metrics(config, sub_scores, clickbait_scores)
+    sub_scores = _build_sub_scores(indices, scores)
     with open(result_file, 'w', encoding='utf-8') as result_f:
         for i, sub_score in enumerate(sub_scores):
             sub_score.sort(key=lambda x: x[0], reverse=True)
@@ -1252,14 +1272,11 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
             result_f.write(('' if i == 0 else '\n') + str(i + 1) + ' ' + str(result).replace(' ', ''))
     if dataset_size != 'submission' or mode != 'test':
         truth_file_path = config.data_path + '/' + mode + '/ref/truth-%s.txt' % config.DATASET_ROOT
-        cba_ndcgs = _compute_cba_ndcg_from_sub_scores(sub_scores, truth_file_path, clickbait_scores, (5, 10))
-        cba_ndcg5 = cba_ndcgs[5]
-        cba_ndcg10 = cba_ndcgs[10]
         with open(truth_file_path, 'r', encoding='utf-8') as truth_f, open(result_file, 'r', encoding='utf-8') as result_f:
             auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = scoring(truth_f, result_f)
-        return auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10, dce5, dce10, cba_ndcg5, cba_ndcg10, cb_hr5, cb_hr10
+        return auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10
     else:
-        return None, None, None, None, None, None, None, None, None, None, None, None, dce5, dce10, None, None, cb_hr5, cb_hr10
+        return (None,) * 12
 
 
 def compute_scores_mmrec(config: Config, model: nn.Module, corpus, batch_size: int, mode: str, result_file: str, dataset_size: str):
@@ -1267,6 +1284,10 @@ def compute_scores_mmrec(config: Config, model: nn.Module, corpus, batch_size: i
     if config.dataset_name == 'ebnerd':
         corpus = EBNeRD_Corpus(config)
         dataset = Ebnerd_DevTest_Dataset(corpus, mode)
+    elif config.dataset_name == 'Adressa':
+        if corpus is None:
+            corpus = Adressa_Corpus(config)
+        dataset = Adressa_DevTest_Dataset(corpus, mode)
     elif config.dataset_name == 'MIND':
         corpus = MIND_Corpus(config)
         dataset = MIND_DevTest_Dataset(corpus, mode)
@@ -1316,13 +1337,7 @@ def compute_scores_mmrec(config: Config, model: nn.Module, corpus, batch_size: i
 
             index += batch_size
     scores = scores.tolist()
-    candidate_news_indices = _get_candidate_news_indices(corpus, mode)
-    candidate_read_times, candidate_scroll_percentages = _get_candidate_engagement_values(corpus, mode)
-    clickbait_scores = get_clickbait_scores(config, corpus)
-    sub_scores = _build_sub_scores(indices, scores, candidate_news_indices, candidate_read_times, candidate_scroll_percentages)
-    dce5 = _compute_dce_from_sub_scores(sub_scores, clickbait_scores, 5)
-    dce10 = _compute_dce_from_sub_scores(sub_scores, clickbait_scores, 10)
-    cb_hr5, cb_hr10 = _compute_cb_hr_metrics(config, sub_scores, clickbait_scores)
+    sub_scores = _build_sub_scores(indices, scores)
     with open(result_file, 'w', encoding='utf-8') as result_f:
         for i, sub_score in enumerate(sub_scores):
             sub_score.sort(key=lambda x: x[0], reverse=True)
@@ -1332,14 +1347,11 @@ def compute_scores_mmrec(config: Config, model: nn.Module, corpus, batch_size: i
             result_f.write(('' if i == 0 else '\n') + str(i + 1) + ' ' + str(result).replace(' ', ''))
     if dataset_size != 'submission' or mode != 'test':
         truth_file_path = config.data_path + '/' + mode + '/ref/truth-%s.txt' % config.DATASET_ROOT
-        cba_ndcgs = _compute_cba_ndcg_from_sub_scores(sub_scores, truth_file_path, clickbait_scores, (5, 10))
-        cba_ndcg5 = cba_ndcgs[5]
-        cba_ndcg10 = cba_ndcgs[10]
         with open(truth_file_path, 'r', encoding='utf-8') as truth_f, open(result_file, 'r', encoding='utf-8') as result_f:
             auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = scoring(truth_f, result_f)
-        return auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10, dce5, dce10, cba_ndcg5, cba_ndcg10, cb_hr5, cb_hr10
+        return auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10
     else:
-        return None, None, None, None, None, None, None, None, None, None, None, None, dce5, dce10, None, None, cb_hr5, cb_hr10
+        return (None,) * 12
 
 
 def get_run_index(result_dir: str):

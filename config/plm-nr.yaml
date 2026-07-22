@@ -1,0 +1,26 @@
+# RoBERTa-NRMS reproduction of PLM-NR (SIGIR 2021).
+# The paper used an effective batch size of 128 on four GPUs (32 per GPU).
+batch_size: 32
+lr: 1.0e-5
+weight_decay: 0
+dropout_rate: 0.2
+
+# PLM news encoder: roberta-base token states followed by attention pooling.
+plm_model_name_or_path: roberta-base
+plm_hf_token_env: HF_TOKEN
+plm_local_files_only: false
+plm_trust_remote_code: false
+plm_freeze: false
+plm_trainable_layers: 2
+plm_freeze_vocabulary_mapping: true
+# With the first ten layers frozen, autograd already retains activations only
+# for the final two layers; checkpointing is unnecessary for this setup.
+plm_gradient_checkpointing: false
+plm_mapping_batch_size: 512
+plm_mapping_max_subwords: 8
+nrms_variant_text_dim: 768
+
+# Original NRMS user encoder.
+head_num: 20
+head_dim: 20
+attention_dim: 200

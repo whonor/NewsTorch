@@ -161,8 +161,8 @@ class NewsEncoder(nn.Module):
             if getattr(config, "model", None) == 'IPNR':
                 return os.path.join('cache', 'IPNR', file_name)
             return os.path.join('cache', file_name)
-        if getattr(config, "dataset_name", None) == 'ebnerd':
-            return os.path.join('cache', config.dataset_name, file_name)
+        if getattr(config, "dataset_name", None) in {'ebnerd', 'Adressa'}:
+            return os.path.join('cache', config.dataset_name.lower(), file_name)
         return None
 
     def _load_pretrained_word_embedding(self):

@@ -27,12 +27,14 @@ class CNRCL_Ebnerd_Train_Dataset(Ebnerd_Train_Dataset):
         self.news_ID_dict = corpus.news_ID_dict
         
         # Ensure similarity file exists or generate it
-        self.similarity_file = f'cache/ebnerd/similarities-{corpus.config.dataset_size}.csv'
+        dataset_cache = corpus.config.dataset_name.lower()
+        os.makedirs(os.path.join('cache', dataset_cache), exist_ok=True)
+        self.similarity_file = f'cache/{dataset_cache}/similarities-{corpus.config.dataset_size}.csv'
         if not os.path.exists(self.similarity_file):
             self.generate_similarities()
 
         # Ensure history similarity file exists or generate it (for Curriculum Learning)
-        self.similarity_results_history_file = f'cache/ebnerd/similarities_results_history-{corpus.config.dataset_size}.pkl'
+        self.similarity_results_history_file = f'cache/{dataset_cache}/similarities_results_history-{corpus.config.dataset_size}.pkl'
         if not os.path.exists(self.similarity_results_history_file):
             self.generate_similarities_results_history_file()
 
@@ -40,7 +42,7 @@ class CNRCL_Ebnerd_Train_Dataset(Ebnerd_Train_Dataset):
         print("Generating history-based similarities for Curriculum Learning (CNRCL)...")
         
         # 1. Load Word Embeddings
-        word_embedding_file = 'cache/%s/word_embedding-' % self.config.dataset_name + str(self.config.word_threshold) + '-' + str(
+        word_embedding_file = 'cache/%s/word_embedding-' % self.config.dataset_name.lower() + str(self.config.word_threshold) + '-' + str(
             self.config.word_embedding_dim) + '-' + self.config.tokenizer + '-' + str(
             self.config.max_title_length) + '-' + str(self.config.max_abstract_length) + '-' + self.config.dataset_size + '.pkl'
         
@@ -129,7 +131,7 @@ class CNRCL_Ebnerd_Train_Dataset(Ebnerd_Train_Dataset):
         print("Generating similarities for CNRCL...")
         # Need word embeddings
         # corpus.config has dataset_name, etc.
-        word_embedding_file = 'cache/%s/word_embedding-' % self.corpus.config.dataset_name + str(self.corpus.config.word_threshold) + '-' + str(
+        word_embedding_file = 'cache/%s/word_embedding-' % self.corpus.config.dataset_name.lower() + str(self.corpus.config.word_threshold) + '-' + str(
             self.corpus.config.word_embedding_dim) + '-' + self.corpus.config.tokenizer + '-' + str(
             self.corpus.config.max_title_length) + '-' + str(self.corpus.config.max_abstract_length) + '-' + self.corpus.config.dataset_size + '.pkl'
         

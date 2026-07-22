@@ -64,15 +64,17 @@ With NewsTorch, researchers and practitioners can quickly implement and evaluate
 | LSTUR | Neural news recommendation with long-and short-term user representations | 2019 | DL-based | models/LSTUR.py  general_runner.py                                   | config/lstur.yaml     | None                                                                                                                                                            |
 | NAML | Neural News Recommendation with Attentive Multi-View Learning | 2019 | DL-based | models/NAML.py  general_runner.py                                    | config/naml.yaml      | None                                                                                                                                                            |
 | NRMS | Neural news recommendation with multi-head self-attention | 2019 | DL-based | models/NRMS.py  general_runner.py                                    | config/nrms.yaml      | None                                                                                                                                                            |
+| PLM-NR | PLM-empowered News Recommendation | 2021 | PLM-based | models/PLM_NR.py models/modules/plm_nr.py general_runner.py | config/plm-nr.yaml | RoBERTa-NRMS reproduction: title-only `roberta-base` news encoding with attention pooling; the final two RoBERTa layers are fine-tuned. |
 | FIM | Fine-grained Interest Matching for Neural News Recommendation| 2020 | DL-based | models/FIM.py  general_runner.py                                     | config/fim.yaml       | None                                                                                                                                                            |
 | TANR | Neural news recommendation with topic-aware news representation | 2019 | DL-based | models/TANR.py  general_runner.py                                    | config/tanr.yaml      | None                                                                                                                                                            |
 | CenNewsRec | Privacy-Preserving News Recommendation Model Learning | 2020 | DL-based | models/CenNewsRec.py  general_runner.py                              | config/cennewsrec.yaml | None                                                                                                                                                            |
 | MINS | News recommendation via multi-interest news sequence modelling | 2022 | DL-based | models/MINS.py  general_runner.py                                    | config/mins.yaml      | None                                                                                                                                                            |
 | CNE-SUE | Neural News Recommendation with Collaborative News Encoding and Structural User Encoding | 2021 | Graph-based | models/CNE_SUE.py  general_runner.py                                 | config/cne-sue.yaml   | None                                                                                                                                                            |
 | IPNR | Intention-aware user modeling for personalized news recommendation | 2023 | Graph-based | models/IPNR.py models/modules/ipnr Conceptgraph general_runner.py    | config/ipnr.yaml      | First to download and execute Conceptgraph to generate graph data [here](https://drive.google.com/file/d/1rih15bSlXTHZg-JNdtxSoS3uiVfjjIyX/view?usp=sharing)    |
-| LKPNR | LKPNR: Large Language Models and Knowledge Graph for Personalized News Recommendation Framework | 2024 | LLM-based | models/LKPNR.py models/modules/LKPNR  KGraph_LKPNR general_runner.py | config/lkpnr.yaml | First to download and execute KGraph_LKPNR to generate required data [here](https://drive.google.com/file/d/1eGiw6Cg7yH-bdjcXJnIBmRjjPlVde69s/view?usp=sharing) |
-| ONCE | ONCE: Boosting Content-based Recommendation with Both Open- and Closed-source Large Language Models | 2024 | LLM-based | models/ONCE_DIRE_LLAMA1_NAML.py general_runner.py | config/once.yaml | Reproduces ONCE-DIRE-LLAMA with NAML-style user modeling. Requires local or Hugging Face-accessible LLaMA weights. Builds a cached lower-layer hidden-state store before training. |
-| S2LENR | Towards S2-Challenges Underlying LLM-Based Augmentation for Personalized News Recommendation | 2025 | LLM-based | models/S2LENR.py scripts/generate_s2lenr_qwen_news.py general_runner.py | config/s2lenr.yaml | Structure-aware and semantic-aware LLM augmentation. Generate the JSONL cache locally with Qwen/Qwen3-32B before training for the full model. |
+| LKPNR | LKPNR: Large Language Models and Knowledge Graph for Personalized News Recommendation Framework | 2024 | LLM-based | models/LKPNR.py models/modules/LKPNR general_runner.py | config/lkpnr.yaml | Ported from the [official implementation](https://github.com/Xuan-ZW/LKPNR). EB-NeRD and Adressa use native semantic and linked-metadata features; the original KGraph_LKPNR files remain optional for legacy MIND experiments. |
+| ONCE | ONCE: Boosting Content-based Recommendation with Both Open- and Closed-source Large Language Models | 2024 | LLM-based | models/ONCE_DIRE_QWEN3_NAML.py general_runner.py | config/once.yaml | Qwen3 adaptation of ONCE-DIRE with NAML-style user modeling. Builds a cached lower-layer hidden-state store and fine-tunes the final Qwen3 block with LoRA. |
+| S2LENR | Towards S2-Challenges Underlying LLM-Based Augmentation for Personalized News Recommendation | 2025 | LLM-based | models/S2LENR.py scripts/generate_s2lenr_qwen_news.py general_runner.py | config/s2lenr.yaml | Structure-aware and semantic-aware LLM augmentation. Generate the JSONL cache locally with the model configured by `s2lenr_llm_model` before training for the full model. |
+| PNR-LLM | Enhancing News Recommendation with Hierarchical LLM Prompting | 2025 | LLM-based | models/PNR_LLM.py scripts/generate_pnr_llm_enrichment.py general_runner.py | config/pnr-llm.yaml | Hierarchical title and entity enrichment followed by CNN, entity self-attention, multi-view attention, and attentive user pooling. |
 
 
 ## 🛠️ Installation
@@ -145,25 +147,222 @@ To train a model (e.g., NRMS) on the MIND dataset:
 python general_runner.py --model=NRMS --batch_size=64 --epoch=10
 ```
 
-To train the ONCE-DIRE reproduction on MIND, set the LLaMA checkpoint in `config/once.yaml` or set `ONCE_LLAMA_MODEL`. For gated Meta checkpoints, request Hugging Face access and authenticate with `huggingface-cli login` or `HF_TOKEN`.
+To reproduce the paper's RoBERTa-NRMS PLM-NR model on MIND-small (the
+configuration uses the paper's `1e-5` Adam learning rate and per-GPU batch size
+of 32):
+
+```bash
+python general_runner.py --dataset_name=MIND --DATASET_ROOT=MIND-small --dataset_size=small --model=PLM-NR --word_embedding_dim=300 --batch_size=32
+```
+
+The first run downloads `roberta-base` and creates a cached mapping from the
+corpus vocabulary to RoBERTa subword embeddings under `cache/nrms_plm/`.
+
+To train SEIN on MIND, select the prepared MIND split and its 300-dimensional GloVe embeddings:
+
+```bash
+python general_runner.py --dataset_name=MIND --DATASET_ROOT=MIND-small --dataset_size=small --model=SEIN --batch_size=64 --epoch=10 --word_embedding_dim=300
+```
+
+ONCE-DIRE uses the public `Qwen/Qwen3-0.6B` safetensors checkpoint by default.
+Set `ONCE_QWEN_MODEL` to use an already downloaded Qwen3 directory; also set
+`once_local_files_only: true` in `config/once.yaml` for a fully offline run.
+The first run automatically creates the lower-layer cache under
+`cache/once_dire_qwen3_naml/`; previous LLaMA caches are not reused.
 
 ```bash
 python general_runner.py --dataset_name=MIND --DATASET_ROOT=MIND-small --dataset_size=small --model=ONCE --batch_size=64 --epoch=10
 ```
 
-To train S2LENR, first generate the user-level synthetic-news cache locally with `Qwen/Qwen3-32B`, then launch training. The generator uses Hugging Face `transformers` and disables Qwen3 thinking mode by default for efficient instruction-style generation:
+To train S2LENR, first generate the user-level synthetic-news cache locally with the same model named by `s2lenr_llm_model` (`Qwen/Qwen3-0.6B` by default), then launch training. The generator uses Hugging Face `transformers` and disables Qwen3 thinking mode by default for efficient instruction-style generation:
 
 ```bash
-python scripts/generate_s2lenr_qwen_news.py --dataset_name=MIND --DATASET_ROOT=MIND-small
+python scripts/generate_s2lenr_qwen_news.py --dataset_name=MIND --DATASET_ROOT=MIND-small --model_name_or_path=Qwen/Qwen3-0.6B
 python general_runner.py --dataset_name=MIND --DATASET_ROOT=MIND-small --dataset_size=small --model=S2LENR --batch_size=64 --epoch=10
 ```
 
 For EB-NeRD, use the EB-NeRD root and embedding dimension used by the existing EB-NeRD configs:
 
 ```bash
-python scripts/generate_s2lenr_qwen_news.py --dataset_name=ebnerd --DATASET_ROOT=ebnerd_demo
+python scripts/generate_s2lenr_qwen_news.py --dataset_name=ebnerd --DATASET_ROOT=ebnerd_demo --model_name_or_path=Qwen/Qwen3-0.6B
 python general_runner.py --dataset_name=ebnerd --DATASET_ROOT=ebnerd_demo --dataset_size=demo --model=S2LENR --batch_size=64 --epoch=10 --word_embedding_dim=1024
 ```
+
+PNR-LLM requires an offline per-article enrichment cache. NewsTorch uses local `Qwen/Qwen3-0.6B` generation instead of the paper's Gemini API, and writes to the cache path resolved by `config/pnr-llm.yaml`:
+
+```bash
+python scripts/generate_pnr_llm_enrichment.py --dataset_name=MIND --DATASET_ROOT=MIND-small --model_name_or_path=Qwen/Qwen3-0.6B
+python general_runner.py --dataset_name=MIND --DATASET_ROOT=MIND-small --dataset_size=small --model=PNR-LLM --batch_size=64 --epoch=10 --word_embedding_dim=300
+```
+
+Generated entities can optionally be canonicalized through Wikidata before training:
+
+```bash
+python scripts/generate_pnr_llm_enrichment.py --dataset_name=MIND --DATASET_ROOT=MIND-small --model_name_or_path=Qwen/Qwen3-0.6B --verify_wikidata
+```
+
+Set `pnr_llm_require_enrichment_cache: true` for benchmark runs so an incomplete preprocessing setup fails immediately instead of using the title-only ablation.
+
+### Adressa-1week
+
+The official Adressa one-week light release is licensed CC BY-NC-SA 4.0 for non-commercial use. Review the terms, then download, extract, and prepare it in one command:
+
+```bash
+python dataset_download_prepare/download_adressa.py --accept-license --prepare
+```
+
+The downloader streams the official `one_week.tar.gz` archive into `Adressa-1week/download/`, resumes an existing `.part` file, and safely extracts the daily files into `Adressa-1week/raw/`. Use `--url` for an approved mirror, `--sha256` when a checksum is available, or `--force-download`/`--force-extract` to replace cached artifacts.
+
+To prepare raw files that were obtained separately:
+
+```bash
+python dataset_download_prepare/Adressa_dataset_prepare.py --dataset-root Adressa-1week
+```
+
+Adressa contains positive click events rather than displayed non-click impressions. The preparer therefore uses days 1-5 as history, day 6 for training, and chronological halves of day 7 for development and testing. It deterministically samples 20 negatives per click by default and records the complete policy in `Adressa-1week/manifest.json`.
+
+Run one model with the unified runner:
+
+```bash
+python general_runner.py --dataset_name=Adressa --DATASET_ROOT=Adressa-1week --dataset_size=1week --model=NRMS --word_embedding_dim=300
+```
+
+### LKPNR on EB-NeRD small and Adressa-1week
+
+LKPNR requires a CUDA-capable GPU when launched through `general_runner.py`.
+Before starting, ensure that the selected dataset has prepared `train`, `dev`,
+and `test` directories. For Adressa, use the preparation commands above.
+
+The full LKPNR semantic branch uses one frozen LLM vector per article. The
+generator reproduces the official last-hidden-layer, attention-mask mean
+pooling. It loads only `safetensors` weights, so it remains safe and usable with
+PyTorch versions older than 2.6. `Qwen/Qwen3-0.6B` is the default compatible
+encoder. To download it from Hugging Face while generating the cache, run:
+
+```bash
+# EB-NeRD small
+python scripts/generate_lkpnr_embeddings.py \
+  --dataset_name=ebnerd \
+  --DATASET_ROOT=ebnerd_small \
+  --dataset_size=small \
+  --model_name_or_path=Qwen/Qwen3-0.6B \
+  --batch_size=4 \
+  --device=cuda
+
+# Adressa-1week
+python scripts/generate_lkpnr_embeddings.py \
+  --dataset_name=Adressa \
+  --DATASET_ROOT=Adressa-1week \
+  --dataset_size=1week \
+  --model_name_or_path=Qwen/Qwen3-0.6B \
+  --batch_size=4 \
+  --device=cuda
+```
+
+For an already downloaded checkpoint, replace the model name with its local
+directory and add `--local_files_only`. That directory must contain
+`model.safetensors` or sharded `*.safetensors` files.
+
+The official LKPNR code used ChatGLM2-6B, whose official checkpoint contains
+legacy `.bin` shards. Recent Transformers versions refuse to load those shards
+with PyTorch older than 2.6 because the load path is affected by
+CVE-2025-32434. Do not bypass that check. For an exact ChatGLM2 semantic cache,
+convert the checkpoint with `safe_serialization=True` in a separate environment
+that has PyTorch 2.6 or newer, then point this generator at the converted
+directory. The resulting `.npy` cache can be used for LKPNR training in the
+original NewsTorch environment.
+
+These commands create:
+
+```text
+cache/ebnerd/lkpnr_item_embedding-small.npy
+cache/adressa/lkpnr_item_embedding-1week.npy
+```
+
+If the cache is absent, LKPNR remains runnable and pools the dataset's
+pretrained title and abstract word embeddings as a semantic fallback. For a
+benchmark run that must use LLM vectors, set the following in
+`config/lkpnr.yaml`:
+
+```yaml
+lkpnr_require_semantic_cache: true
+```
+
+Train on EB-NeRD small:
+
+```bash
+python general_runner.py \
+  --model=LKPNR \
+  --dataset_name=ebnerd \
+  --DATASET_ROOT=ebnerd_small \
+  --dataset_size=small \
+  --word_embedding_dim=1024 \
+  --batch_size=64 \
+  --epoch=10
+```
+
+Train on Adressa-1week:
+
+```bash
+python general_runner.py \
+  --model=LKPNR \
+  --dataset_name=Adressa \
+  --DATASET_ROOT=Adressa-1week \
+  --dataset_size=1week \
+  --word_embedding_dim=300 \
+  --batch_size=64 \
+  --epoch=10
+```
+
+Reduce the batch size to `16` or `32` if LKPNR does not fit in GPU memory.
+Training evaluates the best checkpoint automatically. Checkpoints are stored
+under `cache/best_models/<DATASET_ROOT>/LKPNR/`; for example:
+
+```text
+cache/best_models/ebnerd_small/LKPNR/#1/LKPNR
+cache/best_models/Adressa-1week/LKPNR/#1/LKPNR
+```
+
+Evaluate an existing EB-NeRD checkpoint:
+
+```bash
+python general_runner.py \
+  --mode=test \
+  --model=LKPNR \
+  --dataset_name=ebnerd \
+  --DATASET_ROOT=ebnerd_small \
+  --dataset_size=small \
+  --word_embedding_dim=1024 \
+  --test_model_path='cache/best_models/ebnerd_small/LKPNR/#1/LKPNR'
+```
+
+Evaluate an existing Adressa checkpoint:
+
+```bash
+python general_runner.py \
+  --mode=test \
+  --model=LKPNR \
+  --dataset_name=Adressa \
+  --DATASET_ROOT=Adressa-1week \
+  --dataset_size=1week \
+  --word_embedding_dim=300 \
+  --test_model_path='cache/best_models/Adressa-1week/LKPNR/#1/LKPNR'
+```
+
+Prepare optional local Qwen3 caches for the full S2LENR and PNR-LLM paths:
+
+```bash
+python scripts/generate_s2lenr_qwen_news.py --dataset_name=Adressa --DATASET_ROOT=Adressa-1week --model_name_or_path=Qwen/Qwen3-0.6B
+python scripts/generate_pnr_llm_enrichment.py --dataset_name=Adressa --DATASET_ROOT=Adressa-1week --model_name_or_path=Qwen/Qwen3-0.6B
+```
+
+Deploy every model registered by `general_runner.py` sequentially, preserving completed checkpoints on a resumed run:
+
+```bash
+python scripts/deploy_all_adressa.py --dataset-root Adressa-1week --resume --continue-on-error
+```
+
+The common Adressa adapter derives text, category, named-entity, read-time, popularity, and concept fields from the click log. Since the release has no article images or calibrated sentiment labels, MMRec receives zero image features and sentiment models receive neutral labels. LKPNR derives its semantic and knowledge views from the available Adressa article fields instead of using MIND-specific knowledge files. ONCE uses the Qwen3 checkpoint configured in `config/once.yaml`.
 
 To test a trained model:
 ```bash
@@ -233,11 +432,8 @@ NewsTorch computes multiple evaluation metrics during validation and testing:
 - **MRR**: Mean Reciprocal Rank
 - **nDCG@5/10**: Normalized Discounted Cumulative Gain
 - **Recall@5/10**: Recall at K
-- **Hit@5/10**: Hit Rate at K
+- **Hit Rate@5/10**: Whether a relevant item appears in the top K
 - **Precision@5/10**: Precision at K
-- **DCE@5/10**: Discounted Clickbait Exposure over valid per-article clickbait scores
-- **CBA-NDCG@5/10**: Clickbait-adjusted nDCG using post-click engagement confidence and visual clickbait risk
-- **CB-HR@5/10**: Clickbait Hit Rate, the fraction of recommendation lists containing at least one visual clickbait item in the top K; lower is better
 - **MAE**: Mean Absolute Error
 - **RMSE**: Root Mean Square Error
 
@@ -256,7 +452,7 @@ To improve reproducibility, we recommend recording the LLM provider, model name,
 
 ### Dataset Coverage
 
-The current validation mainly focuses on MIND and EB-NeRD. Although these are widely used datasets in news recommendation research, they do not cover all possible data schemas, languages, metadata fields, behavior logs, licensing requirements, or temporal evaluation protocols.
+The current validation mainly focuses on MIND, EB-NeRD, and the Adressa-1week adapter. These datasets do not cover all possible data schemas, languages, metadata fields, behavior logs, licensing requirements, or temporal evaluation protocols.
 
 Additional dataset-specific adapters may be required to support other news recommendation datasets.
 

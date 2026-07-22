@@ -4,8 +4,16 @@ import shutil
 
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 
+import nltk
+nltk.download('stopwords')
+
 from utils import _transformers_compat
 from dataset_corpus_preprocessing.EBNeRD_corpus_main import EBNeRD_Corpus, Ebnerd_Train_Dataset, Ebnerd_DevTest_Dataset
+from dataset_corpus_preprocessing.Adressa_corpus_main import (
+    Adressa_Corpus,
+    Adressa_DevTest_Dataset,
+    Adressa_DevTest_Dataset_IPNR,
+)
 from dataset_corpus_preprocessing.EBNeRD_corpus_CPRS import EBNeRD_Corpus as EBNeRD_Corpus_CPRS
 from dataset_corpus_preprocessing.EBNeRD_corpus_TCCM import EBNeRD_Corpus as EBNeRD_Corpus_TCCM
 from dataset_corpus_preprocessing.EBNeRD_corpus_SEIN import EBNeRD_Corpus as EBNeRD_Corpus_SEIN
@@ -23,6 +31,7 @@ from models.MINS import MINS
 from models.NAML import NAML
 from models.NPA import NPA
 from models.NRMS import NRMS
+from models.PLM_NR import PLM_NR
 from models.TCCM import TCCM
 from models.SentiRec import SentiRec
 from models.TANR import TANR
@@ -31,7 +40,8 @@ from models.SentiDebias import SentiDebias
 from models.CNRCL import CNRCL
 from models.CPRS import CPRS
 from models.SEIN import SEIN
-from models.ONCE_DIRE_LLAMA1_NAML import ONCE_DIRE_LLAMA1_NAML
+from models.ONCE_DIRE_QWEN3_NAML import ONCE_DIRE_QWEN3_NAML
+from models.PNR_LLM import PNR_LLM
 from models.S2LENR import S2LENR
 from models.modules.cnrcl.trainer import TrainerCNRCL
 from models.modules.ipnr.trainer import TrainerIPNR
@@ -65,6 +75,7 @@ def get_model_classes():
         'NAML': NAML,
         'DKN': DKN,
         'NRMS': NRMS,
+        'PLM-NR': PLM_NR,
         'LSTUR': LSTUR,
         'NPA': NPA,
         'FIM': FIM,
@@ -80,8 +91,9 @@ def get_model_classes():
         'CPRS': CPRS,
         'TCCM': TCCM,
         'SEIN': SEIN,
-        'ONCE': ONCE_DIRE_LLAMA1_NAML,
-        'S2LENR': S2LENR
+        'ONCE': ONCE_DIRE_QWEN3_NAML,
+        'S2LENR': S2LENR,
+        'PNR-LLM': PNR_LLM
     }
     return model_classes
 
@@ -119,7 +131,7 @@ def train(config: Config, corpus, wandb):
         else:
             trainer = Trainer(model, config, corpus, wandb, run_index)
             trainer.train()
-    elif config.dataset_name == 'ebnerd':
+    elif config.dataset_name in {'ebnerd', 'Adressa'}:
         if config.model == 'IPNR':
             trainer = TrainerIPNR(model, config, corpus, wandb, run_index)
             trainer.train()
@@ -160,27 +172,29 @@ def dev(config: Config, corpus):
         os.mkdir(dev_res_dir)
     if config.dataset_name in ['MIND', 'gossipcop']:
         if config.model == 'IPNR':
-            auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10, dce5, dce10, cba_ndcg5, cba_ndcg10, cb_hr5, cb_hr10 = compute_scores_IPNR(config, model, corpus, config.batch_size, 'dev',
+            auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = compute_scores_IPNR(config, model, corpus, config.batch_size, 'dev',
                                                           dev_res_dir + '/' + config.model + '.txt', config.dataset_size)
         else:
-            auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10, dce5, dce10, cba_ndcg5, cba_ndcg10, cb_hr5, cb_hr10 = compute_scores(config, model, corpus, config.batch_size,
+            auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = compute_scores(config, model, corpus, config.batch_size,
                                                      'dev',
                                                      dev_res_dir + '/' + config.model + '.txt', config.dataset_size)
-    elif config.dataset_name == 'ebnerd':
-        if config.model == 'MMRec':
-            auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10, dce5, dce10, cba_ndcg5, cba_ndcg10, cb_hr5, cb_hr10 = compute_scores_mmrec(config, model, corpus, config.batch_size,
+    elif config.dataset_name in {'ebnerd', 'Adressa'}:
+        if config.model == 'IPNR':
+            auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = compute_scores_IPNR(config, model, corpus, config.batch_size, 'dev',
+                                                          dev_res_dir + '/' + config.model + '.txt', config.dataset_size)
+        elif config.model == 'MMRec':
+            auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = compute_scores_mmrec(config, model, corpus, config.batch_size,
                                                      'dev',
                                                      dev_res_dir + '/' + config.model + '.txt', config.dataset_size)
         else:
-            auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10, dce5, dce10, cba_ndcg5, cba_ndcg10, cb_hr5, cb_hr10 = compute_scores(config, model, corpus, config.batch_size,
+            auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = compute_scores(config, model, corpus, config.batch_size,
                                                      'dev',
                                                      dev_res_dir + '/' + config.model + '.txt', config.dataset_size)
 
     print('Dev : ' + config.dev_model_path)
-    print('AUC : %.4f\nMRR : %.4f\nnDCG@5 : %.4f\nnDCG@10 : %.4f\nMAE : %.4f\nRMSE : %.4f\nrecall@5 : %.4f'
-          '\nrecall@10 : %.4f\nhit@5 : %.4f\nhit@10 : %.4f\nprecision@5 : %.4f\nprecision@10 : %.4f\nDCE@5 : %.4f\nDCE@10 : %.4f'
-          '\nCBA-NDCG@5 : %.4f\nCBA-NDCG@10 : %.4f\nCB-HR@5 : %.4f\nCB-HR@10 : %.4f' % (auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10, dce5, dce10, cba_ndcg5, cba_ndcg10, cb_hr5, cb_hr10))
-    return auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10, dce5, dce10, cba_ndcg5, cba_ndcg10, cb_hr5, cb_hr10
+    print('AUC : %.4f\nMRR : %.4f\nnDCG@5 : %.4f\nnDCG@10 : %.4f\nMAE : %.4f\nRMSE : %.4f\nRecall@5 : %.4f'
+          '\nRecall@10 : %.4f\nHit Rate@5 : %.4f\nHit Rate@10 : %.4f\nPrecision@5 : %.4f\nPrecision@10 : %.4f' % (auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10))
+    return auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10
 
 
 
@@ -209,21 +223,21 @@ def test(config: Config, corpus):
     print('test output file : ' + test_res_dir + '/' + config.model + '.txt')
     if config.dataset_name in ['MIND', 'gossipcop']:
         if config.model == 'IPNR':
-            auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10, dce5, dce10, cba_ndcg5, cba_ndcg10, cb_hr5, cb_hr10 = compute_scores_IPNR(config, model, corpus, config.batch_size, 'test',
+            auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = compute_scores_IPNR(config, model, corpus, config.batch_size, 'test',
                                                           test_res_dir + '/' + config.model + '.txt', config.dataset_size)
         else:
-            auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10, dce5, dce10, cba_ndcg5, cba_ndcg10, cb_hr5, cb_hr10 = compute_scores(config, model, corpus, config.batch_size,
+            auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = compute_scores(config, model, corpus, config.batch_size,
                                                      'test',
                                                      test_res_dir + '/' + config.model + '.txt', config.dataset_size)
-    elif config.dataset_name == 'ebnerd':
+    elif config.dataset_name in {'ebnerd', 'Adressa'}:
         if config.model == 'IPNR':
-            auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10, dce5, dce10, cba_ndcg5, cba_ndcg10, cb_hr5, cb_hr10 = compute_scores_IPNR(config, model, corpus, config.batch_size, 'test',
+            auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = compute_scores_IPNR(config, model, corpus, config.batch_size, 'test',
                                                           test_res_dir + '/' + config.model + '.txt', config.dataset_size)
         elif config.model == 'MMRec':
-            auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10, dce5, dce10, cba_ndcg5, cba_ndcg10, cb_hr5, cb_hr10 = compute_scores_mmrec(config, model, corpus, config.batch_size,
+            auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = compute_scores_mmrec(config, model, corpus, config.batch_size,
                                                                                                                                'test', test_res_dir + '/' + config.model + '.txt', config.dataset_size)
         else:
-            auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10, dce5, dce10, cba_ndcg5, cba_ndcg10, cb_hr5, cb_hr10 = compute_scores(config, model, corpus, config.batch_size,
+            auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = compute_scores(config, model, corpus, config.batch_size,
                                                      'test',
                                                      test_res_dir + '/' + config.model + '.txt', config.dataset_size)
 
@@ -234,6 +248,11 @@ def test(config: Config, corpus):
             dataset = Ebnerd_DevTest_Dataset_SEIN(corpus, 'test')
         else:
             dataset = Ebnerd_DevTest_Dataset(corpus, 'test')
+    elif config.dataset_name == 'Adressa':
+        if config.model == 'IPNR':
+            dataset = Adressa_DevTest_Dataset_IPNR(corpus, 'test')
+        else:
+            dataset = Adressa_DevTest_Dataset(corpus, 'test')
     elif config.dataset_name == 'MIND':
         if config.model == 'IPNR':
             dataset = MIND_DevTest_Dataset_IPNR(corpus, 'test')
@@ -255,9 +274,8 @@ def test(config: Config, corpus):
         flops, params, inference_time = 0, 0, 0
 
     if config.dataset_size != 'submission':
-        print('AUC : %.4f\nMRR : %.4f\nnDCG@5 : %.4f\nnDCG@10 : %.4f\nMAE : %.4f\nRMSE : %.4f\nrecall@5 : %.4f'
-          '\nrecall@10 : %.4f\nhit@5 : %.4f\nhit@10 : %.4f\nprecision@5 : %.4f\nprecision@10 : %.4f\nDCE@5 : %.4f\nDCE@10 : %.4f'
-          '\nCBA-NDCG@5 : %.4f\nCBA-NDCG@10 : %.4f\nCB-HR@5 : %.4f\nCB-HR@10 : %.4f' % (auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10, dce5, dce10, cba_ndcg5, cba_ndcg10, cb_hr5, cb_hr10))
+        print('AUC : %.4f\nMRR : %.4f\nnDCG@5 : %.4f\nnDCG@10 : %.4f\nMAE : %.4f\nRMSE : %.4f\nRecall@5 : %.4f'
+          '\nRecall@10 : %.4f\nHit Rate@5 : %.4f\nHit Rate@10 : %.4f\nPrecision@5 : %.4f\nPrecision@10 : %.4f' % (auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10))
         if config.mode == 'train':
             metrics = {
                 'AUC': auc,
@@ -268,16 +286,10 @@ def test(config: Config, corpus):
                 'RMSE': rmse,
                 'Recall@5': recall5,
                 'Recall@10': recall10,
-                'Hit@5': hit5,
-                'Hit@10': hit10,
+                'Hit Rate@5': hit5,
+                'Hit Rate@10': hit10,
                 'Precision@5': precision5,
                 'Precision@10': precision10,
-                'DCE@5': dce5,
-                'DCE@10': dce10,
-                'CBA-NDCG@5': cba_ndcg5,
-                'CBA-NDCG@10': cba_ndcg10,
-                'CB-HR@5': cb_hr5,
-                'CB-HR@10': cb_hr10,
                 'FLOPs': flops,
                 'Params': params,
                 'Inference Time': inference_time
@@ -298,8 +310,7 @@ def test(config: Config, corpus):
             with open(config.test_output_file, 'w', encoding='utf-8') as f:
                 f.write('#' + str(config.seed + 1) + '\t' + str(auc) + '\t' + str(mrr) + '\t' + str(ndcg5) + '\t' + str(ndcg10)
                         + '\t' + str(mae) + '\t' + str(rmse) + '\t' + str(recall5) + '\t' + str(recall10) + '\t' + str(hit5)
-                        + '\t' + str(hit10) + '\t' + str(precision5) + '\t' + str(precision10) + '\t' + str(dce5) + '\t' + str(dce10)
-                        + '\t' + str(cba_ndcg5) + '\t' + str(cba_ndcg10) + '\t' + str(cb_hr5) + '\t' + str(cb_hr10) + '\n')
+                        + '\t' + str(hit10) + '\t' + str(precision5) + '\t' + str(precision10) + '\n')
     else:
         shutil.copy(test_res_dir + '/' + config.model + '.txt', 'cache/prediction/large/%s/#%d/prediction.txt' % (config.model, config.run_index))
         os.chdir('cache/prediction/large/%s/#%d' % (config.model, config.run_index))
@@ -338,6 +349,8 @@ if __name__ == '__main__':
             corpus = EBNeRD_Corpus_SEIN(config)
         else:
             corpus = EBNeRD_Corpus(config)
+    elif config.dataset_name == 'Adressa':
+        corpus = Adressa_Corpus(config)
 
     if config.mode == 'train':
         print("Start training at: ", datetime.now())

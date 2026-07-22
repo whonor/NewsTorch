@@ -260,6 +260,18 @@ class SEIN(nn.Module):
                 return arg
         return None
 
+    def _unpack_extra_args(self, extra_args, history_mask):
+        if self.config.dataset_name in {"MIND", "gossipcop"}:
+            history_index = extra_args[0] if len(extra_args) > 0 else None
+            sample_index = extra_args[1] if len(extra_args) > 1 else None
+            stage_args = extra_args[2:]
+        else:
+            history_index = extra_args[2] if len(extra_args) > 2 else None
+            sample_index = extra_args[3] if len(extra_args) > 3 else None
+            stage_args = extra_args[4:]
+        history_stage_ids = self._history_stage_ids_from_extra_args(stage_args, history_mask)
+        return history_index, sample_index, history_stage_ids
+
     def forward(
         self,
         user_ID,
@@ -285,11 +297,11 @@ class SEIN(nn.Module):
         news_content_entity,
         *extra_args,
     ):
-        history_index = extra_args[2] if len(extra_args) > 2 else None
-        sample_index = extra_args[3] if len(extra_args) > 3 else None
+        history_index, sample_index, history_stage_ids = self._unpack_extra_args(
+            extra_args, user_history_mask
+        )
         history_index = self._batch_indices_to_tensor(history_index, user_ID.device)
         sample_index = self._batch_indices_to_tensor(sample_index, user_ID.device)
-        history_stage_ids = self._history_stage_ids_from_extra_args(extra_args, user_history_mask)
 
         global_users, global_news = self._global_embeddings()
         user_global = global_users[user_ID]

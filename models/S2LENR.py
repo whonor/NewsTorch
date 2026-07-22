@@ -58,7 +58,7 @@ class S2LENRGeneratedNewsStore:
         explicit_path = getattr(config, "s2lenr_generated_news_path", "")
         if explicit_path:
             return explicit_path
-        llm_name = _safe_name(str(getattr(config, "s2lenr_llm_model", "Qwen/Qwen3-32B")))
+        llm_name = _safe_name(str(getattr(config, "s2lenr_llm_model", "Qwen/Qwen3-0.6B")))
         dataset_root = _safe_name(str(getattr(config, "DATASET_ROOT", "dataset")))
         return os.path.join("cache", "s2lenr", dataset_root, llm_name, "generated_news.jsonl")
 

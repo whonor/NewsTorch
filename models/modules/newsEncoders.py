@@ -31,8 +31,9 @@ class NewsEncoder(nn.Module):
                           'rb') as word_embedding_f:
                     self.word_embedding.weight.data.copy_(pickle.load(word_embedding_f))
 
-        elif config.dataset_name == 'ebnerd':
-            with open('cache/%s/word_embedding-' % config.dataset_name + str(config.word_threshold) + '-' + str(
+        elif config.dataset_name in {'ebnerd', 'Adressa'}:
+            cache_name = config.dataset_name.lower()
+            with open('cache/%s/word_embedding-' % cache_name + str(config.word_threshold) + '-' + str(
                     config.word_embedding_dim) + '-' + config.tokenizer + '-' + str(
                     config.max_title_length) + '-' + str(config.max_abstract_length) + '-' + config.dataset_size + '.pkl',
                       'rb') as word_embedding_f:

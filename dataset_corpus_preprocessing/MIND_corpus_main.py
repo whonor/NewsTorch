@@ -28,11 +28,14 @@ def is_number(s):
 
 pat = re.compile(r"[\w]+|[.,!?;|]")
 
-nltk.download('stopwords')
-stop_words = set(stopwords.words('english'))
 word_tokenizer = RegexpTokenizer(r'\w+')
 
 def remove_stopword(sentence):
+    try:
+        stop_words = set(stopwords.words('english'))
+    except LookupError:
+        nltk.download('stopwords', quiet=True)
+        stop_words = set(stopwords.words('english'))
     return ' '.join([word for word in word_tokenizer.tokenize(sentence) if word not in stop_words])
 
 def sampling(imps, ratio=4):
@@ -68,7 +71,9 @@ class MIND_Corpus:
         entity_embedding_file = 'cache/entity_embedding-%s.pkl' % config.dataset_size
         context_embedding_file = 'cache/context_embedding-%s.pkl' % config.dataset_size
         user_history_graph_file = 'cache/user_history_graph-' + str(config.max_history_num) + ('' if config.no_self_connection else '-self') + ('' if config.no_adjacent_normalization else '-normalize-' + config.gcn_normalization_type) + '-' + config.dataset_name + config.dataset_size + '.pkl'
-        preprocessed_data_files = [user_ID_file, news_ID_file, category_file, subCategory_file, vocabulary_file, word_embedding_file, entity_file, entity_embedding_file, context_embedding_file, user_history_graph_file]
+        preprocessed_data_files = [user_ID_file, news_ID_file, category_file, subCategory_file, vocabulary_file, word_embedding_file, entity_file, entity_embedding_file, context_embedding_file]
+        if config.model in {'CNE-SUE', 'CNRCL'}:
+            preprocessed_data_files.append(user_history_graph_file)
 
         if not all(list(map(os.path.exists, preprocessed_data_files))):
             user_ID_dict = {'<UNK>': 0}
@@ -195,7 +200,7 @@ class MIND_Corpus:
                 pickle.dump(context_embedding_vectors, context_embedding_f)
 
             # 6. user history graph for CNE-SUE
-            if config.model == 'CNE-SUE' or 'CNRCL':
+            if config.model in {'CNE-SUE', 'CNRCL'}:
                 category_num = len(category_dict)
                 graph_size = config.max_history_num + category_num # graph size of |V_{n}|+|V_{p}|
                 prefix_mode = ['train', 'dev', 'test']
@@ -266,6 +271,7 @@ class MIND_Corpus:
         with open('cache/news_ID-%s.json' % config.dataset_size, 'r', encoding='utf-8') as news_ID_f:
             self.news_ID_dict = json.load(news_ID_f)
             self.news_num = len(self.news_ID_dict)
+            config.news_num = self.news_num
         with open('cache/category-%s.json' % config.dataset_size, 'r', encoding='utf-8') as category_f:
             self.category_dict = json.load(category_f)
             config.category_num = len(self.category_dict)
@@ -279,7 +285,7 @@ class MIND_Corpus:
             self.entity_dict = json.load(entity_f)
             config.entity_size = len(self.entity_dict)
         
-        if config.model == 'CNE-SUE' or 'CNRCL':
+        if config.model in {'CNE-SUE', 'CNRCL'}:
             user_history_graph_file = 'cache/user_history_graph-' + str(config.max_history_num) + ('' if config.no_self_connection else '-self') + ('' if config.no_adjacent_normalization else '-normalize-' + config.gcn_normalization_type) + '-' + config.dataset_name + config.dataset_size + '.pkl'
             try:
                 with open(user_history_graph_file, 'rb') as user_history_graph_f:
@@ -495,6 +501,12 @@ class MIND_Train_Dataset(data.Dataset):
         self.user_history_graph = corpus.train_user_history_graph
         self.user_history_category_mask = corpus.train_user_history_category_mask
         self.user_history_category_indices = corpus.train_user_history_category_indices
+        if self.model not in {'CNE-SUE', 'CNRCL'}:
+            category_num = len(corpus.category_dict)
+            graph_size = corpus.max_history_num + category_num
+            self.user_history_graph = np.zeros((graph_size, graph_size), dtype=np.float32)
+            self.user_history_category_mask = np.zeros(category_num + 1, dtype=np.float32)
+            self.user_history_category_indices = np.zeros(corpus.max_history_num, dtype=np.int64)
         self.train_behaviors = corpus.train_behaviors
         self.train_samples = [[0 for _ in range(1 + self.negative_sample_num)] for __ in range(len(self.train_behaviors))]
         self.num = len(self.train_behaviors)
@@ -527,7 +539,7 @@ class MIND_Train_Dataset(data.Dataset):
         sample_index = torch.tensor(self.train_samples[index])
         behavior_index = train_behavior[5]
 
-        if self.model == 'CNE-SUE' or 'CNRCL':
+        if self.model in {'CNE-SUE', 'CNRCL'}:
             return train_behavior[0], self.news_category[history_index], self.news_subCategory[history_index], self.news_title_text[history_index], self.news_title_mask[history_index], self.news_title_entity[history_index], self.news_abstract_text[history_index], self.news_abstract_mask[history_index], self.news_abstract_entity[history_index], train_behavior[2], self.user_history_graph[behavior_index], self.user_history_category_mask[behavior_index], self.user_history_category_indices[behavior_index], \
                self.news_category[sample_index], self.news_subCategory[sample_index], self.news_title_text[sample_index], self.news_title_mask[sample_index], self.news_title_entity[sample_index], self.news_abstract_text[sample_index], self.news_abstract_mask[sample_index], self.news_abstract_entity[sample_index], history_index, sample_index
         else:
@@ -552,6 +564,12 @@ class MIND_DevTest_Dataset(data.Dataset):
         self.user_history_graph = corpus.dev_user_history_graph if mode == 'dev' else corpus.test_user_history_graph
         self.user_history_category_mask = corpus.dev_user_history_category_mask if mode == 'dev' else corpus.test_user_history_category_mask
         self.user_history_category_indices = corpus.dev_user_history_category_indices if mode == 'dev' else corpus.test_user_history_category_indices
+        if self.model not in {'CNE-SUE', 'CNRCL'}:
+            category_num = len(corpus.category_dict)
+            graph_size = corpus.max_history_num + category_num
+            self.user_history_graph = np.zeros((graph_size, graph_size), dtype=np.float32)
+            self.user_history_category_mask = np.zeros(category_num + 1, dtype=np.float32)
+            self.user_history_category_indices = np.zeros(corpus.max_history_num, dtype=np.int64)
         self.behaviors = corpus.dev_behaviors if mode == 'dev' else corpus.test_behaviors
         self.num = len(self.behaviors)
 
@@ -560,7 +578,7 @@ class MIND_DevTest_Dataset(data.Dataset):
         history_index = torch.tensor(behavior[1])
         candidate_news_index = torch.tensor(behavior[3])
         behavior_index = behavior[4]
-        if self.model == 'CNE-SUE' or 'CNRCL':
+        if self.model in {'CNE-SUE', 'CNRCL'}:
             return behavior[0], self.news_category[history_index], self.news_subCategory[history_index], self.news_title_text[history_index], self.news_title_mask[history_index], self.news_title_entity[history_index], self.news_abstract_text[history_index], self.news_abstract_mask[history_index], self.news_abstract_entity[history_index], behavior[2], self.user_history_graph[behavior_index], self.user_history_category_mask[behavior_index], self.user_history_category_indices[behavior_index], \
                self.news_category[candidate_news_index], self.news_subCategory[candidate_news_index], self.news_title_text[candidate_news_index], self.news_title_mask[candidate_news_index], self.news_title_entity[candidate_news_index], self.news_abstract_text[candidate_news_index], self.news_abstract_mask[candidate_news_index], self.news_abstract_entity[candidate_news_index], history_index, candidate_news_index
         else:
