@@ -1,6 +1,6 @@
 # RoBERTa-NRMS reproduction of PLM-NR (SIGIR 2021).
 # The paper used an effective batch size of 128 on four GPUs (32 per GPU).
-batch_size: 32
+batch_size: 128
 lr: 1.0e-5
 weight_decay: 0
 dropout_rate: 0.2

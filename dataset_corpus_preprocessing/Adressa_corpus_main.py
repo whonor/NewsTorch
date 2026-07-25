@@ -366,6 +366,11 @@ class Adressa_Corpus:
             f"category-{config.dataset_size}.json": self.category_dict,
             f"subCategory-{config.dataset_size}.json": self.subCategory_dict,
             f"entity-{config.dataset_size}.json": self.entity_dict,
+            (
+                f"vocabulary-{config.word_threshold}-{config.tokenizer}-"
+                f"{config.max_title_length}-{config.max_abstract_length}-"
+                f"{config.dataset_size}.json"
+            ): self.word_dict,
         }
         for name, value in dictionaries.items():
             with open(os.path.join(cache_dir, name), "w", encoding="utf-8") as output:

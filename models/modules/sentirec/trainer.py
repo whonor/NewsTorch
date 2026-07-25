@@ -97,7 +97,7 @@ class TrainerSentiRec(Trainer):
             self.wandb.log({'train epoch': e, 'loss': epoch_loss / len(self.train_dataset)})
 
             # validation (uses the same logic as the base Trainer)
-            auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = compute_scores(self.config, model, self._corpus, self.batch_size,
+            auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10, categ_div5, categ_div10, categ_pers5, categ_pers10 = compute_scores(self.config, model, self._corpus, self.batch_size,
                                                      'dev', self.dev_res_dir + '/' + self.config.model + '-' + str(
                     e) + '.txt', self._dataset)
             
@@ -107,7 +107,8 @@ class TrainerSentiRec(Trainer):
             self.ndcg10_results.append(ndcg10)
             print('Epoch %d : dev done\nDev criterions' % e)
             print('AUC = {:.4f}\nMRR = {:.4f}\nnDCG@5 = {:.4f}\nnDCG@10 = {:.4f}\nMAE = {:.4f}\nRMSE = {:.4f}\nRecall@5 = {:.4f}\nRecall@10 = {:.4f}\nHit Rate@5 = {:.4f}\nHit Rate@10 = {:.4f}'.format(auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10))
-            self.wandb.log({'validation epoch': e, 'AUC': auc, 'MRR': mrr, 'nDCG@5': ndcg5, 'nDCG@10': ndcg10, 'MAE': mae, 'RMSE': rmse, 'Recall@5': recall5, 'Recall@10': recall10, 'Hit Rate@5': hit5, 'Hit Rate@10': hit10})
+            print('Categ-Div@5 = {:.4f}\nCateg-Div@10 = {:.4f}\nCateg-Pers@5 = {:.4f}\nCateg-Pers@10 = {:.4f}'.format(categ_div5, categ_div10, categ_pers5, categ_pers10))
+            self.wandb.log({'validation epoch': e, 'AUC': auc, 'MRR': mrr, 'nDCG@5': ndcg5, 'nDCG@10': ndcg10, 'MAE': mae, 'RMSE': rmse, 'Recall@5': recall5, 'Recall@10': recall10, 'Hit Rate@5': hit5, 'Hit Rate@10': hit10, 'Categ-Div@5': categ_div5, 'Categ-Div@10': categ_div10, 'Categ-Pers@5': categ_pers5, 'Categ-Pers@10': categ_pers10})
             avg = AvgMetric(auc, mrr, ndcg5, ndcg10)
             if avg >= self.best_dev_avg:
                 self.best_dev_avg = avg

@@ -434,10 +434,16 @@ NewsTorch computes multiple evaluation metrics during validation and testing:
 - **Recall@5/10**: Recall at K
 - **Hit Rate@5/10**: Whether a relevant item appears in the top K
 - **Precision@5/10**: Precision at K
+- **Categ-Div@5/10**: Normalized entropy of recommended-news categories (subcategories for Adressa-1week)
+- **Categ-Pers@5/10**: Generalized Jaccard similarity between recommended and clicked-history category counts (subcategory counts for Adressa-1week)
 - **MAE**: Mean Absolute Error
 - **RMSE**: Root Mean Square Error
 
-Results are automatically saved to CSV files for further analysis.
+The category diversity and personalization metrics follow the aspect-based
+definitions in [NewsRecLib](https://github.com/andreeaiana/newsreclib). Results
+are automatically saved to CSV files for further analysis. Because the
+Adressa-1week adapter does not expose informative top-level categories, its
+`Categ-*` metrics explicitly use the corpus subcategory taxonomy instead.
 
 
 ## Limitations

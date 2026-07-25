@@ -122,7 +122,7 @@ class TrainerCNRCL:
 
             # validation
             # Standard compute_scores should work now as forward returns only logits when not training
-            auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = compute_scores(
+            auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10, categ_div5, categ_div10, categ_pers5, categ_pers10 = compute_scores(
                 self.config, model, self.corpus, self.batch_size * 3 // 2, 'dev', 
                 self.dev_res_dir + '/' + model.model_name + '-' + str(e) + '.txt', self._dataset
             )
@@ -134,7 +134,8 @@ class TrainerCNRCL:
             
             print('Epoch %d : dev done\nDev criterions' % e)
             print('AUC = {:.4f}\nMRR = {:.4f}\nnDCG@5 = {:.4f}\nnDCG@10 = {:.4f}\nMAE = {:.4f}\nRMSE = {:.4f}\nRecall@5 = {:.4f}\nRecall@10 = {:.4f}\nHit Rate@5 = {:.4f}\nHit Rate@10 = {:.4f}'.format(auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10))
-            wandb.log({'epoch': e, 'dev_auc': auc, 'dev_mrr': mrr, 'dev_ndcg5': ndcg5, 'dev_ndcg10': ndcg10, 'dev_mae': mae, 'dev_rmse': rmse, 'dev_recall5': recall5, 'dev_recall10': recall10, 'dev_hit_rate5': hit5, 'dev_hit_rate10': hit10}, step=e)
+            print('Categ-Div@5 = {:.4f}\nCateg-Div@10 = {:.4f}\nCateg-Pers@5 = {:.4f}\nCateg-Pers@10 = {:.4f}'.format(categ_div5, categ_div10, categ_pers5, categ_pers10))
+            wandb.log({'epoch': e, 'dev_auc': auc, 'dev_mrr': mrr, 'dev_ndcg5': ndcg5, 'dev_ndcg10': ndcg10, 'dev_mae': mae, 'dev_rmse': rmse, 'dev_recall5': recall5, 'dev_recall10': recall10, 'dev_hit_rate5': hit5, 'dev_hit_rate10': hit10, 'dev_categ_div5': categ_div5, 'dev_categ_div10': categ_div10, 'dev_categ_pers5': categ_pers5, 'dev_categ_pers10': categ_pers10}, step=e)
             
             avg = AvgMetric(auc, mrr, ndcg5, ndcg10)
             if avg >= self.best_dev_avg:

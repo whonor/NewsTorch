@@ -77,15 +77,16 @@ class Config:
         parser.add_argument('--adressa_raw_dir', type=str, default='', help='Directory containing the licensed Adressa JSON/JSONL files')
         parser.add_argument('--adressa_eval_negative_num', type=int, default=20, help='Sampled negatives per Adressa click')
         parser.add_argument('--adressa_min_history', type=int, default=1, help='Minimum prior clicks for an Adressa training/evaluation example')
-        parser.add_argument('--clickbait_score_path', type=str, default='cache/visual_clickbait_scores_ebnerd_demo.parquet',
-                            help='Optional per-news clickbait score file for counterfactual robustness analysis')
-
         parser.add_argument('--dev_model_path', type=str,
                             default='cache/best_models/small/NRMS/#1/NRMS',
                             help='The path of the best model')
         parser.add_argument('--test_model_path', type=str,
                             default='cache/best_models/small/NRMS/#1/NRMS',
                             help='The path of the best model')
+        parser.add_argument('--test_output_file', type=str, default='',
+                            help='Optional tab-separated file for test metrics')
+        parser.add_argument('--skip_complexity', action='store_true',
+                            help='Skip FLOPs, parameter, and inference-time profiling during testing')
         args, _ = parser.parse_known_args()
         self.model = args.model
 
@@ -94,7 +95,8 @@ class Config:
         self.mode = args.mode
         self.dev_model_path = args.dev_model_path
         self.test_model_path = args.test_model_path
-        self.test_output_file = ''
+        self.test_output_file = args.test_output_file
+        self.skip_complexity = args.skip_complexity
         self.seed = args.seed
         self.config_file = ''
         self.downloaded_images_file = args.images_path
@@ -125,7 +127,6 @@ class Config:
         self.early_stopping_epoch = 5
 
         self.word_embedding_dim = args.word_embedding_dim or (1024 if self.dataset_name == 'ebnerd' else 300)
-        self.clickbait_score_path = args.clickbait_score_path
         self.category_embedding_dim = 50
         self.subCategory_embedding_dim = 50
         self.entity_embedding_dim = 100
