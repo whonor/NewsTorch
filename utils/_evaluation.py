@@ -555,7 +555,7 @@ def compute_scores_IPNR(config: Config, model: nn.Module, mind_corpus: MIND_Corp
         return (None,) * 16
 
 
-def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mode: str, result_file: str, dataset_size: str):
+def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mode: str, result_file: str, dataset_size: str, truth_file_path: str = None):
     assert mode in ['dev', 'test'], 'mode must be chosen from \'dev\' or \'test\''
     if config.dataset_name == 'ebnerd':
         if corpus is None:
@@ -591,7 +591,8 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
             corpus = MIND_Corpus_SentiDebias(config)
             devtest_dataset = MIND_DevTest_Dataset_SentiDebias(corpus, mode)
         else:
-            corpus = MIND_Corpus(config)
+            if corpus is None:
+                corpus = MIND_Corpus(config)
             devtest_dataset = MIND_DevTest_Dataset(corpus, mode)
     elif config.dataset_name == 'gossipcop':
         if corpus is None:
@@ -744,7 +745,8 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
                 result[sub_score[j][1]] = j + 1
             result_f.write(('' if i == 0 else '\n') + str(i + 1) + ' ' + str(result).replace(' ', ''))
     if dataset_size != 'submission' or mode != 'test':
-        truth_file_path = config.data_path + '/' + mode + '/ref/truth-%s.txt' % config.DATASET_ROOT
+        if truth_file_path is None:
+            truth_file_path = config.data_path + '/' + mode + '/ref/truth-%s.txt' % config.DATASET_ROOT
         with open(truth_file_path, 'r', encoding='utf-8') as truth_f, open(result_file, 'r', encoding='utf-8') as result_f:
             auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = scoring(truth_f, result_f)
         category_metrics = category_metrics_from_corpus(
