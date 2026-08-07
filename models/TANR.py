@@ -50,14 +50,13 @@ class TANR(nn.Module):
         # [batch, 1 + negative_sample_num + max_history_num, 400]
         mixed_vector = torch.cat((news_representation, user_representation.unsqueeze(dim=1).expand(-1, self.config.max_history_num, -1)), dim=1)
         # [batch * (1 + negative_sample_num + max_history_num), category_num + 1]
-        topic_scores = self.topic_predictor(mixed_vector).cuda()
+        topic_scores = self.topic_predictor(mixed_vector)
         # [batch * (1 + negative_sample_num + max_history_num)]
-        topic_mixed_vector = torch.cat((news_category, user_category), dim=1).cuda()
-        class_weight = torch.ones(self.config.category_num + 1).cuda()
+        topic_mixed_vector = torch.cat((news_category, user_category), dim=1).to(topic_scores.device)
+        class_weight = torch.ones(self.config.category_num + 1, device=topic_scores.device)
         class_weight[0] = 0
         criterion = CrossEntropyLoss(weight=class_weight)
         topic_pred_loss = criterion(topic_scores.view(-1, self.config.category_num + 1), topic_mixed_vector.flatten().long())
 
 
         return logits, topic_pred_loss
-

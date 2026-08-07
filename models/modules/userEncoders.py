@@ -21,7 +21,7 @@ class UserEncoder(nn.Module):
         super(UserEncoder, self).__init__()
         self.news_embedding_dim = news_encoder.news_embedding_dim
         self.news_encoder = news_encoder
-        self.device = torch.device('cuda')
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.auxiliary_loss = None
 
     # Input

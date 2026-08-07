@@ -7,6 +7,7 @@ import wandb
 
 from config import Config
 from dataset_corpus_preprocessing.MIND_corpus_IPNR import MIND_Corpus_IPNR, MIND_Train_Dataset_IPNR
+from dataset_corpus_preprocessing.Adressa_corpus_main import Adressa_Train_Dataset_IPNR
 
 from utils._evaluation import AvgMetric, compute_scores_IPNR
 from utils._evaluation import compute_scores
@@ -31,7 +32,11 @@ class TrainerIPNR:
         self.optimizer = optim.Adam(filter(lambda p: p.requires_grad, self.model.parameters()), lr=config.lr, weight_decay=config.weight_decay)
         self._dataset = config.dataset_size
         self.mind_corpus = mind_corpus
-        self.train_dataset = MIND_Train_Dataset_IPNR(mind_corpus)
+        self.train_dataset = (
+            Adressa_Train_Dataset_IPNR(mind_corpus)
+            if config.dataset_name == 'Adressa'
+            else MIND_Train_Dataset_IPNR(mind_corpus)
+        )
         self.run_index = run_index
         self.model_dir = config.model_dir + '/#' + str(self.run_index)
         self.best_model_dir = config.best_model_dir + '/#' + str(self.run_index)
@@ -111,8 +116,8 @@ class TrainerIPNR:
             self.ndcg5_results.append(ndcg5)
             self.ndcg10_results.append(ndcg10)
             print('Epoch %d : dev done\nDev criterions' % e)
-            print('AUC = {:.4f}\nMRR = {:.4f}\nnDCG@5 = {:.4f}\nnDCG@10 = {:.4f}'.format(auc, mrr, ndcg5, ndcg10))
-            wandb.log({'epoch': e, 'dev_auc': auc, 'dev_mrr': mrr, 'dev_ndcg5': ndcg5, 'dev_ndcg10': ndcg10}, step=e)
+            print('AUC = {:.4f}\nMRR = {:.4f}\nnDCG@5 = {:.4f}\nnDCG@10 = {:.4f}\nMAE = {:.4f}\nRMSE = {:.4f}\nRecall@5 = {:.4f}\nRecall@10 = {:.4f}\nHit Rate@5 = {:.4f}\nHit Rate@10 = {:.4f}'.format(auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10))
+            wandb.log({'epoch': e, 'dev_auc': auc, 'dev_mrr': mrr, 'dev_ndcg5': ndcg5, 'dev_ndcg10': ndcg10, 'dev_mae': mae, 'dev_rmse': rmse, 'dev_recall5': recall5, 'dev_recall10': recall10, 'dev_hit_rate5': hit5, 'dev_hit_rate10': hit10}, step=e)
             if self.dev_criterion == 'auc':
                 if auc >= self.best_dev_auc:
                     self.best_dev_auc = auc

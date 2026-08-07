@@ -30,6 +30,40 @@ def is_number(s):
 
 pat = re.compile(r"[\w]+|[.,!?;|]")
 
+
+def _metadata_values(value):
+    if value is None:
+        return []
+    if isinstance(value, np.ndarray):
+        value = value.tolist()
+    elif not isinstance(value, (list, tuple, set)):
+        try:
+            if pd.isna(value):
+                return []
+        except (TypeError, ValueError):
+            pass
+        value = [value]
+    return [str(item).strip() for item in value if str(item).strip()]
+
+
+def ebnerd_knowledge_nodes(record):
+    """Return stable LKPNR nodes linked to one EB-NeRD article."""
+    nodes = []
+    seen = set()
+    fields = (
+        ("ner_clusters", "entity"),
+        ("topics", "topic"),
+        ("category_str", "category"),
+    )
+    for field, prefix in fields:
+        value = record.get(field) if hasattr(record, "get") else None
+        for item in _metadata_values(value):
+            node = f"{prefix}:{item.casefold()}"
+            if node not in seen:
+                seen.add(node)
+                nodes.append(node)
+    return nodes
+
 # --- Image Encoding Functions ---
 
 def get_image_transforms():
@@ -218,6 +252,10 @@ class EBNeRD_Corpus:
                         if sentiment_label not in sentiment_dict:
                             sentiment_dict[sentiment_label] = len(sentiment_dict)
 
+                        for entity in ebnerd_knowledge_nodes(row):
+                            if entity not in entity_dict:
+                                entity_dict[entity] = len(entity_dict)
+
                         words = pat.findall(title) if config.tokenizer == 'MIND' else word_tokenize(title)
                         for word in words:
                             if is_number(word):
@@ -255,6 +293,8 @@ class EBNeRD_Corpus:
                 json.dump(news_sentiment_dict, sentiment_f)
             with open(sentiment_label_file, 'w', encoding='utf-8') as sentiment_label_f:
                 json.dump(sentiment_dict, sentiment_label_f)
+            with open(entity_file, 'w', encoding='utf-8') as entity_f:
+                json.dump(entity_dict, entity_f, ensure_ascii=False)
 
             # 3. word dictionary
             word_counter_list = [[word, word_counter[word]] for word in word_counter]
@@ -272,6 +312,20 @@ class EBNeRD_Corpus:
                     embedding_dim=config.word_embedding_dim,
                     output_pkl_path=word_embedding_file
                 )
+
+            # LKPNR learns dataset-native linked-node embeddings.  Keep these
+            # conventional cache files available for other entity-aware models
+            # and, importantly, make preprocessing idempotent.
+            entity_embeddings = torch.zeros(
+                len(entity_dict), config.entity_embedding_dim
+            )
+            context_embeddings = torch.zeros(
+                len(entity_dict), config.context_embedding_dim
+            )
+            with open(entity_embedding_file, 'wb') as entity_embedding_f:
+                pickle.dump(entity_embeddings, entity_embedding_f)
+            with open(context_embedding_file, 'wb') as context_embedding_f:
+                pickle.dump(context_embeddings, context_embedding_f)
             
             # 5. Image embeddings
             if config.model.lower() == 'mmrec':
@@ -398,6 +452,10 @@ class EBNeRD_Corpus:
             self.subCategory_dict = json.load(subCategory_f)
             config.subCategory_num = len(self.subCategory_dict)
 
+        with open('cache/ebnerd/entity-%s.json' % config.dataset_size, 'r', encoding='utf-8') as entity_f:
+            self.entity_dict = json.load(entity_f)
+            config.entity_size = len(self.entity_dict)
+
         with open('cache/ebnerd/sentiment-%s.json' % config.dataset_size, 'r', encoding='utf-8') as sentiment_f:
             self.sentiment_dict = json.load(sentiment_f)
 
@@ -515,6 +573,13 @@ class EBNeRD_Corpus:
             self.news_category[index] = self.category_dict.get(category, 0)
             self.news_subCategory[index] = self.subCategory_dict.get(subCategory, 0)
             self.news_sentiment[index] = final_score
+
+            for entity_offset, entity in enumerate(
+                ebnerd_knowledge_nodes(row)[:self.max_title_length]
+            ):
+                self.news_title_entity[index][entity_offset] = self.entity_dict.get(
+                    entity, 1
+                )
 
             words = pat.findall(title.lower()) if config.tokenizer == 'MIND' else word_tokenize(title.lower())
             offset_index = 0
@@ -734,8 +799,12 @@ class Ebnerd_Train_Dataset(data.Dataset):
 
     def __getitem__(self, index):
         train_behavior = self.train_behaviors[index]
-        history_index = train_behavior[1]
-        sample_index = self.train_samples[index]
+        # Keep news indices in the same tensor-friendly format as the MIND and
+        # Adressa adapters.  Returning Python lists makes default_collate
+        # transpose them into a list of batch-sized tensors, which then cannot
+        # be moved to CUDA or consumed by index-aware models such as PNR-LLM.
+        history_index = np.asarray(train_behavior[1], dtype=np.int64)
+        sample_index = np.asarray(self.train_samples[index], dtype=np.int64)
         behavior_index = train_behavior[5]
 
         if self.config.model in ['CNE-SUE', 'CNRCL']:
@@ -790,8 +859,8 @@ class Ebnerd_DevTest_Dataset(data.Dataset):
 
     def __getitem__(self, index):
         behavior = self.behaviors[index]
-        history_index = behavior[1]
-        candidate_news_index = behavior[3]
+        history_index = np.asarray(behavior[1], dtype=np.int64)
+        candidate_news_index = np.asarray(behavior[3], dtype=np.int64)
         behavior_index = behavior[4]
 
         if self.config.model in ['CNE-SUE', 'CNRCL']:

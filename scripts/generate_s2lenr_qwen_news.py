@@ -135,6 +135,39 @@ def collect_ebnerd_users(train_root: str, news: Dict[str, Dict[str, str]], max_h
     return users
 
 
+def load_adressa_news(roots: Iterable[str]) -> Dict[str, Dict[str, str]]:
+    news = {}
+    for root in roots:
+        path = os.path.join(root, "news.jsonl")
+        if not os.path.exists(path):
+            continue
+        with open(path, "r", encoding="utf-8") as news_f:
+            for line in news_f:
+                row = json.loads(line)
+                news_id = clean_text(row.get("nid"))
+                if news_id:
+                    news.setdefault(news_id, {
+                        "title": clean_text(row.get("title")),
+                        "abstract": clean_text(row.get("abstract")),
+                        "category": clean_text(row.get("category")),
+                        "subcategory": clean_text(row.get("subcategory")),
+                    })
+    return news
+
+
+def collect_adressa_users(train_root: str, news: Dict[str, Dict[str, str]], max_history: int):
+    users = {}
+    path = os.path.join(train_root, "behaviors.jsonl")
+    with open(path, "r", encoding="utf-8") as behavior_f:
+        for line in behavior_f:
+            row = json.loads(line)
+            user_id = clean_text(row.get("uid"))
+            history_ids = [clean_text(item) for item in row.get("history", []) if clean_text(item) in news]
+            if user_id and history_ids and (user_id not in users or len(history_ids) > len(users[user_id])):
+                users[user_id] = history_ids[-max_history:]
+    return users
+
+
 def build_history_text(history_ids: List[str], news: Dict[str, Dict[str, str]], prompt_history_num: int) -> str:
     items = []
     for news_id in history_ids[-prompt_history_num:]:
@@ -294,12 +327,12 @@ def default_output_path(args) -> str:
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Generate S2LENR synthetic news locally with Qwen3-32B.")
-    parser.add_argument("--dataset_name", choices=["MIND", "ebnerd"], required=True)
+    parser = argparse.ArgumentParser(description="Generate S2LENR synthetic news locally with Qwen3.")
+    parser.add_argument("--dataset_name", choices=["MIND", "ebnerd", "Adressa"], required=True)
     parser.add_argument("--DATASET_ROOT", required=True)
     parser.add_argument("--root", default=".")
     parser.add_argument("--output", default="")
-    parser.add_argument("--model_name_or_path", default="Qwen/Qwen3-32B")
+    parser.add_argument("--model_name_or_path", default="Qwen/Qwen3-0.6B")
     parser.add_argument("--torch_dtype", default="auto")
     parser.add_argument("--device_map", default="auto")
     parser.add_argument("--attn_implementation", default="")
@@ -332,9 +365,12 @@ def main():
     if args.dataset_name == "MIND":
         news = load_mind_news(roots)
         users = collect_mind_users(train_root, news, args.max_history)
-    else:
+    elif args.dataset_name == "ebnerd":
         news = load_ebnerd_news(roots)
         users = collect_ebnerd_users(train_root, news, args.max_history)
+    else:
+        news = load_adressa_news(roots)
+        users = collect_adressa_users(train_root, news, args.max_history)
 
     output = args.output or default_output_path(args)
     os.makedirs(os.path.dirname(output), exist_ok=True)

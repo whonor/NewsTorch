@@ -1,0 +1,14 @@
+category_embedding_dim: 50
+cnn_method: "naive"
+cnn_kernel_num: 400
+cnn_window_size: 3
+attention_dim: 200
+entity_embedding_dim: 100
+
+# The paper reports 40 as the best enriched-title token length.
+pnr_llm_max_title_length: 40
+pnr_llm_max_entity_length: 20
+pnr_llm_entity_attention_heads: 4
+pnr_llm_llm_model: "Qwen/Qwen3-0.6B"
+pnr_llm_enrichment_path: ""
+pnr_llm_require_enrichment_cache: false

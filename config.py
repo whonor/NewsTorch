@@ -63,17 +63,23 @@ class Config:
 
     def __init__(self):
         parser = argparse.ArgumentParser()
-        parser.add_argument('--model', type=str, default='SentiRec', help='Model name: NRMS, LSTUR, TANR, DKN, NAML, NPA, FIM, MINS, CENNEWSREC, IPNR, CNE-SUE, LKPNR, SentiDebias, SentiRec, MMRec, CNRCL, CPRS, ONCE, S2LENR')
+        parser.add_argument('--model', type=str, default='SentiRec', help='Model name: NRMS, PLM-NR, LSTUR, TANR, DKN, NAML, NPA, FIM, MINS, CENNEWSREC, IPNR, CNE-SUE, LKPNR, SentiDebias, SentiRec, MMRec, CNRCL, CPRS, DREAM, ONCE, S2LENR, PNR-LLM')
         parser.add_argument('--batch_size', type=int, default='64', help='Batch size for training')
         parser.add_argument('--seed', type=int, default=0, help='Seed')
         parser.add_argument('--epoch', type=int, default=10, help='Epoch for training')
         parser.add_argument('--mode', type=str, default='train', help='Mode')
-        parser.add_argument('--DATASET_ROOT', type=str, default='ebnerd_demo', help='Default dataset name, can be ebnerd_demo, ebnerd_small, ebnerd_large, MIND-small, or MIND-large; gossipcop')
-        parser.add_argument('--dataset_name', type=str, default='ebnerd', help='Name of the dataset to be used, MIND, ebnerd, gossipcop')
+        parser.add_argument('--DATASET_ROOT', type=str, default='ebnerd_demo', help='Dataset directory, for example ebnerd_demo, MIND-small, or Adressa-1week')
+        parser.add_argument('--dataset_name', type=str, default='ebnerd', help='Dataset adapter: MIND, ebnerd, Adressa, or gossipcop')
         parser.add_argument('--dataset_size', type=str, default='demo', help='Dataset variant, can be small, large, or demo, if submit the predictions submission')
-        parser.add_argument('--images_path', type=str, default='downloaded_images_ebnerd_demo',
+        parser.add_argument('--images_path', type=str, default='downloaded_images_ebnerd_small',
                             help='downloaded_images for demo or small')
-        parser.add_argument('--word_embedding_dim', type=int, default=1024, help='ebnerd: 1024; glove: 300')
+        parser.add_argument('--word_embedding_dim', type=int, default=0, help='Embedding size; defaults to 1024 for EB-NeRD and 300 otherwise')
+        parser.add_argument('--adressa_raw_dir', type=str, default='', help='Directory containing the licensed Adressa JSON/JSONL files')
+        parser.add_argument('--adressa_eval_negative_num', type=int, default=20, help='Sampled negatives per Adressa click')
+        parser.add_argument('--adressa_min_history', type=int, default=1, help='Minimum prior clicks for an Adressa training/evaluation example')
+        parser.add_argument('--clickbait_score_path', type=str, default='cache/visual_clickbait_scores_ebnerd_demo.parquet',
+                            help='Optional per-news clickbait score file for counterfactual robustness analysis')
+
         parser.add_argument('--dev_model_path', type=str,
                             default='cache/best_models/small/NRMS/#1/NRMS',
                             help='The path of the best model')
@@ -96,8 +102,11 @@ class Config:
         self.root = "."
         self.data_path = "cache/"
         self.DATASET_ROOT = args.DATASET_ROOT
-        self.dataset_name = args.dataset_name
-        self.dataset_size = args.dataset_size
+        self.dataset_name = 'Adressa' if args.dataset_name.lower() == 'adressa' else args.dataset_name
+        self.dataset_size = '1week' if self.dataset_name == 'Adressa' and args.dataset_size == 'demo' else args.dataset_size
+        self.adressa_raw_dir = args.adressa_raw_dir
+        self.adressa_eval_negative_num = args.adressa_eval_negative_num
+        self.adressa_min_history = args.adressa_min_history
         self.tokenizer = 'MIND'
         self.word_threshold = 3
         self.max_title_length = 32
@@ -115,7 +124,8 @@ class Config:
         self.dev_criterion = 'avg'
         self.early_stopping_epoch = 5
 
-        self.word_embedding_dim = args.word_embedding_dim
+        self.word_embedding_dim = args.word_embedding_dim or (1024 if self.dataset_name == 'ebnerd' else 300)
+        self.clickbait_score_path = args.clickbait_score_path
         self.category_embedding_dim = 50
         self.subCategory_embedding_dim = 50
         self.entity_embedding_dim = 100
@@ -151,6 +161,8 @@ class Config:
             print(f"Warning: Model config file {yaml_path} not found, using default parameters")
 
         self.image_embedding_dim = 2048
+        self.num_concepts = getattr(self, 'num_concepts', 1)
+        self.concept_num_per_news = getattr(self, 'concept_num_per_news', 20)
 
 
         self.attribute_dict = self.__dict__.copy()
@@ -273,3 +285,22 @@ class Config:
                             for row_ID, row in enumerate(csv.DictReader(csv_f)):
                                 labels = [int(label) for label in row['clicked'].split()]
                                 truth_f.write(('' if row_ID == 0 else '\n') + str(row_ID + 1) + ' ' + str(labels).replace(' ', ''))
+
+        elif dataset_name == 'Adressa':
+            from dataset_download_prepare.Adressa_dataset_prepare import prepare_adressa_1week
+
+            prepare_adressa_1week(
+                dataset_root=os.path.join(self.root, self.DATASET_ROOT),
+                raw_dir=self.adressa_raw_dir or None,
+                negative_num=self.adressa_eval_negative_num,
+                max_history_num=self.max_history_num,
+                min_history=self.adressa_min_history,
+                seed=self.seed,
+            )
+
+            for split, truth_path in [('dev', dev_truth_path), ('test', test_truth_path)]:
+                behavior_path = os.path.join(self.root, self.DATASET_ROOT, split, 'behaviors.jsonl')
+                with open(behavior_path, 'r', encoding='utf-8') as behavior_f, open(truth_path, 'w', encoding='utf-8') as truth_f:
+                    for row_ID, line in enumerate(behavior_f):
+                        labels = [int(label) for label in json.loads(line)['labels']]
+                        truth_f.write(('' if row_ID == 0 else '\n') + str(row_ID + 1) + ' ' + str(labels).replace(' ', ''))

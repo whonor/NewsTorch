@@ -10,6 +10,6 @@ s2lenr_prototype_num: 1000
 s2lenr_ssl_weight: 0.1
 s2lenr_ssl_temperature: 1.0
 s2lenr_ssl_exact_ratio: false
-s2lenr_llm_model: "Qwen/Qwen3-32B"
+s2lenr_llm_model: "Qwen/Qwen3-0.6B"
 s2lenr_generated_news_path: ""
 s2lenr_require_generated_cache: false

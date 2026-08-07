@@ -61,7 +61,7 @@ class Conv1D(nn.Module):
             self.conv3 = nn.Conv1d(in_channels=self.in_channels, out_channels=cnn_kernel_num // 5, kernel_size=3, padding=1)
             self.conv4 = nn.Conv1d(in_channels=self.in_channels, out_channels=cnn_kernel_num // 5, kernel_size=4, padding=1)
             self.conv5 = nn.Conv1d(in_channels=self.in_channels, out_channels=cnn_kernel_num // 5, kernel_size=5, padding=2)
-        self.device = torch.device('cuda')
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # Input
     # feature : [batch_size, feature_dim, length]
@@ -73,7 +73,7 @@ class Conv1D(nn.Module):
         elif self.cnn_method == 'group3':
             return F.relu(torch.cat([self.conv1(feature), self.conv2(feature), self.conv3(feature)], dim=1))
         else:
-            padding_zeros = torch.zeros([feature.size(0), self.in_channels, 1], device=self.device)
+            padding_zeros = torch.zeros([feature.size(0), self.in_channels, 1], device=feature.device)
             return F.relu(torch.cat([self.conv1(feature), \
                                      self.conv2(torch.cat([feature, padding_zeros], dim=1)), \
                                      self.conv3(feature), \
@@ -102,7 +102,7 @@ class Conv2D_Pool(nn.Module):
             self.conv2 = nn.Conv2d(in_channels=self.in_channels, out_channels=cnn_kernel_num // 4, kernel_size=[2, last_channel_num], padding=[0, 0])
             self.conv3 = nn.Conv2d(in_channels=self.in_channels, out_channels=cnn_kernel_num // 4, kernel_size=[3, last_channel_num], padding=[1, 0])
             self.conv4 = nn.Conv2d(in_channels=self.in_channels, out_channels=cnn_kernel_num // 4, kernel_size=[4, last_channel_num], padding=[1, 0])
-        self.device = torch.device('cuda')
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # Input
     # feature : [batch_size, feature_dim, length]
@@ -463,8 +463,8 @@ class MultiHeadSelfAttention(nn.Module):
 
         if length is not None:
             maxlen = Q.size(1)
-            attn_mask = torch.arange(maxlen).cuda().expand(
-                batch_size, maxlen) < length.cuda().view(-1, 1)
+            attn_mask = torch.arange(maxlen, device=Q.device).expand(
+                batch_size, maxlen) < length.to(Q.device).view(-1, 1)
             attn_mask = attn_mask.unsqueeze(1).expand(batch_size, maxlen,
                                                       maxlen)
             attn_mask = attn_mask.unsqueeze(1).repeat(1,

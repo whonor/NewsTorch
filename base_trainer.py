@@ -5,6 +5,7 @@ from config import Config
 from dataset_corpus_preprocessing.MIND_corpus_main import MIND_Corpus, MIND_Train_Dataset
 from dataset_corpus_preprocessing.Fake_MIND_corpus import Fake_MIND_Corpus, MIND_Train_Dataset as Fake_MIND_Train_Dataset
 from dataset_corpus_preprocessing.EBNeRD_corpus_main import EBNeRD_Corpus, Ebnerd_Train_Dataset
+from dataset_corpus_preprocessing.Adressa_corpus_main import Adressa_Corpus, Adressa_Train_Dataset
 from utils._evaluation import AvgMetric
 from utils._evaluation import compute_scores
 from tqdm import tqdm
@@ -67,6 +68,11 @@ class Trainer:
                 self.train_dataset = Ebnerd_Train_Dataset_SEIN(_corpus)
             else:
                 self.train_dataset = Ebnerd_Train_Dataset(_corpus)
+        elif config.dataset_name == 'Adressa':
+            if _corpus is None:
+                _corpus = Adressa_Corpus(config)
+                self._corpus = _corpus
+            self.train_dataset = Adressa_Train_Dataset(_corpus)
 
         self.run_index = run_index
         self.model_dir = config.model_dir + '/#' + str(self.run_index)
@@ -125,7 +131,7 @@ class Trainer:
                     logits, topic_pred_loss = self.model(*data_batch[:21])
                     loss = self.loss(logits) + self.config.topic_pred_loss_coef * topic_pred_loss
                 elif self.config.model == "LKPNR":
-                    if self.config.dataset_name == 'ebnerd':
+                    if self.config.dataset_name in {'ebnerd', 'Adressa'}:
                         model_args = data_batch[:21] + data_batch[23:25]
                         logits = self.model(*model_args)
                     else:
@@ -162,6 +168,13 @@ class Trainer:
                     outputs = self.model(*data_batch[:21])
                     logits, ssl_loss = outputs if isinstance(outputs, tuple) else (outputs, 0.0)
                     loss = self.loss(logits) + getattr(self.config, 's2lenr_ssl_weight', 0.1) * ssl_loss
+                elif self.config.model == "PNR-LLM":
+                    if self.config.dataset_name in ['MIND', 'gossipcop']:
+                        model_args = data_batch[:21] + data_batch[21:23]
+                    else:
+                        model_args = data_batch[:21] + data_batch[23:25]
+                    logits = self.model(*model_args)
+                    loss = self.loss(logits)
                 elif self.config.model in ONCE_DIRE_MODEL_NAMES:
                     if self.config.dataset_name in ['MIND', 'gossipcop']:
                         logits = self.model(*data_batch[:21], data_batch[21], data_batch[22])
@@ -195,8 +208,8 @@ class Trainer:
             self.ndcg5_results.append(ndcg5)
             self.ndcg10_results.append(ndcg10)
             print('Epoch %d : dev done\nDev criterions' % e)
-            print('AUC = {:.4f}\nMRR = {:.4f}\nnDCG@5 = {:.4f}\nnDCG@10 = {:.4f}'.format(auc, mrr, ndcg5, ndcg10))
-            self.wandb.log({'validation epoch': e, 'AUC': auc, 'MRR': mrr, 'nDCG@5': ndcg5, 'nDCG@10': ndcg10})
+            print('AUC = {:.4f}\nMRR = {:.4f}\nnDCG@5 = {:.4f}\nnDCG@10 = {:.4f}\nMAE = {:.4f}\nRMSE = {:.4f}\nRecall@5 = {:.4f}\nRecall@10 = {:.4f}\nHit Rate@5 = {:.4f}\nHit Rate@10 = {:.4f}'.format(auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10))
+            self.wandb.log({'validation epoch': e, 'AUC': auc, 'MRR': mrr, 'nDCG@5': ndcg5, 'nDCG@10': ndcg10, 'MAE': mae, 'RMSE': rmse, 'Recall@5': recall5, 'Recall@10': recall10, 'Hit Rate@5': hit5, 'Hit Rate@10': hit10})
             avg = AvgMetric(auc, mrr, ndcg5, ndcg10)
             if avg >= self.best_dev_avg:
                 self.best_dev_avg = avg

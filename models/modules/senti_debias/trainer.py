@@ -2,6 +2,7 @@ import os
 import shutil
 
 from dataset_corpus_preprocessing.EBNeRD_corpus_main import EBNeRD_Corpus, Ebnerd_Train_Dataset
+from dataset_corpus_preprocessing.Adressa_corpus_main import Adressa_Corpus, Adressa_Train_Dataset
 from utils._evaluation import get_run_index, compute_scores_IPNR
 from datetime import datetime
 import wandb
@@ -36,10 +37,11 @@ class TrainerSentiDebias:
             if _corpus is None:
                 _corpus = MIND_Corpus_SentiDebias(config)
             self.train_dataset = MIND_Train_Dataset_SentiDebias(_corpus)
-        elif config.dataset_name == 'ebnerd':
+        elif config.dataset_name in {'ebnerd', 'Adressa'}:
             if _corpus is None:
-                _corpus = EBNeRD_Corpus(config)
-            self.train_dataset = Ebnerd_Train_Dataset(_corpus)
+                _corpus = EBNeRD_Corpus(config) if config.dataset_name == 'ebnerd' else Adressa_Corpus(config)
+                self._corpus = _corpus
+            self.train_dataset = Ebnerd_Train_Dataset(_corpus) if config.dataset_name == 'ebnerd' else Adressa_Train_Dataset(_corpus)
 
         self.run_index = run_index
         self.model_dir = config.model_dir + '/#' + str(self.run_index)
@@ -90,7 +92,7 @@ class TrainerSentiDebias:
             model = nn.DataParallel(model)
 
         for e in tqdm(range(1, self.epoch + 1)):
-            if self.config.dataset_name == 'MIND':
+            if hasattr(self.train_dataset, 'negative_sampling'):
                 self.train_dataset.negative_sampling()
             train_dataloader = DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.batch_size // 16, pin_memory=True)
             model.train()
@@ -108,7 +110,7 @@ class TrainerSentiDebias:
                 user_content_entity = batch[8]
                 user_history_mask = batch[9]
                 
-                if self.config.dataset_name == 'ebnerd':
+                if self.config.dataset_name in {'ebnerd', 'Adressa'}:
                     # Indices 10, 11, 12 are graph-related
                     # user_history_graph = batch[10]
                     # user_history_category_mask = batch[11]
@@ -218,8 +220,8 @@ class TrainerSentiDebias:
             self.ndcg5_results.append(ndcg5)
             self.ndcg10_results.append(ndcg10)
             print('Epoch %d : dev done\nDev criterions' % e)
-            print('AUC = {:.4f}\nMRR = {:.4f}\nnDCG@5 = {:.4f}\nnDCG@10 = {:.4f}'.format(auc, mrr, ndcg5, ndcg10))
-            self.wandb.log({'validation epoch': e, 'AUC': auc, 'MRR': mrr, 'nDCG@5': ndcg5, 'nDCG@10': ndcg10})
+            print('AUC = {:.4f}\nMRR = {:.4f}\nnDCG@5 = {:.4f}\nnDCG@10 = {:.4f}\nMAE = {:.4f}\nRMSE = {:.4f}\nRecall@5 = {:.4f}\nRecall@10 = {:.4f}\nHit Rate@5 = {:.4f}\nHit Rate@10 = {:.4f}'.format(auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10))
+            self.wandb.log({'validation epoch': e, 'AUC': auc, 'MRR': mrr, 'nDCG@5': ndcg5, 'nDCG@10': ndcg10, 'MAE': mae, 'RMSE': rmse, 'Recall@5': recall5, 'Recall@10': recall10, 'Hit Rate@5': hit5, 'Hit Rate@10': hit10})
             avg = AvgMetric(auc, mrr, ndcg5, ndcg10)
             if avg >= self.best_dev_avg:
                 self.best_dev_avg = avg

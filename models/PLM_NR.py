@@ -1,16 +1,21 @@
 import torch.nn as nn
 
 from config import Config
-from models.modules.LKPNR import newsEncoders, userEncoders
+from models.modules.click_predictor import DotProduct
+from models.modules.plm_nr import NRMSUserEncoder, PLMNewsEncoder
 
-class LKPNR(nn.Module):
+
+class PLM_NR(nn.Module):
+    """RoBERTa-empowered NRMS implementation of the PLM-NR framework."""
+
     def __init__(self, config: Config):
         super().__init__()
-        self.news_encoder = newsEncoders.MHSA(config)
-        self.user_encoder = userEncoders.MHSA(self.news_encoder, config)
+        self.news_encoder = PLMNewsEncoder(config)
+        self.user_encoder = NRMSUserEncoder(self.news_encoder, config)
+        self.click_predictor = DotProduct()
         self.model_name = config.model
-        self.batch_size = config.batch_size
         self.config = config
+        self.batch_size = config.batch_size
 
     def initialize(self):
         self.news_encoder.initialize()
@@ -39,10 +44,7 @@ class LKPNR(nn.Module):
         news_content_text,
         news_content_mask,
         news_content_entity,
-        history_index=None,
-        sample_index=None,
     ):
-        del user_ID
         news_representation = self.news_encoder(
             news_title_text,
             news_title_mask,
@@ -53,8 +55,10 @@ class LKPNR(nn.Module):
             news_category,
             news_subCategory,
             None,
-            sample_index,
         )
+        if news_representation.dim() == 2:
+            news_representation = news_representation.unsqueeze(1)
+
         user_representation = self.user_encoder(
             user_title_text,
             user_title_mask,
@@ -70,6 +74,9 @@ class LKPNR(nn.Module):
             user_history_category_indices,
             None,
             news_representation,
-            history_index,
         )
-        return (user_representation * news_representation).sum(dim=2)
+        logits = self.click_predictor(
+            user_representation.unsqueeze(1),
+            news_representation.transpose(1, 2),
+        )
+        return logits.squeeze(1) if logits.size(1) == 1 else logits
