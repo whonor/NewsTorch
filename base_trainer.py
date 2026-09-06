@@ -8,14 +8,26 @@ from dataset_corpus_preprocessing.EBNeRD_corpus_main import EBNeRD_Corpus, Ebner
 from dataset_corpus_preprocessing.Adressa_corpus_main import Adressa_Corpus, Adressa_Train_Dataset
 from utils._evaluation import AvgMetric
 from utils._evaluation import compute_scores
+from experiments.sota_composition.dataset import SOTACompositionTrainDataset
+from models.modules.cnrcl.pcgrad import PCGrad
+from models.modules.cnrcl.utils import NewsRecSupConLoss_with_neg_pos
 from tqdm import tqdm
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
+import random
+import numpy as np
 
 
 ONCE_DIRE_MODEL_NAMES = {"ONCE"}
+
+
+def _seed_worker(worker_id):
+    """Seed NumPy and Python RNGs from the deterministic PyTorch worker seed."""
+    worker_seed = torch.initial_seed() % (2 ** 32)
+    np.random.seed(worker_seed)
+    random.seed(worker_seed)
 
 
 class Trainer:
@@ -28,7 +40,26 @@ class Trainer:
         self.max_history_num = config.max_history_num
         self.negative_sample_num = config.negative_sample_num
         self.loss = self.negative_log_softmax if config.click_predictor in ['dot_product', 'mlp', 'FIM'] else self.negative_log_sigmoid
-        self.optimizer = optim.Adam(filter(lambda p: p.requires_grad, self.model.parameters()), lr=config.lr, weight_decay=config.weight_decay)
+        optimizer_name = getattr(config, 'optimizer', 'Adam')
+        optimizer_class = getattr(optim, optimizer_name, None)
+        if not isinstance(optimizer_class, type) or not issubclass(optimizer_class, optim.Optimizer):
+            raise ValueError('Unsupported torch optimizer: %s' % optimizer_name)
+        base_optimizer = optimizer_class(
+            filter(lambda p: p.requires_grad, self.model.parameters()),
+            lr=config.lr,
+            weight_decay=config.weight_decay,
+        )
+        self.training_strategy = str(
+            getattr(config, 'training_strategy', 'standard')
+        ).lower().replace('_', '-')
+        self.use_sota_contrastive = (
+            config.model == 'SOTA-COMPOSABLE'
+            and self.training_strategy == 'cnrcl'
+        )
+        self.optimizer = PCGrad(base_optimizer) if self.use_sota_contrastive else base_optimizer
+        self.contrastive_loss = (
+            NewsRecSupConLoss_with_neg_pos() if self.use_sota_contrastive else None
+        )
         self._dataset = config.dataset_name
         self._corpus = _corpus
         if config.dataset_name == 'MIND':
@@ -36,7 +67,11 @@ class Trainer:
                 _corpus = MIND_Corpus(config)
                 self._corpus = _corpus
             if type(_corpus).__name__ == 'MIND_Corpus':
-                self.train_dataset = MIND_Train_Dataset(_corpus)
+                self.train_dataset = (
+                    SOTACompositionTrainDataset(_corpus)
+                    if self.use_sota_contrastive
+                    else MIND_Train_Dataset(_corpus)
+                )
         elif config.dataset_name == 'gossipcop':
             if _corpus is None:
                 _corpus = Fake_MIND_Corpus(config)
@@ -89,6 +124,7 @@ class Trainer:
             os.mkdir(self.model_dir)
         self.dev_criterion = config.dev_criterion
         self.early_stopping_epoch = config.early_stopping_epoch
+        self.early_stopping_min_delta = getattr(config, 'early_stopping_min_delta', 0.0)
         self.auc_results = []
         self.mrr_results = []
         self.ndcg5_results = []
@@ -99,6 +135,7 @@ class Trainer:
         self.best_dev_ndcg5 = 0
         self.best_dev_ndcg10 = 0
         self.best_dev_avg = AvgMetric(0, 0, 0, 0)
+        self.best_monitor_value = float('-inf')
         self.epoch_not_increase = 0
         self.gradient_clip_norm = config.gradient_clip_norm
         self.model.cuda()
@@ -121,12 +158,29 @@ class Trainer:
             model = nn.DataParallel(model)
 
         for e in tqdm(range(1, self.epoch + 1)):
-            self.train_dataset.negative_sampling()
-            train_dataloader = DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.batch_size // 16, pin_memory=True)
+            if self.use_sota_contrastive:
+                self.train_dataset.negative_sampling(epoch=e)
+            else:
+                self.train_dataset.negative_sampling()
+            data_generator = torch.Generator()
+            data_generator.manual_seed(self.config.seed + e)
+            num_workers = getattr(self.config, 'num_workers', None)
+            if num_workers is None:
+                num_workers = self.batch_size // 16
+            train_dataloader = DataLoader(
+                self.train_dataset,
+                batch_size=self.batch_size,
+                shuffle=True,
+                num_workers=num_workers,
+                pin_memory=True,
+                generator=data_generator,
+                worker_init_fn=_seed_worker,
+            )
             model.train()
             epoch_loss = 0
             for data_batch in tqdm(train_dataloader):
                 data_batch = [item.cuda(non_blocking=True) if isinstance(item, torch.Tensor) else item for item in data_batch]
+                pcgrad_losses = None
                 if self.config.model == "TANR":
                     logits, topic_pred_loss = self.model(*data_batch[:21])
                     loss = self.loss(logits) + self.config.topic_pred_loss_coef * topic_pred_loss
@@ -181,6 +235,20 @@ class Trainer:
                     else:
                         logits = self.model(*data_batch[:21], data_batch[23], data_batch[24])
                     loss = self.loss(logits)
+                elif self.config.model == 'SOTA-COMPOSABLE':
+                    logits, logits_unsummed, auxiliary_loss = self.model(*data_batch)
+                    prediction_loss = self.loss(logits) + auxiliary_loss
+                    if self.use_sota_contrastive:
+                        contrastive_loss = (
+                            float(getattr(self.config, 'sota_contrastive_weight', 1.0))
+                            * self.contrastive_loss(
+                                logits_unsummed, self.negative_sample_num
+                            )
+                        )
+                        pcgrad_losses = [prediction_loss, contrastive_loss]
+                        loss = prediction_loss + contrastive_loss
+                    else:
+                        loss = prediction_loss
                 else:
                     logits = self.model(*data_batch[:21])  # For other models like NRMS, NPA, etc.
                     if isinstance(logits, tuple):
@@ -189,7 +257,10 @@ class Trainer:
 
                 epoch_loss += float(loss) * data_batch[0].size(0)
                 self.optimizer.zero_grad()
-                loss.backward()
+                if pcgrad_losses is None:
+                    loss.backward()
+                else:
+                    self.optimizer.pc_backward(pcgrad_losses)
                 if self.gradient_clip_norm > 0:
                     nn.utils.clip_grad_norm_(model.parameters(), self.gradient_clip_norm)
                 self.optimizer.step()
@@ -211,19 +282,39 @@ class Trainer:
             print('AUC = {:.4f}\nMRR = {:.4f}\nnDCG@5 = {:.4f}\nnDCG@10 = {:.4f}\nMAE = {:.4f}\nRMSE = {:.4f}\nRecall@5 = {:.4f}\nRecall@10 = {:.4f}\nHit Rate@5 = {:.4f}\nHit Rate@10 = {:.4f}'.format(auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10))
             self.wandb.log({'validation epoch': e, 'AUC': auc, 'MRR': mrr, 'nDCG@5': ndcg5, 'nDCG@10': ndcg10, 'MAE': mae, 'RMSE': rmse, 'Recall@5': recall5, 'Recall@10': recall10, 'Hit Rate@5': hit5, 'Hit Rate@10': hit10})
             avg = AvgMetric(auc, mrr, ndcg5, ndcg10)
-            if avg >= self.best_dev_avg:
+            criterion_key = self.dev_criterion.lower().replace('@', '').replace('_', '').replace('-', '')
+            criterion_values = {
+                'avg': avg.avg,
+                'auc': auc,
+                'mrr': mrr,
+                'ndcg5': ndcg5,
+                'ndcg10': ndcg10,
+            }
+            if criterion_key not in criterion_values:
+                raise ValueError(
+                    'Unsupported dev criterion %r; choose avg, auc, mrr, ndcg5, or ndcg10'
+                    % self.dev_criterion
+                )
+            monitor_value = criterion_values[criterion_key]
+            improved = monitor_value > self.best_monitor_value + self.early_stopping_min_delta
+            if improved:
                 self.best_dev_avg = avg
+                self.best_dev_auc = auc
+                self.best_dev_mrr = mrr
+                self.best_dev_ndcg5 = ndcg5
+                self.best_dev_ndcg10 = ndcg10
+                self.best_monitor_value = monitor_value
                 self.best_dev_epoch = e
                 self.epoch_not_increase = 0
             else:
                 self.epoch_not_increase += 1
 
             print('Best epoch :', self.best_dev_epoch)
-            print('Best ' + self.dev_criterion + ' : ' + str(getattr(self, 'best_dev_' + self.dev_criterion)))
+            print('Best ' + self.dev_criterion + ' : ' + str(self.best_monitor_value))
             torch.cuda.empty_cache()
-            if self.epoch_not_increase == 0:
+            if improved:
                 torch.save({self.config.model: model.state_dict()}, self.model_dir + '/' + self.config.model + '-' + str(self.best_dev_epoch))
-            if self.epoch_not_increase == self.early_stopping_epoch:
+            if self.epoch_not_increase >= self.early_stopping_epoch:
                 break
         if self.best_dev_epoch == 0:
             raise RuntimeError("Training finished, but no model was saved. "

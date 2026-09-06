@@ -1,4 +1,6 @@
 import csv
+import hashlib
+import json
 import os
 import shutil
 
@@ -43,6 +45,8 @@ from models.SEIN import SEIN
 from models.ONCE_DIRE_QWEN3_NAML import ONCE_DIRE_QWEN3_NAML
 from models.PNR_LLM import PNR_LLM
 from models.S2LENR import S2LENR
+from models.Composable import Composable
+from models.SOTAComposition import SOTAComposition
 from models.modules.cnrcl.trainer import TrainerCNRCL
 from models.modules.ipnr.trainer import TrainerIPNR
 from models.modules.mmrec.trainer import TrainerMMRec
@@ -69,6 +73,130 @@ from dataset_corpus_preprocessing.MIND_corpus_main import MIND_DevTest_Dataset
 from base_trainer import Trainer
 
 
+def _sha256_file(path):
+    digest = hashlib.sha256()
+    with open(path, 'rb') as input_file:
+        for chunk in iter(lambda: input_file.read(1024 * 1024), b''):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _json_default(value):
+    """Convert NumPy/PyTorch scalar metrics to JSON-native values."""
+    item = getattr(value, 'item', None)
+    if callable(item):
+        scalar = item()
+        if isinstance(scalar, (bool, int, float, str)) or scalar is None:
+            return scalar
+    raise TypeError('Object of type %s is not JSON serializable' % type(value).__name__)
+
+
+def write_metrics_output(config, metrics):
+    """Write one framework-neutral result record for comparison experiments."""
+    if not config.metrics_output:
+        return
+    output_path = os.path.abspath(config.metrics_output)
+    output_dir = os.path.dirname(output_path)
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+    payload = {
+        'schema_version': 1,
+        'framework': 'newstorch',
+        'model': config.model,
+        'seed': config.seed,
+        'evaluation_split': 'test',
+        'run_index': getattr(config, 'run_index', None),
+        'best_epoch': getattr(config, 'best_dev_epoch', None),
+        'metrics': metrics,
+        'runtime_settings': {
+            'dataset_root': os.path.abspath(config.DATASET_ROOT),
+            'word_embedding_dim': config.word_embedding_dim,
+            'max_title_length': config.max_title_length,
+            'max_abstract_length': config.max_abstract_length,
+            'max_history_num': config.max_history_num,
+            'negative_sample_num': config.negative_sample_num,
+            'optimizer': config.optimizer,
+            'learning_rate': config.lr,
+            'weight_decay': config.weight_decay,
+            'dropout_rate': config.dropout_rate,
+            'loss': 'cross_entropy' if config.click_predictor in ('dot_product', 'mlp', 'FIM') else 'binary_cross_entropy',
+            'max_epochs': config.epoch,
+            'early_stopping_patience': config.early_stopping_epoch,
+            'early_stopping_min_delta': config.early_stopping_min_delta,
+            'stopping_metric': config.dev_criterion,
+        },
+    }
+    if config.model in {'COMPOSABLE', 'SOTA-COMPOSABLE'}:
+        payload['composition'] = {
+            'id': config.composition_id,
+            'news_encoder': config.news_encoder_type,
+            'user_encoder': config.user_encoder_type,
+        }
+        if config.model == 'SOTA-COMPOSABLE':
+            payload['composition'].update({
+                'enhancement': config.enhancement_type,
+                'training': config.training_strategy,
+                'special_modules': getattr(config, 'special_modules', []),
+            })
+    if config.protocol_manifest:
+        manifest_path = os.path.abspath(config.protocol_manifest)
+        if not os.path.isfile(manifest_path):
+            raise FileNotFoundError('Protocol manifest does not exist: ' + manifest_path)
+        with open(manifest_path, 'r', encoding='utf-8') as manifest_file:
+            manifest = json.load(manifest_file)
+        protocol = manifest['protocol']
+        expected_training = protocol['training']
+        actual_training = {
+            'batch_size': config.batch_size,
+            'max_epochs': config.epoch,
+            'negative_sample_num': config.negative_sample_num,
+            'optimizer': config.optimizer,
+            'learning_rate': config.lr,
+            'weight_decay': config.weight_decay,
+            'dropout_rate': config.dropout_rate,
+            'loss': 'cross_entropy' if config.click_predictor in ('dot_product', 'mlp', 'FIM') else 'binary_cross_entropy',
+            'gradient_clip_norm': config.gradient_clip_norm,
+            'early_stopping_patience': config.early_stopping_epoch,
+            'early_stopping_min_delta': config.early_stopping_min_delta,
+            'stopping_metric': config.dev_criterion,
+            'deterministic': config.deterministic,
+            'num_workers': config.num_workers,
+        }
+        if actual_training != expected_training:
+            raise ValueError('Runtime training settings do not match the protocol')
+        actual_sequence_lengths = {
+            'title': config.max_title_length,
+            'abstract': config.max_abstract_length,
+            'history': config.max_history_num,
+        }
+        if actual_sequence_lengths != protocol['sequence_lengths']:
+            raise ValueError('Runtime sequence lengths do not match the protocol')
+        model_overrides = protocol.get('model_overrides', {}).get(config.model, {})
+        for name, expected_value in model_overrides.items():
+            if getattr(config, name, None) != expected_value:
+                raise ValueError('Runtime model setting %s does not match the protocol' % name)
+        expected_dataset_root = manifest['aligned_datasets'][str(config.seed)]['root']
+        if os.path.realpath(config.DATASET_ROOT) != os.path.realpath(expected_dataset_root):
+            raise ValueError('Runtime dataset root does not match the seed-specific protocol data')
+        if os.path.realpath(config.word_embedding_path) != os.path.realpath(manifest['embeddings']['path']):
+            raise ValueError('Runtime word embeddings do not match the protocol artifact')
+        if os.path.realpath(config.vocabulary_path) != os.path.realpath(manifest['vocabulary']['path']):
+            raise ValueError('Runtime vocabulary does not match the protocol artifact')
+        payload['settings'] = {
+            'training': expected_training,
+            'sequence_lengths': protocol['sequence_lengths'],
+            'model_overrides': model_overrides,
+            'word_embeddings_sha256': manifest['embeddings']['logical_sha256'],
+        }
+        payload['protocol_manifest'] = manifest_path
+        payload['protocol_manifest_sha256'] = _sha256_file(manifest_path)
+    temporary_path = output_path + '.tmp'
+    with open(temporary_path, 'w', encoding='utf-8') as output_file:
+        json.dump(payload, output_file, indent=2, sort_keys=True, default=_json_default)
+        output_file.write('\n')
+    os.replace(temporary_path, output_path)
+
+
 def get_model_classes():
     model_classes = {
         'TANR': TANR,
@@ -93,7 +221,9 @@ def get_model_classes():
         'SEIN': SEIN,
         'ONCE': ONCE_DIRE_QWEN3_NAML,
         'S2LENR': S2LENR,
-        'PNR-LLM': PNR_LLM
+        'PNR-LLM': PNR_LLM,
+        'COMPOSABLE': Composable,
+        'SOTA-COMPOSABLE': SOTAComposition,
     }
     return model_classes
 
@@ -151,6 +281,7 @@ def train(config: Config, corpus, wandb):
             trainer = Trainer(model, config, corpus, wandb, run_index)
             trainer.train()
     config.run_index = run_index
+    config.best_dev_epoch = trainer.best_dev_epoch
     return trainer.best_dev_avg
 
 
@@ -274,10 +405,27 @@ def test(config: Config, corpus):
         flops, params, inference_time = 0, 0, 0
 
     if config.dataset_size != 'submission':
+        metrics = {
+            'auc': auc,
+            'mrr': mrr,
+            'ndcg5': ndcg5,
+            'ndcg10': ndcg10,
+            'mae': mae,
+            'rmse': rmse,
+            'recall5': recall5,
+            'recall10': recall10,
+            'hit5': hit5,
+            'hit10': hit10,
+            'precision5': precision5,
+            'precision10': precision10,
+            'flops': flops,
+            'params': params,
+            'inference_time': inference_time,
+        }
         print('AUC : %.4f\nMRR : %.4f\nnDCG@5 : %.4f\nnDCG@10 : %.4f\nMAE : %.4f\nRMSE : %.4f\nRecall@5 : %.4f'
           '\nRecall@10 : %.4f\nHit Rate@5 : %.4f\nHit Rate@10 : %.4f\nPrecision@5 : %.4f\nPrecision@10 : %.4f' % (auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10))
         if config.mode == 'train':
-            metrics = {
+            csv_metrics = {
                 'AUC': auc,
                 'MRR': mrr,
                 'nDCG@5': ndcg5,
@@ -297,13 +445,13 @@ def test(config: Config, corpus):
             csv_path = os.path.join(config.result_dir, 'metrics_results.csv')
             file_exists = os.path.isfile(csv_path)
             with open(csv_path, mode='a', newline='') as csv_file:
-                writer = csv.DictWriter(csv_file, fieldnames=['Model'] + ['RunIndex'] + list(metrics.keys()))
+                writer = csv.DictWriter(csv_file, fieldnames=['Model'] + ['RunIndex'] + list(csv_metrics.keys()))
 
                 if not file_exists:
                     writer.writeheader()
 
                 row = {'Model': config.model, 'RunIndex': config.run_index}
-                row.update(metrics)
+                row.update(csv_metrics)
                 writer.writerow(row)
 
         elif config.mode == 'test' and config.test_output_file != '':
@@ -312,10 +460,12 @@ def test(config: Config, corpus):
                         + '\t' + str(mae) + '\t' + str(rmse) + '\t' + str(recall5) + '\t' + str(recall10) + '\t' + str(hit5)
                         + '\t' + str(hit10) + '\t' + str(precision5) + '\t' + str(precision10) + '\n')
     else:
+        metrics = {}
         shutil.copy(test_res_dir + '/' + config.model + '.txt', 'cache/prediction/large/%s/#%d/prediction.txt' % (config.model, config.run_index))
         os.chdir('cache/prediction/large/%s/#%d' % (config.model, config.run_index))
         os.system('zip prediction.zip prediction.txt')
         os.chdir('../../../..')
+    return metrics
 
 
 if __name__ == '__main__':
@@ -358,7 +508,8 @@ if __name__ == '__main__':
         print("Finish training at: ", datetime.now())
         config.test_model_path = config.best_model_dir + '/#' + str(config.run_index) + '/' + config.model
         print("Start testing at: ", datetime.now())
-        test(config, corpus)
+        metrics = test(config, corpus)
+        write_metrics_output(config, metrics)
         print("Finish testing at: ", datetime.now())
     elif config.mode == 'dev':
         print("Start dev at: ", datetime.now())
@@ -366,5 +517,6 @@ if __name__ == '__main__':
         print("Finish dev at: ", datetime.now())
     elif config.mode == 'test':
         print("Start testing at: ", datetime.now())
-        test(config, corpus)
+        metrics = test(config, corpus)
+        write_metrics_output(config, metrics)
         print("Finish testing at: ", datetime.now())

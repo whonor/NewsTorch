@@ -3,6 +3,7 @@ from config import Config
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import numpy as np
 from torch.nn.utils.rnn import pack_padded_sequence
 from torch.nn.utils.rnn import pad_packed_sequence
 from models.modules.layers import Conv1D, Conv2D_Pool, MultiHeadAttention, Attention, \
@@ -16,7 +17,15 @@ class NewsEncoder(nn.Module):
         self.word_embedding_dim = config.word_embedding_dim
         self.word_embedding = nn.Embedding(num_embeddings=config.vocabulary_size, embedding_dim=self.word_embedding_dim)
         if config.dataset_name == 'MIND':
-            if config.model == 'IPNR':
+            explicit_embedding_path = getattr(config, 'word_embedding_path', '')
+            if explicit_embedding_path:
+                if explicit_embedding_path.endswith('.npy'):
+                    embedding_matrix = torch.from_numpy(np.load(explicit_embedding_path, allow_pickle=False))
+                else:
+                    with open(explicit_embedding_path, 'rb') as word_embedding_f:
+                        embedding_matrix = pickle.load(word_embedding_f)
+                self.word_embedding.weight.data.copy_(torch.as_tensor(embedding_matrix))
+            elif config.model == 'IPNR':
                 with open('cache/IPNR/word_embedding-' + str(config.word_threshold) + '-' + str(
                         config.word_embedding_dim) + '-' + config.tokenizer + '-' + str(
                     config.max_title_length) + '-' + str(
@@ -208,9 +217,15 @@ class MHSA(NewsEncoder):
         super(MHSA, self).__init__(config)
         self.max_sentence_length = config.max_title_length
         self.feature_dim = config.head_num * config.head_dim
+        # The published NRMS encoder is title-only.  Keep the historical
+        # NewsTorch category fusion as the default, but allow controlled
+        # reproduction runs to select the paper-faithful architecture.
+        self.use_category = getattr(config, 'nrms_use_category', True)
         self.multiheadAttention = MultiHeadAttention(config.head_num, config.word_embedding_dim, config.max_title_length, config.max_title_length, config.head_dim, config.head_dim)
         self.attention = Attention(config.head_num*config.head_dim, config.attention_dim)
-        self.news_embedding_dim = config.head_num * config.head_dim + config.category_embedding_dim + config.subCategory_embedding_dim
+        self.news_embedding_dim = config.head_num * config.head_dim
+        if self.use_category:
+            self.news_embedding_dim += config.category_embedding_dim + config.subCategory_embedding_dim
 
     def initialize(self):
         super().initialize()
@@ -231,7 +246,8 @@ class MHSA(NewsEncoder):
             # Attention layer, reshape back to 3D [batch_size, news_num, feature_dim]
             news_representation = self.attention(c, mask=mask).view([batch_size, news_num, self.feature_dim])
             # Feature fusion
-            news_representation = self.feature_fusion(news_representation, category, subCategory)
+            if self.use_category:
+                news_representation = self.feature_fusion(news_representation, category, subCategory)
         elif title_text.dim() == 2:  # Dev/Test path: [batch_size, max_title_length] (single news item per batch entry)
             batch_size = title_text.size(0)
             # In this case, news_num is implicitly 1.
@@ -250,11 +266,12 @@ class MHSA(NewsEncoder):
             # subCategory becomes [batch_size, 1]
             # Then feature_fusion returns [batch_size, 1, news_embedding_dim]
             # Squeeze back to [batch_size, news_embedding_dim]
-            news_representation = self.feature_fusion(
-                news_representation.unsqueeze(1),
-                category.unsqueeze(1),
-                subCategory.unsqueeze(1)
-            ).squeeze(1)
+            if self.use_category:
+                news_representation = self.feature_fusion(
+                    news_representation.unsqueeze(1),
+                    category.unsqueeze(1),
+                    subCategory.unsqueeze(1)
+                ).squeeze(1)
         else:
             raise ValueError(f"Unexpected title_text dimension: {title_text.dim()}")
         # [batch_size, news_num, news_embedding_dim]

@@ -2,6 +2,7 @@ import os
 import argparse
 import time
 import csv
+import hashlib
 
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 
@@ -69,11 +70,17 @@ class Config:
         parser.add_argument('--epoch', type=int, default=10, help='Epoch for training')
         parser.add_argument('--mode', type=str, default='train', help='Mode')
         parser.add_argument('--DATASET_ROOT', type=str, default='ebnerd_demo', help='Dataset directory, for example ebnerd_demo, MIND-small, or Adressa-1week')
+        parser.add_argument('--dataset_cache_key', type=str, default='',
+                            help='Filesystem-safe identifier for cache/results paths')
         parser.add_argument('--dataset_name', type=str, default='ebnerd', help='Dataset adapter: MIND, ebnerd, Adressa, or gossipcop')
         parser.add_argument('--dataset_size', type=str, default='demo', help='Dataset variant, can be small, large, or demo, if submit the predictions submission')
         parser.add_argument('--images_path', type=str, default='downloaded_images_ebnerd_small',
                             help='downloaded_images for demo or small')
         parser.add_argument('--word_embedding_dim', type=int, default=0, help='Embedding size; defaults to 1024 for EB-NeRD and 300 otherwise')
+        parser.add_argument('--word_embedding_path', type=str, default='',
+                            help='Exact preprocessed word-embedding matrix (.pkl or .npy)')
+        parser.add_argument('--vocabulary_path', type=str, default='',
+                            help='Exact token-to-index vocabulary JSON')
         parser.add_argument('--adressa_raw_dir', type=str, default='', help='Directory containing the licensed Adressa JSON/JSONL files')
         parser.add_argument('--adressa_eval_negative_num', type=int, default=20, help='Sampled negatives per Adressa click')
         parser.add_argument('--adressa_min_history', type=int, default=1, help='Minimum prior clicks for an Adressa training/evaluation example')
@@ -86,6 +93,27 @@ class Config:
         parser.add_argument('--test_model_path', type=str,
                             default='cache/best_models/small/NRMS/#1/NRMS',
                             help='The path of the best model')
+        parser.add_argument('--config_file', type=str, default='',
+                            help='Optional YAML file with experiment-wide overrides')
+        parser.add_argument('--metrics_output', type=str, default='',
+                            help='Write normalized run metrics to this JSON file')
+        parser.add_argument('--protocol_manifest', type=str, default='',
+                            help='Alignment manifest used by a reproducibility experiment')
+        parser.add_argument('--negative_sample_num', type=int, default=None)
+        parser.add_argument('--max_history_num', type=int, default=None)
+        parser.add_argument('--max_title_length', type=int, default=None)
+        parser.add_argument('--max_abstract_length', type=int, default=None)
+        parser.add_argument('--lr', type=float, default=None)
+        parser.add_argument('--weight_decay', type=float, default=None)
+        parser.add_argument('--gradient_clip_norm', type=float, default=None)
+        parser.add_argument('--dropout_rate', type=float, default=None)
+        parser.add_argument('--early_stopping_epoch', type=int, default=None)
+        parser.add_argument('--early_stopping_min_delta', type=float, default=None)
+        parser.add_argument('--dev_criterion', type=str, default=None)
+        parser.add_argument('--optimizer', type=str, default=None)
+        parser.add_argument('--num_workers', type=int, default=None)
+        parser.add_argument('--deterministic', action='store_true',
+                            help='Enable deterministic PyTorch/CUDA execution where supported')
         args, _ = parser.parse_known_args()
         self.model = args.model
 
@@ -96,12 +124,22 @@ class Config:
         self.test_model_path = args.test_model_path
         self.test_output_file = ''
         self.seed = args.seed
-        self.config_file = ''
+        self.config_file = args.config_file
+        self.metrics_output = args.metrics_output
+        self.protocol_manifest = args.protocol_manifest
         self.downloaded_images_file = args.images_path
 
         self.root = "."
         self.data_path = "cache/"
         self.DATASET_ROOT = args.DATASET_ROOT
+        dataset_path = os.path.abspath(os.path.join(self.root, self.DATASET_ROOT))
+        if args.dataset_cache_key:
+            self.dataset_cache_key = args.dataset_cache_key
+        elif os.path.basename(os.path.normpath(self.DATASET_ROOT)) == self.DATASET_ROOT:
+            self.dataset_cache_key = self.DATASET_ROOT
+        else:
+            path_hash = hashlib.sha1(dataset_path.encode('utf-8')).hexdigest()[:8]
+            self.dataset_cache_key = os.path.basename(os.path.normpath(dataset_path)) + '-' + path_hash
         self.dataset_name = 'Adressa' if args.dataset_name.lower() == 'adressa' else args.dataset_name
         self.dataset_size = '1week' if self.dataset_name == 'Adressa' and args.dataset_size == 'demo' else args.dataset_size
         self.adressa_raw_dir = args.adressa_raw_dir
@@ -123,8 +161,14 @@ class Config:
         self.world_size = 1
         self.dev_criterion = 'avg'
         self.early_stopping_epoch = 5
+        self.early_stopping_min_delta = 0.0
+        self.optimizer = 'Adam'
+        self.num_workers = None
+        self.deterministic = False
 
         self.word_embedding_dim = args.word_embedding_dim or (1024 if self.dataset_name == 'ebnerd' else 300)
+        self.word_embedding_path = args.word_embedding_path
+        self.vocabulary_path = args.vocabulary_path
         self.clickbait_score_path = args.clickbait_score_path
         self.category_embedding_dim = 50
         self.subCategory_embedding_dim = 50
@@ -143,9 +187,9 @@ class Config:
         # self.train_root = self.root + '/%s_%s/train' % (self.dataset_name, self.dataset)
         # self.dev_root = self.root + '/%s_%s/dev' % (self.dataset_name, self.dataset)
         # self.test_root = self.root + '/%s_%s/test' % (self.dataset_name, self.dataset)
-        self.train_root = self.root + '/%s/train' % self.DATASET_ROOT
-        self.dev_root = self.root + '/%s/dev' % self.DATASET_ROOT
-        self.test_root = self.root + '/%s/test' % self.DATASET_ROOT
+        self.train_root = os.path.join(dataset_path, 'train')
+        self.dev_root = os.path.join(dataset_path, 'dev')
+        self.test_root = os.path.join(dataset_path, 'test')
 
         self.seed = self.seed if self.seed >= 0 else (int)(time.time())
 
@@ -165,18 +209,41 @@ class Config:
         self.concept_num_per_news = getattr(self, 'concept_num_per_news', 20)
 
 
-        self.attribute_dict = self.__dict__.copy()
         if self.config_file != '':
             if os.path.exists(self.config_file):
                 print('Get experiment settings from the config file : ' + self.config_file)
                 with open(self.config_file, 'r', encoding='utf-8') as f:
-                    configs = yaml.safe_load(f)
-                    for attribute in self.attribute_dict:
-                        if attribute in configs:
-                            setattr(self, attribute, configs[attribute])
-                            self.attribute_dict[attribute] = configs[attribute]
+                    configs = yaml.safe_load(f) or {}
+                    if not isinstance(configs, dict):
+                        raise ValueError('Experiment config must contain a YAML mapping')
+                    for attribute, value in configs.items():
+                        setattr(self, attribute, value)
             else:
                 raise Exception('config file does not exist : ' + self.config_file)
+
+        # Explicit command-line values take precedence over model and experiment YAML.
+        cli_overrides = {
+            'negative_sample_num': args.negative_sample_num,
+            'max_history_num': args.max_history_num,
+            'max_title_length': args.max_title_length,
+            'max_abstract_length': args.max_abstract_length,
+            'lr': args.lr,
+            'weight_decay': args.weight_decay,
+            'gradient_clip_norm': args.gradient_clip_norm,
+            'dropout_rate': args.dropout_rate,
+            'early_stopping_epoch': args.early_stopping_epoch,
+            'early_stopping_min_delta': args.early_stopping_min_delta,
+            'dev_criterion': args.dev_criterion,
+            'optimizer': args.optimizer,
+            'num_workers': args.num_workers,
+        }
+        for attribute, value in cli_overrides.items():
+            if value is not None:
+                setattr(self, attribute, value)
+        if args.deterministic:
+            self.deterministic = True
+        self.candidate_news_num = self.negative_sample_num + 1
+        self.attribute_dict = self.__dict__.copy()
         assert not (
                     self.no_self_connection and not self.no_adjacent_normalization), 'Adjacent normalization of graph only can be set in case of self-connection'
 
@@ -196,11 +263,14 @@ class Config:
         assert gpu_available, 'GPU is not available'
         #torch.cuda.set_device(self.device_id)
         torch.manual_seed(self.seed)
-        torch.cuda.manual_seed(self.seed)
+        torch.cuda.manual_seed_all(self.seed)
         random.seed(self.seed)
         np.random.seed(self.seed)
-        torch.backends.cudnn.benchmark = True # For faster training
-        torch.backends.cudnn.deterministic = False # For reproducibility (https://pytorch.org/docs/stable/notes/randomness.html)
+        torch.backends.cudnn.benchmark = not self.deterministic
+        torch.backends.cudnn.deterministic = self.deterministic
+        if self.deterministic:
+            os.environ.setdefault('CUBLAS_WORKSPACE_CONFIG', ':4096:8')
+            torch.use_deterministic_algorithms(True, warn_only=True)
 
 
     def preliminary_setup(self):
@@ -217,11 +287,11 @@ class Config:
         model_name = self.model
         data_path = self.data_path
         mkdirs = lambda x: os.makedirs(x) if not os.path.exists(x) else None
-        self.model_dir = data_path + 'models/' + self.DATASET_ROOT + '/' + model_name
-        self.dev_res_dir = data_path + 'dev/res/' + self.DATASET_ROOT + '/' + model_name
-        self.result_dir = data_path + 'results/' + self.DATASET_ROOT + '/' + model_name
-        self.best_model_dir = data_path + 'best_models/' + self.DATASET_ROOT + '/' + model_name
-        self.test_res_dir = data_path + 'test/res/' + self.DATASET_ROOT + '/' + model_name
+        self.model_dir = data_path + 'models/' + self.dataset_cache_key + '/' + model_name
+        self.dev_res_dir = data_path + 'dev/res/' + self.dataset_cache_key + '/' + model_name
+        self.result_dir = data_path + 'results/' + self.dataset_cache_key + '/' + model_name
+        self.best_model_dir = data_path + 'best_models/' + self.dataset_cache_key + '/' + model_name
+        self.test_res_dir = data_path + 'test/res/' + self.dataset_cache_key + '/' + model_name
         mkdirs(self.model_dir)
         mkdirs(data_path + 'dev/ref')
         mkdirs(self.dev_res_dir)
@@ -233,8 +303,8 @@ class Config:
             mkdirs("cache/IPNR/")
         mkdirs("cache/%s/" % self.dataset_name)
 
-        dev_truth_path = os.path.join(data_path, f'dev/ref/truth-{self.DATASET_ROOT}.txt')
-        test_truth_path = os.path.join(data_path, f'test/ref/truth-{self.DATASET_ROOT}.txt')
+        dev_truth_path = os.path.join(data_path, f'dev/ref/truth-{self.dataset_cache_key}.txt')
+        test_truth_path = os.path.join(data_path, f'test/ref/truth-{self.dataset_cache_key}.txt')
 
         if dataset_name == 'MIND':
             if not os.path.exists(dev_truth_path):

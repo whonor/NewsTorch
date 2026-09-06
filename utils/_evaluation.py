@@ -25,6 +25,7 @@ import numpy as np
 import json
 from sklearn.metrics import roc_auc_score
 import time
+from experiments.faithful_reproduction.protocol import score_impression_ranks
 
 
 ONCE_DIRE_MODEL_NAMES = {"ONCE"}
@@ -121,7 +122,7 @@ def _get_model_inputs(config, data_batch):
         else:
              return tuple(data_batch[:21] + [data_batch[23], data_batch[24], data_batch[21], data_batch[22]])
 
-    elif config.model == 'IPNR' or config.model == 'TCCM' or config.model == 'DREAM' or config.model == 'SEIN':
+    elif config.model in {'IPNR', 'TCCM', 'DREAM', 'SEIN', 'SOTA-COMPOSABLE'}:
         return data_batch
 
     elif config.model in ONCE_DIRE_MODEL_NAMES or config.model == 'PNR-LLM':
@@ -989,10 +990,11 @@ def scoring(truth_f, sub_f):
                 ))
             y_score.append(score_rslt)
 
-        auc = roc_auc_score(y_true, y_score)
-        mrr = mrr_score(y_true, y_score)
-        ndcg5 = ndcg_score(y_true, y_score, 5)
-        ndcg10 = ndcg_score(y_true, y_score, 10)
+        common_metrics = score_impression_ranks(labels, sub_ranks)
+        auc = common_metrics['auc']
+        mrr = common_metrics['mrr']
+        ndcg5 = common_metrics['ndcg5']
+        ndcg10 = common_metrics['ndcg10']
 
         aucs.append(auc)
         mrrs.append(mrr)
@@ -1074,7 +1076,7 @@ def compute_scores_IPNR(config: Config, model: nn.Module, mind_corpus: MIND_Corp
                 result[sub_score[j][1]] = j + 1
             result_f.write(('' if i == 0 else '\n') + str(i + 1) + ' ' + str(result).replace(' ', ''))
     if dataset != 'submission' or mode != 'test':
-        truth_file_path = "./cache/" + mode + '/ref/truth-%s.txt' % config.DATASET_ROOT
+        truth_file_path = "./cache/" + mode + '/ref/truth-%s.txt' % config.dataset_cache_key
         with open(truth_file_path, 'r', encoding='utf-8') as truth_f, open(result_file, 'r', encoding='utf-8') as result_f:
             auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = scoring(truth_f, result_f)
         return auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10
@@ -1246,6 +1248,11 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
                 if isinstance(out, tuple):
                     out = out[0]
                 scores[index: index + batch_size] = out
+            elif config.model == "SOTA-COMPOSABLE":
+                out = model(*data_batch)
+                if isinstance(out, tuple):
+                    out = out[0]
+                scores[index: index + batch_size] = _as_score_vector(out, batch_size)
             elif config.model in ONCE_DIRE_MODEL_NAMES:
                 if config.dataset_name in ['MIND', 'gossipcop']:
                     args = data_batch[:21] + [data_batch[21], data_batch[22]]
@@ -1271,7 +1278,7 @@ def compute_scores(config: Config, model: nn.Module, corpus, batch_size: int, mo
                 result[sub_score[j][1]] = j + 1
             result_f.write(('' if i == 0 else '\n') + str(i + 1) + ' ' + str(result).replace(' ', ''))
     if dataset_size != 'submission' or mode != 'test':
-        truth_file_path = config.data_path + '/' + mode + '/ref/truth-%s.txt' % config.DATASET_ROOT
+        truth_file_path = config.data_path + '/' + mode + '/ref/truth-%s.txt' % config.dataset_cache_key
         with open(truth_file_path, 'r', encoding='utf-8') as truth_f, open(result_file, 'r', encoding='utf-8') as result_f:
             auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = scoring(truth_f, result_f)
         return auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10
@@ -1346,7 +1353,7 @@ def compute_scores_mmrec(config: Config, model: nn.Module, corpus, batch_size: i
                 result[sub_score[j][1]] = j + 1
             result_f.write(('' if i == 0 else '\n') + str(i + 1) + ' ' + str(result).replace(' ', ''))
     if dataset_size != 'submission' or mode != 'test':
-        truth_file_path = config.data_path + '/' + mode + '/ref/truth-%s.txt' % config.DATASET_ROOT
+        truth_file_path = config.data_path + '/' + mode + '/ref/truth-%s.txt' % config.dataset_cache_key
         with open(truth_file_path, 'r', encoding='utf-8') as truth_f, open(result_file, 'r', encoding='utf-8') as result_f:
             auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10 = scoring(truth_f, result_f)
         return auc, mrr, ndcg5, ndcg10, mae, rmse, recall5, recall10, hit5, hit10, precision5, precision10

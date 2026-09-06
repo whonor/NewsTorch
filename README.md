@@ -439,6 +439,25 @@ NewsTorch computes multiple evaluation metrics during validation and testing:
 
 Results are automatically saved to CSV files for further analysis.
 
+### Extensibility through modular composition
+
+NewsTorch can assemble a recommendation model at runtime from registered news
+and user encoders. The evaluation in
+[`experiments/extensibility`](experiments/extensibility/README.md) covers six
+Attention/RNN/CNN compositions, verifies five lifecycle stages for each model,
+runs the configured seed matrix, and emits CSV, JSON, and LaTeX table rows with
+AUC and NDCG@10. Previously unseen pairings use the same `COMPOSABLE` model
+class and require no composition-specific source files.
+
+### Faithful reproduction of NRMS, NAML, and LSTUR
+
+The controlled three-framework, five-seed experiment is implemented under
+[`experiments/faithful_reproduction`](experiments/faithful_reproduction/README.md).
+It materializes fixed training candidate sets, fingerprints the shared splits
+and word embeddings, applies one optimizer/stopping configuration, evaluates
+all rank files with the same code, and reports paired NewsTorch-versus-original
+and NewsTorch-versus-NewsRecLib deltas.
+
 
 ## Limitations
 

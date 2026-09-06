@@ -58,6 +58,9 @@ def sampling(imps, ratio=4):
 
 
 
+GRAPH_HISTORY_MODELS = {'CNE-SUE', 'CNRCL', 'SOTA-COMPOSABLE'}
+
+
 class MIND_Corpus:
     @staticmethod
     def preprocess(config: Config):
@@ -65,14 +68,14 @@ class MIND_Corpus:
         news_ID_file = 'cache/news_ID-%s.json' % config.dataset_size
         category_file = 'cache/category-%s.json' % config.dataset_size
         subCategory_file = 'cache/subCategory-%s.json' % config.dataset_size
-        vocabulary_file = 'cache/vocabulary-' + str(config.word_threshold) + '-' + config.tokenizer + '-' + str(config.max_title_length) + '-' + str(config.max_abstract_length) + '-' + config.dataset_size + '.json'
-        word_embedding_file = 'cache/word_embedding-' + str(config.word_threshold) + '-' + str(config.word_embedding_dim) + '-' + config.tokenizer + '-' + str(config.max_title_length) + '-' + str(config.max_abstract_length) + '-' + config.dataset_size + '.pkl'
+        vocabulary_file = getattr(config, 'vocabulary_path', '') or ('cache/vocabulary-' + str(config.word_threshold) + '-' + config.tokenizer + '-' + str(config.max_title_length) + '-' + str(config.max_abstract_length) + '-' + config.dataset_size + '.json')
+        word_embedding_file = getattr(config, 'word_embedding_path', '') or ('cache/word_embedding-' + str(config.word_threshold) + '-' + str(config.word_embedding_dim) + '-' + config.tokenizer + '-' + str(config.max_title_length) + '-' + str(config.max_abstract_length) + '-' + config.dataset_size + '.pkl')
         entity_file = 'cache/entity-%s.json' % config.dataset_size
         entity_embedding_file = 'cache/entity_embedding-%s.pkl' % config.dataset_size
         context_embedding_file = 'cache/context_embedding-%s.pkl' % config.dataset_size
         user_history_graph_file = 'cache/user_history_graph-' + str(config.max_history_num) + ('' if config.no_self_connection else '-self') + ('' if config.no_adjacent_normalization else '-normalize-' + config.gcn_normalization_type) + '-' + config.dataset_name + config.dataset_size + '.pkl'
         preprocessed_data_files = [user_ID_file, news_ID_file, category_file, subCategory_file, vocabulary_file, word_embedding_file, entity_file, entity_embedding_file, context_embedding_file]
-        if config.model in {'CNE-SUE', 'CNRCL'}:
+        if config.model in GRAPH_HISTORY_MODELS:
             preprocessed_data_files.append(user_history_graph_file)
 
         if not all(list(map(os.path.exists, preprocessed_data_files))):
@@ -142,34 +145,39 @@ class MIND_Corpus:
                 json.dump(subCategory_dict, subCategory_f)
 
             # 3. word dictionay
-            word_counter_list = [[word, word_counter[word]] for word in word_counter]
-            word_counter_list.sort(key=lambda x: x[1], reverse=True) # sort by word frequency
-            filtered_word_counter_list = list(filter(lambda x: x[1] >= config.word_threshold, word_counter_list))
-            for i, word in enumerate(filtered_word_counter_list):
-                word_dict[word[0]] = i + 2
-            with open(vocabulary_file, 'w', encoding='utf-8') as vocabulary_f:
-                json.dump(word_dict, vocabulary_f)
+            if getattr(config, 'vocabulary_path', ''):
+                with open(vocabulary_file, 'r', encoding='utf-8') as vocabulary_f:
+                    word_dict = json.load(vocabulary_f)
+            else:
+                word_counter_list = [[word, word_counter[word]] for word in word_counter]
+                word_counter_list.sort(key=lambda x: x[1], reverse=True) # sort by word frequency
+                filtered_word_counter_list = list(filter(lambda x: x[1] >= config.word_threshold, word_counter_list))
+                for i, word in enumerate(filtered_word_counter_list):
+                    word_dict[word[0]] = i + 2
+                with open(vocabulary_file, 'w', encoding='utf-8') as vocabulary_f:
+                    json.dump(word_dict, vocabulary_f)
 
             # 4. Glove word embedding
-            if config.word_embedding_dim == 300:
-                glove = GloVe(name='840B', dim=300, cache='./glove', max_vectors=10000000000)
-            else:
-                glove = GloVe(name='6B', dim=config.word_embedding_dim, cache='./glove', max_vectors=10000000000)
-            glove_stoi = glove.stoi
-            glove_vectors = glove.vectors
-            glove_mean_vector = torch.mean(glove_vectors, dim=0, keepdim=False)
-            word_embedding_vectors = torch.zeros([len(word_dict), config.word_embedding_dim])
-            for word in word_dict:
-                index = word_dict[word]
-                if index != 0:
-                    if word in glove_stoi:
-                        word_embedding_vectors[index, :] = glove_vectors[glove_stoi[word]]
-                    else:
-                        random_vector = torch.zeros(config.word_embedding_dim)
-                        random_vector.normal_(mean=0, std=0.1)
-                        word_embedding_vectors[index, :] = random_vector + glove_mean_vector
-            with open(word_embedding_file, 'wb') as word_embedding_f:
-                pickle.dump(word_embedding_vectors, word_embedding_f)
+            if not getattr(config, 'word_embedding_path', ''):
+                if config.word_embedding_dim == 300:
+                    glove = GloVe(name='840B', dim=300, cache='./glove', max_vectors=10000000000)
+                else:
+                    glove = GloVe(name='6B', dim=config.word_embedding_dim, cache='./glove', max_vectors=10000000000)
+                glove_stoi = glove.stoi
+                glove_vectors = glove.vectors
+                glove_mean_vector = torch.mean(glove_vectors, dim=0, keepdim=False)
+                word_embedding_vectors = torch.zeros([len(word_dict), config.word_embedding_dim])
+                for word in word_dict:
+                    index = word_dict[word]
+                    if index != 0:
+                        if word in glove_stoi:
+                            word_embedding_vectors[index, :] = glove_vectors[glove_stoi[word]]
+                        else:
+                            random_vector = torch.zeros(config.word_embedding_dim)
+                            random_vector.normal_(mean=0, std=0.1)
+                            word_embedding_vectors[index, :] = random_vector + glove_mean_vector
+                with open(word_embedding_file, 'wb') as word_embedding_f:
+                    pickle.dump(word_embedding_vectors, word_embedding_f)
 
             # 5. knowledge-graph entity dictionary & eneity embedding & context embedding
             entity_embedding_vectors = torch.zeros([len(entity_dict), config.entity_embedding_dim])
@@ -200,7 +208,7 @@ class MIND_Corpus:
                 pickle.dump(context_embedding_vectors, context_embedding_f)
 
             # 6. user history graph for CNE-SUE
-            if config.model in {'CNE-SUE', 'CNRCL'}:
+            if config.model in GRAPH_HISTORY_MODELS:
                 category_num = len(category_dict)
                 graph_size = config.max_history_num + category_num # graph size of |V_{n}|+|V_{p}|
                 prefix_mode = ['train', 'dev', 'test']
@@ -262,6 +270,7 @@ class MIND_Corpus:
                     pickle.dump(user_history_graph_data, user_history_graph_f)
 
     def __init__(self, config: Config):
+        self.config = config
         self.model = config.model
         # preprocess cache
         MIND_Corpus.preprocess(config)
@@ -278,14 +287,15 @@ class MIND_Corpus:
         with open('cache/subCategory-%s.json' % config.dataset_size, 'r', encoding='utf-8') as subCategory_f:
             self.subCategory_dict = json.load(subCategory_f)
             config.subCategory_num = len(self.subCategory_dict)
-        with open('cache/vocabulary-' + str(config.word_threshold) + '-' + config.tokenizer + '-' + str(config.max_title_length) + '-' + str(config.max_abstract_length) + '-' + config.dataset_size + '.json', 'r', encoding='utf-8') as vocabulary_f:
+        vocabulary_file = getattr(config, 'vocabulary_path', '') or ('cache/vocabulary-' + str(config.word_threshold) + '-' + config.tokenizer + '-' + str(config.max_title_length) + '-' + str(config.max_abstract_length) + '-' + config.dataset_size + '.json')
+        with open(vocabulary_file, 'r', encoding='utf-8') as vocabulary_f:
             self.word_dict = json.load(vocabulary_f)
             config.vocabulary_size = len(self.word_dict)
         with open('cache/entity-%s.json' % config.dataset_size, 'r', encoding='utf-8') as entity_f:
             self.entity_dict = json.load(entity_f)
             config.entity_size = len(self.entity_dict)
         
-        if config.model in {'CNE-SUE', 'CNRCL'}:
+        if config.model in GRAPH_HISTORY_MODELS:
             user_history_graph_file = 'cache/user_history_graph-' + str(config.max_history_num) + ('' if config.no_self_connection else '-self') + ('' if config.no_adjacent_normalization else '-normalize-' + config.gcn_normalization_type) + '-' + config.dataset_name + config.dataset_size + '.pkl'
             try:
                 with open(user_history_graph_file, 'rb') as user_history_graph_f:
@@ -501,7 +511,7 @@ class MIND_Train_Dataset(data.Dataset):
         self.user_history_graph = corpus.train_user_history_graph
         self.user_history_category_mask = corpus.train_user_history_category_mask
         self.user_history_category_indices = corpus.train_user_history_category_indices
-        if self.model not in {'CNE-SUE', 'CNRCL'}:
+        if self.model not in GRAPH_HISTORY_MODELS:
             category_num = len(corpus.category_dict)
             graph_size = corpus.max_history_num + category_num
             self.user_history_graph = np.zeros((graph_size, graph_size), dtype=np.float32)
@@ -539,7 +549,7 @@ class MIND_Train_Dataset(data.Dataset):
         sample_index = torch.tensor(self.train_samples[index])
         behavior_index = train_behavior[5]
 
-        if self.model in {'CNE-SUE', 'CNRCL'}:
+        if self.model in GRAPH_HISTORY_MODELS:
             return train_behavior[0], self.news_category[history_index], self.news_subCategory[history_index], self.news_title_text[history_index], self.news_title_mask[history_index], self.news_title_entity[history_index], self.news_abstract_text[history_index], self.news_abstract_mask[history_index], self.news_abstract_entity[history_index], train_behavior[2], self.user_history_graph[behavior_index], self.user_history_category_mask[behavior_index], self.user_history_category_indices[behavior_index], \
                self.news_category[sample_index], self.news_subCategory[sample_index], self.news_title_text[sample_index], self.news_title_mask[sample_index], self.news_title_entity[sample_index], self.news_abstract_text[sample_index], self.news_abstract_mask[sample_index], self.news_abstract_entity[sample_index], history_index, sample_index
         else:
@@ -564,7 +574,7 @@ class MIND_DevTest_Dataset(data.Dataset):
         self.user_history_graph = corpus.dev_user_history_graph if mode == 'dev' else corpus.test_user_history_graph
         self.user_history_category_mask = corpus.dev_user_history_category_mask if mode == 'dev' else corpus.test_user_history_category_mask
         self.user_history_category_indices = corpus.dev_user_history_category_indices if mode == 'dev' else corpus.test_user_history_category_indices
-        if self.model not in {'CNE-SUE', 'CNRCL'}:
+        if self.model not in GRAPH_HISTORY_MODELS:
             category_num = len(corpus.category_dict)
             graph_size = corpus.max_history_num + category_num
             self.user_history_graph = np.zeros((graph_size, graph_size), dtype=np.float32)
@@ -578,7 +588,7 @@ class MIND_DevTest_Dataset(data.Dataset):
         history_index = torch.tensor(behavior[1])
         candidate_news_index = torch.tensor(behavior[3])
         behavior_index = behavior[4]
-        if self.model in {'CNE-SUE', 'CNRCL'}:
+        if self.model in GRAPH_HISTORY_MODELS:
             return behavior[0], self.news_category[history_index], self.news_subCategory[history_index], self.news_title_text[history_index], self.news_title_mask[history_index], self.news_title_entity[history_index], self.news_abstract_text[history_index], self.news_abstract_mask[history_index], self.news_abstract_entity[history_index], behavior[2], self.user_history_graph[behavior_index], self.user_history_category_mask[behavior_index], self.user_history_category_indices[behavior_index], \
                self.news_category[candidate_news_index], self.news_subCategory[candidate_news_index], self.news_title_text[candidate_news_index], self.news_title_mask[candidate_news_index], self.news_title_entity[candidate_news_index], self.news_abstract_text[candidate_news_index], self.news_abstract_mask[candidate_news_index], self.news_abstract_entity[candidate_news_index], history_index, candidate_news_index
         else:
