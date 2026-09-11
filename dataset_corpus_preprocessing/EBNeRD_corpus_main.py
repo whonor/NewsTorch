@@ -661,7 +661,9 @@ class EBNeRD_Corpus:
                             ])
                 elif mode == 'dev':
                     for impression_position, impression in enumerate(impressions_list):
-                        imp_id = self.news_ID_dict[impression.strip()]
+                        # Match test handling of unknown IDs while preserving
+                        # candidate order and alignment with evaluation labels.
+                        imp_id = self.news_ID_dict.get(impression.strip(), 0)
                         self.dev_indices.append(behavior_index)
                         self.dev_behaviors.append([
                             self.user_ID_dict.get(user_ID, 0),

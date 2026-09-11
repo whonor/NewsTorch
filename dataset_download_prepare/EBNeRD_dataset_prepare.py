@@ -95,14 +95,14 @@ def preprocess_ebnerd_demo(size):
 
 
 def main():
-    print("Prepare ebnerd_demo...")
-    preprocess_ebnerd(size="ebnerd_demo")
+    # print("Prepare ebnerd_demo...")
+    # preprocess_ebnerd(size="ebnerd_demo")
+    #
+    # print("Prepare ebnerd_small...")
+    # preprocess_ebnerd(size="ebnerd_small")
 
-    print("Prepare ebnerd_small...")
-    preprocess_ebnerd(size="ebnerd_small")
-
-    # print("Prepare ebnerd_large...")
-    # preprocess_ebnerd(size="ebnerd_large")
+    print("Prepare ebnerd_large...")
+    preprocess_ebnerd(size="ebnerd_large")
 
     print("All datasets are finished.")
 

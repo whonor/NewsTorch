@@ -205,9 +205,9 @@ def _load_behaviors(source_file_path, dst_dir, split="train"):
 
 def main():
     datasets = {
-        'ebnerd_demo': 'https://ebnerd-dataset.s3.eu-west-1.amazonaws.com/ebnerd_demo.zip',
-        'ebnerd_small': 'https://ebnerd-dataset.s3.eu-west-1.amazonaws.com/ebnerd_small.zip',
-        # 'ebnerd_large': 'https://ebnerd-dataset.s3.eu-west-1.amazonaws.com/ebnerd_large.zip',
+        # 'ebnerd_demo': 'https://ebnerd-dataset.s3.eu-west-1.amazonaws.com/ebnerd_demo.zip',
+        # 'ebnerd_small': 'https://ebnerd-dataset.s3.eu-west-1.amazonaws.com/ebnerd_small.zip',
+        'ebnerd_large': 'https://ebnerd-dataset.s3.eu-west-1.amazonaws.com/ebnerd_large.zip',
         # 'Ekstra_Bladet_image_embeddings': 'https://ebnerd-dataset.s3.eu-west-1.amazonaws.com/artifacts/Ekstra_Bladet_image_embeddings.zip'
     }
 

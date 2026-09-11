@@ -122,7 +122,7 @@ class Trainer:
 
         for e in tqdm(range(1, self.epoch + 1)):
             self.train_dataset.negative_sampling()
-            train_dataloader = DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.batch_size // 16, pin_memory=True)
+            train_dataloader = DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.batch_size // 32, pin_memory=True)
             model.train()
             epoch_loss = 0
             for data_batch in tqdm(train_dataloader):
