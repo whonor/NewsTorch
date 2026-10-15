@@ -1,3 +1,14 @@
+# EENR has structured event assets and must evaluate the original, unsampled
+# EB-NeRD candidate lists. Dispatch before legacy imports and their side effects.
+if __name__ == '__main__':
+    import argparse as _argparse
+    _dispatch = _argparse.ArgumentParser(add_help=False, allow_abbrev=False)
+    _dispatch.add_argument('--model', default='')
+    if _dispatch.parse_known_args()[0].model == 'EENR':
+        from scripts.run_eenr import main as _eenr_main
+        _eenr_main()
+        raise SystemExit(0)
+
 import csv
 import os
 import shutil

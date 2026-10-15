@@ -492,3 +492,21 @@ If you use NewsTorch in your research, please cite our work:
   url = {https://github.com/whonor/NewsTorch}
 }
 ```
+
+## EENR reproduction on EB-NeRD small
+
+For the English MIND-small adaptation with an extractor supervised on English
+WikiEvents, see [docs/EENR_MIND.md](docs/EENR_MIND.md) and
+`NewsTorch_EENR_MIND_small.sh`.
+
+The supervised XLM-R–BiLSTM–CRF extractor, DuEE training pipeline, and separate
+neural EENR configuration are documented in [docs/EENR_XLMR.md](docs/EENR_XLMR.md).
+Use `NewsTorch_EENR_XLMR_small.sh` after training its external event extractor.
+
+The full EENR recommendation model is available through
+`general_runner.py --model EENR`. Its Danish event extraction, raw full-candidate
+EB-NeRD adapter, fixed seed-42 training and checkpoint evaluation are documented
+in [docs/EENR.md](docs/EENR.md). Run the sequence with
+`bash NewsTorch_EENR_small.sh`; actual results are recorded in
+[docs/EENR_RESULTS.md](docs/EENR_RESULTS.md). The Danish extractor is an explicitly
+documented adaptation of the original Chinese event extraction stage.

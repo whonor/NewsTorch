@@ -63,7 +63,7 @@ class Config:
 
     def __init__(self):
         parser = argparse.ArgumentParser()
-        parser.add_argument('--model', type=str, default='SentiRec', help='Model name: NRMS, PLM-NR, LSTUR, TANR, DKN, NAML, NPA, FIM, MINS, CENNEWSREC, IPNR, CNE-SUE, LKPNR, SentiDebias, SentiRec, MMRec, CNRCL, CPRS, DREAM, ONCE, S2LENR, PNR-LLM')
+        parser.add_argument('--model', type=str, default='SentiRec', help='Model name: EENR (dedicated raw-data pipeline), NRMS, PLM-NR, LSTUR, TANR, DKN, NAML, NPA, FIM, MINS, CENNEWSREC, IPNR, CNE-SUE, LKPNR, SentiDebias, SentiRec, MMRec, CNRCL, CPRS, DREAM, ONCE, S2LENR, PNR-LLM')
         parser.add_argument('--batch_size', type=int, default='64', help='Batch size for training')
         parser.add_argument('--seed', type=int, default=0, help='Seed')
         parser.add_argument('--epoch', type=int, default=10, help='Epoch for training')
@@ -261,14 +261,14 @@ class Config:
 
         elif dataset_name == 'ebnerd':
             def write_ebnerd_truth(behaviors_path, truth_path):
-                df = pd.read_parquet(behaviors_path)
+                from dataset_corpus_preprocessing.ebnerd_streaming import iter_parquet_frames
                 with open(truth_path, 'w', encoding='utf-8') as truth_f:
-                    for row_ID, row in df.iterrows():
-                        labels = row['labels']
-                        if hasattr(labels, 'tolist'):
-                            labels = labels.tolist()
-                        label_str = str(labels).replace(' ', '')
-                        truth_f.write(('' if row_ID == 0 else '\n') + str(row_ID + 1) + ' ' + label_str)
+                    for frame in iter_parquet_frames(behaviors_path, ['labels']):
+                        for row_ID, labels in zip(frame.index, frame['labels']):
+                            if hasattr(labels, 'tolist'):
+                                labels = labels.tolist()
+                            label_str = str(labels).replace(' ', '')
+                            truth_f.write(('' if row_ID == 0 else '\n') + str(row_ID + 1) + ' ' + label_str)
 
             write_ebnerd_truth(os.path.join(self.dev_root, 'behaviors.parquet'), dev_truth_path)
             write_ebnerd_truth(os.path.join(self.test_root, 'behaviors.parquet'), test_truth_path)

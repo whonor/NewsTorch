@@ -20,6 +20,15 @@ from dataset_corpus_preprocessing.ebnerd_behavior_utils import (
     candidate_scroll_percentage,
     pad_history_read_time,
 )
+from dataset_corpus_preprocessing.ebnerd_streaming import (
+    BEHAVIOR_COLUMNS, NEWS_COLUMNS, BehaviorCache, DiskBehaviors, iter_parquet_frames,
+)
+
+
+def iter_news_rows(path):
+    for frame in iter_parquet_frames(path, NEWS_COLUMNS):
+        for row in frame.itertuples(index=False, name=None):
+            yield dict(zip(frame.columns, row))
 
 def is_number(s):
     try:
@@ -221,21 +230,20 @@ class EBNeRD_Corpus:
             news_category_dict = {}
 
             # 1. user ID dictionary
-            behaviors_df = pd.read_parquet(os.path.join(config.train_root, 'behaviors.parquet'))
-
-            for user_id in behaviors_df['uid'].unique():
-                user_id = str(user_id)
-                if user_id not in user_ID_dict:
-                    user_ID_dict[user_id] = len(user_ID_dict)
+            for frame in iter_parquet_frames(
+                os.path.join(config.train_root, 'behaviors.parquet'), ['uid']
+            ):
+                for user_id in frame['uid'].unique():
+                    user_id = str(user_id)
+                    if user_id not in user_ID_dict:
+                        user_ID_dict[user_id] = len(user_ID_dict)
             with open(user_ID_file, 'w', encoding='utf-8') as user_ID_f:
                 json.dump(user_ID_dict, user_ID_f)
 
             # 2. news ID dictionary & news category dictionary & news subCategory dictionary & sentiment dictionary
             for i, prefix in enumerate([config.train_root, config.dev_root, config.test_root]):
                 news_parquet_file = os.path.join(prefix, 'news.parquet')
-                df_news = pd.read_parquet(news_parquet_file)
-
-                for _, row in df_news.iterrows():
+                for row in iter_news_rows(news_parquet_file):
                     news_ID = str(row['nid']).strip()
                     category = str(row['category']).strip()
                     subCategory = str(row['subcategory']).strip()
@@ -433,6 +441,7 @@ class EBNeRD_Corpus:
         self.config = config
 
         # preprocess cache
+        print('Preparing EB-NeRD dictionaries and news features...', flush=True)
         EBNeRD_Corpus.preprocess(config)
 
         with open('cache/ebnerd/user_ID-%s.json' % config.dataset_size, 'r', encoding='utf-8') as user_ID_f:
@@ -537,19 +546,15 @@ class EBNeRD_Corpus:
         self.abstract_word_num = 0
 
         news_ID_set = set(['<PAD>'])
-        news_records = []
-        for prefix in [config.train_root, config.dev_root, config.test_root]:
-            news_parquet = os.path.join(prefix, 'news.parquet')
-            df_news = pd.read_parquet(news_parquet)
-            for _, row in df_news.iterrows():
-                news_ID = str(row['nid']).strip()
-                if news_ID not in news_ID_set:
-                    news_records.append(row)
-                    news_ID_set.add(news_ID)
+        def unique_news_rows():
+            for prefix in [config.train_root, config.dev_root, config.test_root]:
+                for row in iter_news_rows(os.path.join(prefix, 'news.parquet')):
+                    news_ID = str(row['nid']).strip()
+                    if news_ID not in news_ID_set:
+                        news_ID_set.add(news_ID)
+                        yield row
         
-        assert self.news_num == len(news_ID_set), f'news num mismatch {self.news_num} v.s. {len(news_ID_set)}'
-        
-        for row in news_records:
+        for row in unique_news_rows():
             news_ID = str(row['nid']).strip()
             category = str(row['category']).strip()
             subCategory = str(row['subcategory']).strip()
@@ -604,11 +609,23 @@ class EBNeRD_Corpus:
                 self.news_abstract_mask[index][i] = 1
             self.abstract_word_num += len(words)
 
+        assert self.news_num == len(news_ID_set), f'news num mismatch {self.news_num} v.s. {len(news_ID_set)}'
         self.news_title_mask[0][0] = 1  
         self.news_abstract_mask[0][0] = 1  
 
+        disk_behaviors = config.dataset_size == 'large'
+        if disk_behaviors:
+            # Unique per process: concurrent seed jobs cannot overwrite each other.
+            self._behavior_cache = BehaviorCache('cache/ebnerd')
+            for mode in ('train', 'dev', 'test'):
+                setattr(self, mode + '_behaviors', DiskBehaviors(
+                    self._behavior_cache.name, mode, self.max_history_num,
+                    cache=self._behavior_cache,
+                ))
+
         def process_behavior_df(df, mode='train'):
-            for behavior_index, row in df.iterrows():
+            for behavior_index, values in zip(df.index, df.itertuples(index=False, name=None)):
+                row = dict(zip(df.columns, values))
                 user_ID = str(row['uid'])
                 history = row['history']
                 history_read_time = row.get('history_read_time', [])
@@ -664,7 +681,8 @@ class EBNeRD_Corpus:
                         # Match test handling of unknown IDs while preserving
                         # candidate order and alignment with evaluation labels.
                         imp_id = self.news_ID_dict.get(impression.strip(), 0)
-                        self.dev_indices.append(behavior_index)
+                        if not disk_behaviors:
+                            self.dev_indices.append(behavior_index)
                         self.dev_behaviors.append([
                             self.user_ID_dict.get(user_ID, 0),
                             user_history,
@@ -678,7 +696,8 @@ class EBNeRD_Corpus:
                 elif mode == 'test':
                     for impression_position, impression in enumerate(impressions_list):
                         imp_id = self.news_ID_dict.get(impression.strip(), 0)
-                        self.test_indices.append(behavior_index)
+                        if not disk_behaviors:
+                            self.test_indices.append(behavior_index)
                         self.test_behaviors.append([
                             self.user_ID_dict.get(user_ID, 0),
                             user_history,
@@ -693,13 +712,25 @@ class EBNeRD_Corpus:
         dev_path = os.path.join(config.dev_root, 'behaviors.parquet')
         test_path = os.path.join(config.test_root, 'behaviors.parquet')
 
-        train_df = pd.read_parquet(train_path)
-        dev_df = pd.read_parquet(dev_path)
-        test_df = pd.read_parquet(test_path)
+        for mode, path in [('train', train_path), ('dev', dev_path), ('test', test_path)]:
+            print(f'Loading EB-NeRD {mode} behaviors in batches...', flush=True)
+            loaded_rows = 0
+            for frame in iter_parquet_frames(path, BEHAVIOR_COLUMNS):
+                process_behavior_df(frame, mode)
+                previous_rows = loaded_rows
+                loaded_rows += len(frame)
+                if disk_behaviors and loaded_rows // 1_000_000 > previous_rows // 1_000_000:
+                    print(f'Processed {loaded_rows:,} {mode} impressions...', flush=True)
+            if disk_behaviors:
+                behaviors = getattr(self, mode + '_behaviors').finalize()
+                if mode != 'train':
+                    setattr(self, mode + '_indices', behaviors.indices)
+            print(f'Loaded {len(getattr(self, mode + "_behaviors"))} {mode} samples.', flush=True)
 
-        process_behavior_df(train_df, 'train')
-        process_behavior_df(dev_df, 'dev')
-        process_behavior_df(test_df, 'test')
+        # Popularity features are consumed by TCCM only. Avoid scanning every
+        # training candidate and token for NRMS and other models.
+        if config.model != 'TCCM':
+            return
         
         # Compute word and entity popularity (CTR) for TCCM
         word_clicks = collections.defaultdict(float)
@@ -774,15 +805,25 @@ class Ebnerd_Train_Dataset(data.Dataset):
         self.user_history_category_mask = corpus.train_user_history_category_mask
         self.user_history_category_indices = corpus.train_user_history_category_indices
         self.train_behaviors = corpus.train_behaviors
-        self.train_samples = [[0 for _ in range(1 + self.negative_sample_num)] for __ in range(len(self.train_behaviors))]
+        sample_shape = (len(self.train_behaviors), 1 + self.negative_sample_num)
+        if isinstance(self.train_behaviors, DiskBehaviors) and sample_shape[0]:
+            self.train_samples = np.memmap(
+                self.train_behaviors.paths[1] + '.sampled', dtype=np.int32,
+                mode='w+', shape=sample_shape,
+            )
+            self.train_behaviors.cache.track(self.train_samples)
+        else:
+            self.train_samples = np.zeros(sample_shape, dtype=np.int32)
         self.num = len(self.train_behaviors)
 
     def negative_sampling(self, rank=None):
         print('\n%sBegin negative sampling, training sample num : %d' % ('' if rank is None else ('rank ' + str(rank) + ' : '), self.num))
         start_time = time.time()
-        for i, train_behavior in enumerate(self.train_behaviors):
-            self.train_samples[i][0] = train_behavior[3]
-            negative_samples = train_behavior[4]
+        candidates = (self.train_behaviors.training_candidates()
+                      if isinstance(self.train_behaviors, DiskBehaviors)
+                      else ((row[3], row[4]) for row in self.train_behaviors))
+        for i, (positive, negative_samples) in enumerate(candidates):
+            self.train_samples[i][0] = positive
             news_num = len(negative_samples)
             if news_num <= self.negative_sample_num:
                 for j in range(self.negative_sample_num):

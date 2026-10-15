@@ -1,23 +1,17 @@
-from .CenNewsRec import CenNewsRec
-from .CNE_SUE import CNE_SUE
-from .CNRCL import CNRCL
-from .CPRS import CPRS
-from .DKN import DKN
-from .FIM import FIM
-from .IPNR import IPNR
-from .LKPNR import LKPNR
-from .LSTUR import LSTUR
-from .MINS import MINS
-from .MMRec import MMRec
-from .NAML import NAML
-from .NPA import NPA
-from .NRMS import NRMS
-from .PLM_NR import PLM_NR
-from .ONCE_DIRE_LLAMA1_NAML import ONCE_DIRE_LLAMA1_NAML
-from .ONCE_DIRE_QWEN3_NAML import ONCE_DIRE_QWEN3_NAML
-from .PNR_LLM import PNR_LLM
-from .S2LENR import S2LENR
-from .SentiDebias import SentiDebias
-from .SentiRec import SentiRec
-from .TANR import TANR
-from .TCCM import TCCM
+"""NewsTorch model exports, loaded on demand to isolate optional dependencies."""
+from importlib import import_module
+
+__all__ = [
+    'CenNewsRec', 'CNE_SUE', 'CNRCL', 'CPRS', 'DKN', 'EENR', 'FIM', 'IPNR',
+    'LKPNR', 'LSTUR', 'MINS', 'MMRec', 'NAML', 'NPA', 'NRMS', 'PLM_NR',
+    'ONCE_DIRE_LLAMA1_NAML', 'ONCE_DIRE_QWEN3_NAML', 'PNR_LLM', 'S2LENR',
+    'SentiDebias', 'SentiRec', 'TANR', 'TCCM',
+]
+
+
+def __getattr__(name):
+    if name not in __all__:
+        raise AttributeError(name)
+    value = getattr(import_module(f'{__name__}.{name}'), name)
+    globals()[name] = value
+    return value

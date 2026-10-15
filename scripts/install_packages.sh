@@ -9,5 +9,7 @@
 #!/bin/bash
 pip install torch==2.4.0 torchvision==0.19.0 torchaudio==2.4.0 --index-url https://download.pytorch.org/whl/cu124
 pip install torchtext==0.17.0 torchmetrics==1.5.2 transformers==4.57.6 peft==0.12.0 wandb==0.21.0 scikit-learn==1.0.2 pandas==2.0.3 scipy==1.10.1 openai==1.88.0 nltk==3.7 networkx==3.1 retrying==1.4.1 polars matplotlib sentencepiece ultralytics-thop optuna
+# EB-NeRD uses projected Parquet batches to avoid full-table memory spikes.
+pip install pyarrow
 pip install --no-index torch-sparse -f https://pytorch-geometric.com/whl/torch-2.4.0+cu124.html
 pip install --no-index torch-scatter -f https://pytorch-geometric.com/whl/torch-2.4.0+cu124.html
