@@ -596,7 +596,9 @@ def _engagement_confidence(read_time, scroll_percentage, read_time_scale):
 
 
 def _build_sub_scores(indices, scores, candidate_news_indices=None, candidate_read_times=None, candidate_scroll_percentages=None):
-    if not indices:
+    # EB-NeRD large supplies a NumPy memmap view; array truth values are
+    # ambiguous (and a single impression index of zero is still nonempty).
+    if len(indices) == 0:
         return []
 
     sub_scores = [[] for _ in range(indices[-1] + 1)]
