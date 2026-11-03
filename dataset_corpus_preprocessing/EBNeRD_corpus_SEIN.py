@@ -11,6 +11,7 @@ from dataset_corpus_preprocessing.EBNeRD_corpus_main import (
     Ebnerd_Train_Dataset as BaseEbnerd_Train_Dataset,
 )
 from dataset_corpus_preprocessing.ebnerd_behavior_utils import as_list
+from dataset_corpus_preprocessing.ebnerd_streaming import DiskBehaviors
 
 
 def _safe_timestamp(value):
@@ -178,6 +179,17 @@ class EBNeRD_Corpus(BaseEBNeRD_Corpus):
 
     @staticmethod
     def _append_stage_ids(behaviors, split_stage_ids):
+        if isinstance(behaviors, DiskBehaviors):
+            # DiskBehaviors reconstructs each row on access; appending to that
+            # temporary list does not update the store. Keep one lookup per
+            # impression and append the matching stages when a row is read.
+            if len(behaviors) and (
+                behaviors.indices.min() < 0
+                or behaviors.indices.max() >= len(split_stage_ids)
+            ):
+                raise ValueError("SEIN history stage cache is incompatible with the prepared behaviors")
+            behaviors.sein_history_stage_ids = split_stage_ids
+            return
         for behavior in behaviors:
             behavior_index_value = behavior[5] if isinstance(behavior[4], (list, tuple, np.ndarray)) else behavior[4]
             behavior_index = int(behavior_index_value)

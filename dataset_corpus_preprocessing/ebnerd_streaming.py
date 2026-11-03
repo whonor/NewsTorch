@@ -1,9 +1,11 @@
 """Bounded-memory Parquet reads and disk-backed EB-NeRD behavior sequences."""
 
+import errno
 import os
 import shutil
 import tempfile
 import weakref
+import warnings
 from collections.abc import Sequence
 
 import numpy as np
@@ -40,13 +42,29 @@ NEWS_COLUMNS = (
 )
 
 
-def _cleanup_maps(directory, mappings):
+def _cleanup_maps(directory, mappings, owner_pid):
+    # Forked DataLoader workers inherit the finalizer and mappings, but only
+    # the creating process owns the shared cache directory.
+    if os.getpid() != owner_pid:
+        return
     # NFS keeps an unlinked but still-open file as .nfs*, preventing rmdir.
     # Close mappings before unlinking their files, including at interpreter exit.
     for array in mappings:
         array._mmap.close()
     mappings.clear()
-    shutil.rmtree(directory)
+    try:
+        shutil.rmtree(directory)
+    except FileNotFoundError:
+        pass
+    except OSError as error:
+        # A worker can still hold a mapping during exceptional shutdown. NFS
+        # retains its unlinked file until that worker exits; report the leftover
+        # cache without replacing the original training error with a traceback.
+        if error.errno != errno.ENOTEMPTY or not all(
+            name.startswith('.nfs') for name in os.listdir(directory)
+        ):
+            raise
+        warnings.warn(f"Cache cleanup deferred while NFS mappings are open: {directory}")
 
 
 class BehaviorCache:
@@ -55,7 +73,7 @@ class BehaviorCache:
     def __init__(self, parent):
         self.name = tempfile.mkdtemp(prefix='behaviors-large-', dir=os.path.abspath(parent))
         self._mappings = []
-        self._finalizer = weakref.finalize(self, _cleanup_maps, self.name, self._mappings)
+        self._finalizer = weakref.finalize(self, _cleanup_maps, self.name, self._mappings, os.getpid())
 
     def track(self, array):
         if isinstance(array, np.memmap):
@@ -154,4 +172,6 @@ class DiskBehaviors(Sequence):
             row.append(self.negatives[start:start + int(context['negative_count'])])
         row.extend([int(sample['behavior']), context['read_time'],
                     float(sample['read_time']), float(sample['scroll'])])
+        if hasattr(self, 'sein_history_stage_ids'):
+            row.append(self.sein_history_stage_ids[int(sample['behavior'])])
         return row

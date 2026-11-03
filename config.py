@@ -63,7 +63,7 @@ class Config:
 
     def __init__(self):
         parser = argparse.ArgumentParser()
-        parser.add_argument('--model', type=str, default='SentiRec', help='Model name: EENR (dedicated raw-data pipeline), NRMS, PLM-NR, LSTUR, TANR, DKN, NAML, NPA, FIM, MINS, CENNEWSREC, IPNR, CNE-SUE, LKPNR, SentiDebias, SentiRec, MMRec, CNRCL, CPRS, DREAM, ONCE, S2LENR, PNR-LLM')
+        parser.add_argument('--model', type=str, default='SentiRec', help='Model name: NRMS, PLM-NR, LSTUR, TANR, DKN, NAML, NPA, FIM, MINS, CENNEWSREC, IPNR, CNE-SUE, LKPNR, SentiDebias, SentiRec, MMRec, CNRCL, CPRS, DREAM, ONCE, S2LENR, PNR-LLM')
         parser.add_argument('--batch_size', type=int, default='64', help='Batch size for training')
         parser.add_argument('--seed', type=int, default=0, help='Seed')
         parser.add_argument('--epoch', type=int, default=10, help='Epoch for training')
@@ -71,8 +71,8 @@ class Config:
         parser.add_argument('--DATASET_ROOT', type=str, default='ebnerd_demo', help='Dataset directory, for example ebnerd_demo, MIND-small, or Adressa-1week')
         parser.add_argument('--dataset_name', type=str, default='ebnerd', help='Dataset adapter: MIND, ebnerd, Adressa, or gossipcop')
         parser.add_argument('--dataset_size', type=str, default='demo', help='Dataset variant, can be small, large, or demo, if submit the predictions submission')
-        parser.add_argument('--images_path', type=str, default='downloaded_images_ebnerd_small',
-                            help='downloaded_images for demo or small')
+        parser.add_argument('--images_path', type=str, default='downloaded_images_ebnerd_large',
+                            help='downloaded_images for demo, small or large')
         parser.add_argument('--word_embedding_dim', type=int, default=0, help='Embedding size; defaults to 1024 for EB-NeRD and 300 otherwise')
         parser.add_argument('--adressa_raw_dir', type=str, default='', help='Directory containing the licensed Adressa JSON/JSONL files')
         parser.add_argument('--adressa_eval_negative_num', type=int, default=20, help='Sampled negatives per Adressa click')
