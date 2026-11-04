@@ -1,0 +1,35 @@
+study: table_encoder_composition
+dataset: {root: MIND-small, name: MIND, size: small}
+seeds: [0, 1, 2, 3, 4]
+sequence_lengths: {title: 32, abstract: 128, history: 50}
+training:
+  batch_size: 64
+  max_epochs: 10
+  negative_sample_num: 4
+  optimizer: Adam
+  learning_rate: 0.0001
+  weight_decay: 0.0
+  gradient_clip_norm: 4.0
+  dropout_rate: 0.2
+  early_stopping_patience: 5
+  early_stopping_min_delta: 0.0
+  stopping_metric: avg
+  num_workers: 0
+  deterministic: true
+  strategy: standard
+  contrastive_weight: 1.0
+model_settings:
+  gcn_layer_num: 4
+  gcn_layer_norm: false
+  no_gcn_residual: false
+  hidden_dim: 200
+  attention_dim: 200
+  category_embedding_dim: 50
+  subCategory_embedding_dim: 50
+  head_num: 20
+  head_dim: 20
+  cnn_method: naive
+  cnn_kernel_num: 400
+  cnn_window_size: 3
+  long_term_masking_probability: 0.1
+  sota_composition_dim: 900
