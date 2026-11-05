@@ -279,3 +279,16 @@ models/__pycache__/SEIN.cpython-39.pyc
 /experiments/cne_sue_composition/
 /experiments/extensibility/
 /experiments/faithful_reproduction/
+experiments/sota_composition/__pycache__/__init__.cpython-39.pyc
+experiments/sota_composition/__pycache__/evaluation.cpython-39.pyc
+experiments/table_composition/__pycache__/components.cpython-39.pyc
+models/__pycache__/ONCE_DIRE_LLAMA1_NAML.cpython-39.pyc
+models/__pycache__/ONCE_DIRE_QWEN3_NAML.cpython-39.pyc
+models/__pycache__/PLM_NR.cpython-39.pyc
+models/__pycache__/PNR_LLM.cpython-39.pyc
+models/__pycache__/S2LENR.cpython-39.pyc
+models/__pycache__/SOTAComposition.cpython-39.pyc
+models/modules/__pycache__/plm_nr.cpython-39.pyc
+utils/__pycache__/_transformers_compat.cpython-39.pyc
+experiments/table_composition/train.slurm
+experiments/table_composition/train.slurm
