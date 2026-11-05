@@ -1,0 +1,107 @@
+schema_version: 1
+study: strong_backbone_composition
+dataset:
+  root: MIND-small
+  name: MIND
+  size: small
+
+# Paired seeds: every variant with a given seed is assigned to the same SLURM
+# partition so hardware is not a within-seed comparison variable.
+seeds: [0, 1, 2, 3, 4]
+
+sequence_lengths:
+  title: 32
+  abstract: 128
+  history: 50
+
+training:
+  batch_size: 64
+  max_epochs: 10
+  negative_sample_num: 4
+  optimizer: Adam
+  learning_rate: 0.0001
+  weight_decay: 0.0
+  gradient_clip_norm: 4.0
+  dropout_rate: 0.2
+  early_stopping_patience: 5
+  early_stopping_min_delta: 0.0
+  stopping_metric: avg
+  num_workers: 0
+  deterministic: true
+  strategy: cnrcl
+  contrastive_weight: 1.0
+
+assets:
+  once_hidden_cache: cache/once_dire_qwen3_naml/MIND-small/qwen3_0.6b/hidden_layer_26_maxlen_64_float16.npy
+  once_mask_cache: cache/once_dire_qwen3_naml/MIND-small/qwen3_0.6b/mask_layer_26_maxlen_64.npy
+  once_manifest: cache/once_dire_qwen3_naml/MIND-small/qwen3_0.6b/done_layer_26_maxlen_64_float16.json
+  llm_embedding: artifacts/sota_composition/assets/once_qwen3_0.6b_mean.npy
+  similar_news: artifacts/sota_composition/assets/similar_news.npy
+  asset_manifest: artifacts/sota_composition/assets/manifest.json
+
+compositions:
+  - id: B0
+    research_question: backbone
+    news_encoder: cnrcl
+    user_encoder: cnrcl
+    enhancement: none
+    training: cnrcl
+    special_modules: []
+    previously_unregistered: false
+  - id: B1
+    research_question: controlled_substitution
+    news_encoder: nrms
+    user_encoder: cnrcl
+    enhancement: none
+    training: cnrcl
+    special_modules: []
+    previously_unregistered: true
+  - id: B2
+    research_question: controlled_substitution
+    news_encoder: naml
+    user_encoder: cnrcl
+    enhancement: none
+    training: cnrcl
+    special_modules: []
+    previously_unregistered: true
+  - id: B3
+    research_question: cross_paradigm
+    news_encoder: once-qwen3
+    user_encoder: cnrcl
+    enhancement: none
+    training: cnrcl
+    special_modules: []
+    previously_unregistered: true
+  - id: B4
+    research_question: controlled_substitution
+    news_encoder: cnrcl
+    user_encoder: nrms
+    enhancement: none
+    training: cnrcl
+    special_modules: []
+    previously_unregistered: true
+  - id: B5
+    research_question: cross_paradigm
+    news_encoder: cnrcl
+    user_encoder: sein
+    enhancement: none
+    training: cnrcl
+    special_modules: [sein-temporal-graph]
+    previously_unregistered: true
+  - id: B6
+    research_question: deep_composition
+    news_encoder: once-qwen3
+    user_encoder: sein
+    enhancement: none
+    training: cnrcl
+    special_modules: [sein-temporal-graph]
+    previously_unregistered: true
+  - id: B7
+    research_question: deep_composition
+    news_encoder: cnrcl
+    user_encoder: cnrcl
+    enhancement: llm-augmentation
+    training: cnrcl
+    special_modules: []
+    previously_unregistered: true
+

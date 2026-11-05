@@ -273,3 +273,9 @@ NewsTorch_SEIN_seeds.sh
 dataset_corpus_preprocessing/__pycache__/EBNeRD_corpus_main.cpython-312.pyc
 dataset_corpus_preprocessing/__pycache__/EBNeRD_corpus_SEIN.cpython-39.pyc
 models/__pycache__/SEIN.cpython-39.pyc
+/experiments/cne_sue_composition/
+/experiments/extensibility/
+/experiments/faithful_reproduction/
+/experiments/cne_sue_composition/
+/experiments/extensibility/
+/experiments/faithful_reproduction/
